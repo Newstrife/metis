@@ -11,6 +11,10 @@ module Agent
     # reframed through PiAgent::Framer (strict-LF JSONL) before parsing.
     class E2bTransport
       CLOSE_TIMEOUT = 5
+      # Lifetime cap for the pi process. The e2b SDK derives the stdout
+      # stream's HTTP timeout from this, so it must comfortably exceed the
+      # longest turn — otherwise a slow LLM call silently kills the stream.
+      COMMAND_TIMEOUT = 3600
 
       # `command` is the full pi command line (a String — E2B runs it via
       # bash -lc). `on_message`/`on_stderr` are pi-agent-rb's handlers.
@@ -28,7 +32,9 @@ module Agent
       def start
         # stdin: true is mandatory — without it E2B never opens the pipe
         # and send_stdin is a silent no-op.
-        @handle = @sandbox.commands.run(@command, background: true, stdin: true, cwd: @cwd&.to_s)
+        @handle = @sandbox.commands.run(
+          @command, background: true, stdin: true, cwd: @cwd&.to_s, timeout: COMMAND_TIMEOUT
+        )
         @reader = Thread.new { read_loop }
         self
       end
@@ -63,10 +69,13 @@ module Agent
         err_framer = PiAgent::Framer.new
         @handle.each do |stdout, stderr, _pty|
           out_framer.feed(stdout) { |line| dispatch_message(line) } if stdout
-          err_framer.feed(stderr) { |line| @on_stderr&.call(line) } if stderr
+          err_framer.feed(stderr) { |line| dispatch_stderr(line) } if stderr
         end
-      rescue E2B::E2BError => e
-        @on_stderr&.call("[metis] E2B stream error: #{e.message}")
+      rescue StandardError => e
+        # Once the reader stops, pi's responses can no longer arrive and
+        # every pending RPC will hang to its timeout. Log loudly rather
+        # than dying as a silent thread death.
+        Rails.logger.error("[e2b] pi stdout reader stopped: #{e.class}: #{e.message}")
       ensure
         @finished = true
       end
@@ -74,7 +83,14 @@ module Agent
       def dispatch_message(line)
         @on_message&.call(JSON.parse(line))
       rescue JSON::ParserError => e
-        @on_stderr&.call("[metis] invalid JSON from pi: #{e.message}: #{line.inspect}")
+        Rails.logger.warn("[e2b] non-JSON line from pi: #{e.message}: #{line.inspect}")
+      end
+
+      # pi's stderr is otherwise invisible — the runtime is a remote
+      # microVM and pi-agent-rb's default stderr handler is a no-op.
+      def dispatch_stderr(line)
+        Rails.logger.warn("[e2b pi stderr] #{line}")
+        @on_stderr&.call(line)
       end
 
       def kill_command
