@@ -21,7 +21,7 @@ gem "tailwindcss-rails"
 gem "devise"
 
 # Ruby client for the pi coding agent (drives `pi --mode rpc`)
-gem "pi-agent-rb", path: "../pi-agent-rb"
+gem "pi-agent-rb", path: "../pi-agent-rb", require: "pi_agent"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
