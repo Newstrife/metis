@@ -3,8 +3,11 @@ require "test_helper"
 class ChatJobTest < ActiveSupport::TestCase
   # Fake adapter that replays a canned Agent::UiEvent stream.
   class FakeAdapter
-    def initialize(events)
+    attr_reader :native_session_id
+
+    def initialize(events, native_session_id: nil)
       @events = events
+      @native_session_id = native_session_id
     end
 
     def stream(_input)
@@ -28,8 +31,8 @@ class ChatJobTest < ActiveSupport::TestCase
     Agent::Adapters.define_singleton_method(:for, original)
   end
 
-  def run_with(events)
-    with_adapter(FakeAdapter.new(events)) do
+  def run_with(events, native_session_id: nil)
+    with_adapter(FakeAdapter.new(events, native_session_id: native_session_id)) do
       ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
     end
   end
@@ -56,6 +59,19 @@ class ChatJobTest < ActiveSupport::TestCase
              ])
 
     assert @assistant_message.reload.errored?
+  end
+
+  test "persists pi's session id to the conversation" do
+    run_with([ Agent::UiEvent.new(:text_delta, data: { delta: "hi" }),
+              Agent::UiEvent.new(:turn_finished) ],
+             native_session_id: "sess-xyz")
+
+    assert_equal "sess-xyz", @conversation.reload.backend_session_id
+  end
+
+  test "leaves backend_session_id unset when the adapter reports none" do
+    run_with([ Agent::UiEvent.new(:turn_finished) ])
+    assert_nil @conversation.reload.backend_session_id
   end
 
   test "touches the conversation after a successful run" do

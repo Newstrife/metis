@@ -35,7 +35,16 @@ class ChatJob < ApplicationJob
       content: buffer,
       streaming_status: errored ? :errored : :done
     )
+    persist_session_id(conversation, adapter)
     conversation.touch
+  end
+
+  # Record pi's session id so the next message resumes the same session.
+  def persist_session_id(conversation, adapter)
+    session_id = adapter.native_session_id
+    return if session_id.blank? || session_id == conversation.backend_session_id
+
+    conversation.update_column(:backend_session_id, session_id)
   end
 
   def fail_message(assistant_message, broadcaster, message)

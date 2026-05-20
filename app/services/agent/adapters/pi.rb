@@ -1,25 +1,41 @@
+require "fileutils"
+
 module Agent
   module Adapters
     # Drives the pi backend via pi-agent-rb (`pi --mode rpc`) and
     # translates pi's native event stream into Agent::UiEvent objects.
     #
-    # `session:` may be injected for testing; production builds one from
-    # `session_options:` (passed through to PiAgent.session).
+    # Continuity: each conversation gets a dedicated pi session directory.
+    # The first run creates a session; later runs pass --continue so pi
+    # reloads its own history. pi's session id is captured after each run
+    # and persisted on Conversation#backend_session_id.
+    #
+    # Credentials: --provider/--model come from conversation.settings;
+    # --api-key from the owner's stored ApiKey for that provider. When
+    # unset, pi falls back to its own configuration.
+    #
+    # `session:` may be injected for testing.
     class Pi < Base
-      def initialize(conversation:, session: nil, session_options: {}, **opts)
+      SESSION_ROOT = Rails.root.join("tmp/pi_sessions")
+
+      def initialize(conversation:, session: nil, **opts)
         super(conversation: conversation, **opts)
         @injected_session = session
-        @session_options = session_options
         @session = nil
+        @native_session_id = nil
       end
+
+      attr_reader :native_session_id
 
       def stream(input, &block)
         return enum_for(:stream, input) unless block
 
-        active_session.prompt(input) do |pi_event|
+        session = active_session
+        session.prompt(input) do |pi_event|
           ui_event = translate(pi_event)
           block.call(ui_event) if ui_event
         end
+        @native_session_id = capture_session_id(session)
       ensure
         close_session
       end
@@ -59,7 +75,52 @@ module Agent
         end
       end
 
+      # pi CLI arguments for this conversation's run.
+      def pi_args
+        [ "--mode", "rpc", "--session-dir", session_dir.to_s, *resume_args, *credential_args ]
+      end
+
       private
+
+      def resume_args
+        conversation.backend_session_id.present? ? [ "--continue" ] : []
+      end
+
+      def credential_args
+        settings = conversation.settings || {}
+        args = []
+        args += [ "--model", settings["model"] ] if settings["model"].present?
+
+        provider = settings["provider"]
+        if provider.present?
+          args += [ "--provider", provider ]
+          key = conversation.user.api_key_for(provider)
+          args += [ "--api-key", key ] if key.present?
+        end
+        args
+      end
+
+      def session_dir
+        SESSION_ROOT.join(conversation.id.to_s)
+      end
+
+      def active_session
+        @session ||= @injected_session || begin
+          FileUtils.mkdir_p(session_dir)
+          PiAgent.session(args: pi_args)
+        end
+      end
+
+      def capture_session_id(session)
+        session.session_stats["sessionId"]
+      rescue StandardError
+        nil
+      end
+
+      def close_session
+        @session&.close
+        @session = nil
+      end
 
       def translate_update(event)
         case event.raw.dig("assistantMessageEvent", "type")
@@ -71,15 +132,6 @@ module Agent
 
       def ui(type, pi_event, **data)
         Agent::UiEvent.new(type, data: data.compact, native_ref: pi_event.raw)
-      end
-
-      def active_session
-        @session ||= @injected_session || PiAgent.session(**@session_options)
-      end
-
-      def close_session
-        @session&.close
-        @session = nil
       end
 
       def message_id(event)

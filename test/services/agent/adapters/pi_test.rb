@@ -11,18 +11,22 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
     $stdin.each_line do |line|
       msg = JSON.parse(line)
-      next unless msg["type"] == "prompt"
-
-      emit({ "id" => msg["id"], "type" => "response", "command" => "prompt", "success" => true })
-      emit({ "type" => "agent_start" })
-      emit({ "type" => "message_start", "message" => { "id" => "m1", "role" => "assistant" } })
-      emit({ "type" => "message_update", "message" => { "id" => "m1" },
-             "assistantMessageEvent" => { "type" => "text_delta", "delta" => "Hi" } })
-      emit({ "type" => "message_update", "message" => { "id" => "m1" },
-             "assistantMessageEvent" => { "type" => "text_delta", "delta" => " there" } })
-      emit({ "type" => "message_end", "message" => { "id" => "m1", "content" => "Hi there" } })
-      emit({ "type" => "turn_end" })
-      emit({ "type" => "agent_end", "messages" => [] })
+      case msg["type"]
+      when "prompt"
+        emit({ "id" => msg["id"], "type" => "response", "command" => "prompt", "success" => true })
+        emit({ "type" => "agent_start" })
+        emit({ "type" => "message_start", "message" => { "id" => "m1", "role" => "assistant" } })
+        emit({ "type" => "message_update", "message" => { "id" => "m1" },
+               "assistantMessageEvent" => { "type" => "text_delta", "delta" => "Hi" } })
+        emit({ "type" => "message_update", "message" => { "id" => "m1" },
+               "assistantMessageEvent" => { "type" => "text_delta", "delta" => " there" } })
+        emit({ "type" => "message_end", "message" => { "id" => "m1", "content" => "Hi there" } })
+        emit({ "type" => "turn_end" })
+        emit({ "type" => "agent_end", "messages" => [] })
+      when "get_session_stats"
+        emit({ "id" => msg["id"], "type" => "response", "command" => "get_session_stats",
+               "success" => true, "data" => { "sessionId" => "stub-session-1" } })
+      end
     end
   RUBY
 
@@ -32,6 +36,11 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
   def pi_event(hash)
     PiAgent::Event.new(hash)
+  end
+
+  def create_conversation(**attrs)
+    user = User.create!(email: "pi-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    user.conversations.create!({ backend: :pi }.merge(attrs))
   end
 
   # --- translation ---------------------------------------------------
@@ -138,5 +147,58 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_equal "Hi", events[1][:delta]
     assert_equal " there", events[2][:delta]
     assert events.last.terminal?
+  end
+
+  test "stream captures pi's session id" do
+    client = PiAgent::Client.new(bin: "ruby", args: [ "-e", PROMPT_STUB ])
+    session = PiAgent::Session.new(client.start)
+    streaming_adapter = Agent::Adapters::Pi.new(conversation: Conversation.new(backend: :pi), session: session)
+
+    streaming_adapter.stream("hi") { |_event| nil }
+
+    assert_equal "stub-session-1", streaming_adapter.native_session_id
+  end
+
+  # --- argument building ---------------------------------------------
+
+  test "pi_args points at a per-conversation session directory" do
+    conversation = create_conversation
+    args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+
+    assert_includes args, "--mode"
+    assert_includes args, "rpc"
+    dir = args[args.index("--session-dir") + 1]
+    assert_match %r{tmp/pi_sessions/#{conversation.id}\z}, dir
+  end
+
+  test "pi_args omits --continue for a fresh conversation" do
+    args = Agent::Adapters::Pi.new(conversation: create_conversation).pi_args
+    refute_includes args, "--continue"
+  end
+
+  test "pi_args includes --continue once a pi session exists" do
+    conversation = create_conversation(backend_session_id: "sess-abc")
+    args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+    assert_includes args, "--continue"
+  end
+
+  test "pi_args carries credential flags from settings and the stored key" do
+    conversation = create_conversation(
+      settings: { "model" => "anthropic/claude-sonnet-4-5", "provider" => "anthropic" }
+    )
+    conversation.user.api_keys.create!(provider: "anthropic", key: "sk-test")
+    args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+
+    assert_equal "anthropic/claude-sonnet-4-5", args[args.index("--model") + 1]
+    assert_equal "anthropic", args[args.index("--provider") + 1]
+    assert_equal "sk-test", args[args.index("--api-key") + 1]
+  end
+
+  test "pi_args omits --api-key when no key is stored for the provider" do
+    conversation = create_conversation(settings: { "provider" => "anthropic" })
+    args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+
+    assert_includes args, "--provider"
+    refute_includes args, "--api-key"
   end
 end
