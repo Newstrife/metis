@@ -39,6 +39,7 @@ class ChatJob < ApplicationJob
     )
     persist_session_id(conversation, adapter)
     persist_context_usage(conversation, adapter)
+    persist_agent_model(conversation, adapter)
     conversation.touch
     broadcaster.refresh_usage
   end
@@ -75,6 +76,15 @@ class ChatJob < ApplicationJob
     return if usage.blank?
 
     conversation.update_column(:context_usage, usage)
+  end
+
+  # Store the model pi resolved for the conversation (it can change if a
+  # model is switched mid-conversation).
+  def persist_agent_model(conversation, adapter)
+    model = adapter.model_info
+    return if model.blank? || model == conversation.agent_model
+
+    conversation.update_column(:agent_model, model)
   end
 
   def fail_message(assistant_message, broadcaster, message)

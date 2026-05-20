@@ -10,7 +10,8 @@ namespace :e2b do
                             .from_node_image
                             .npm_install(pi_package, g: true)
 
-    info = E2B::Template.build(template, name: name, on_build_logs: ->(line) { puts line })
+    # tags must be a non-null array — the E2B v3 build API rejects null.
+    info = E2B::Template.build(template, name: name, tags: [], on_build_logs: ->(line) { puts line })
 
     puts
     puts "Built E2B template '#{name}' (template_id: #{info.template_id})."

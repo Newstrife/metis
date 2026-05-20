@@ -43,6 +43,12 @@ module Agent
       def context_usage
         nil
       end
+
+      # The model the backend resolved for the last run — a hash with
+      # "id"/"name"/"provider" keys, or nil.
+      def model_info
+        nil
+      end
     end
   end
 end

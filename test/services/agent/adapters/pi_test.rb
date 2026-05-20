@@ -30,6 +30,12 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
                  "tokens" => { "input" => 120, "output" => 45, "cacheRead" => 30 },
                  "contextUsage" => { "tokens" => 195, "contextWindow" => 272000, "percent" => 0.07 }
                } })
+      when "get_state"
+        emit({ "id" => msg["id"], "type" => "response", "command" => "get_state",
+               "success" => true, "data" => {
+                 "model" => { "id" => "gpt-5.5", "name" => "GPT-5.5",
+                              "provider" => "openai-codex", "contextWindow" => 272000 }
+               } })
       end
     end
   RUBY
@@ -199,9 +205,18 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_equal 272000, adapter.context_usage["contextWindow"]
   end
 
-  test "token_totals and context_usage are nil before a run" do
+  test "stream captures the resolved model from pi state" do
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.stream("hi") { |_event| nil }
+
+    assert_equal({ "id" => "gpt-5.5", "name" => "GPT-5.5", "provider" => "openai-codex" },
+                 adapter.model_info)
+  end
+
+  test "token_totals, context_usage, and model_info are nil before a run" do
     assert_nil adapter.token_totals
     assert_nil adapter.context_usage
+    assert_nil adapter.model_info
   end
 
   # --- argument building ---------------------------------------------

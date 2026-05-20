@@ -28,6 +28,7 @@ module Agent
         @runtime = runtime || Agent::Runtime.for(conversation)
         @session = nil
         @session_stats = nil
+        @model_info = nil
       end
 
       def stream(input, images: [], files: [], &block)
@@ -40,15 +41,18 @@ module Agent
             block.call(ui_event) if ui_event
           end
           @session_stats = capture_stats(session)
+          @model_info = capture_model(session)
         end
       ensure
         @session = nil
       end
 
-      # pi's session_stats, captured after the last run (see #stream).
+      # Captured after the last run (see #stream). session_stats carries
+      # token/context numbers; model identity comes from get_state.
       def native_session_id = @session_stats&.dig("sessionId")
       def token_totals = @session_stats&.dig("tokens")
       def context_usage = @session_stats&.dig("contextUsage")
+      def model_info = @model_info
 
       def abort
         @session&.abort
@@ -135,6 +139,14 @@ module Agent
       # Never raised — stats are reporting, not the turn itself.
       def capture_stats(session)
         session.session_stats
+      rescue StandardError
+        nil
+      end
+
+      # The model pi resolved for the run, slimmed to id/name/provider.
+      # Reporting only, so failures never raise.
+      def capture_model(session)
+        session.get_state.dig("data", "model")&.slice("id", "name", "provider")
       rescue StandardError
         nil
       end

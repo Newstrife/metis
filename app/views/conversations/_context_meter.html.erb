@@ -1,18 +1,24 @@
-<%# Latest pi context-window usage for the conversation. The element id
-    is stable so ChatJob can repaint it after each turn. %>
-<% usage = conversation.context_usage.presence || {} %>
+<%# The model pi resolved + its context-window usage. The element id is
+    stable so ChatJob can repaint it after each turn. %>
+<% model = conversation.agent_model %>
+<% usage = conversation.context_usage %>
 <% window = usage["contextWindow"].to_i %>
-<div id="<%= dom_id(conversation, :context) %>">
-  <% if window.positive? %>
-    <% percent = usage["percent"].to_f.clamp(0, 100) %>
-    <div class="flex items-center gap-2 text-xs text-gray-400" title="Context window used">
-      <span class="tabular-nums">
+<% if model["name"].present? || window.positive? %>
+  <div id="<%= dom_id(conversation, :context) %>" class="flex items-center gap-2 text-xs text-gray-400">
+    <% if model["name"].present? %>
+      <span class="font-medium text-gray-500" title="<%= model["provider"] %>"><%= model["name"] %></span>
+    <% end %>
+    <% if window.positive? %>
+      <% percent = usage["percent"].to_f.clamp(0, 100) %>
+      <span class="tabular-nums" title="Context window used">
         <%= format_tokens(usage["tokens"]) %> / <%= format_tokens(window) %>
       </span>
       <span class="block h-1.5 w-28 overflow-hidden rounded-full bg-gray-100">
         <span class="block h-full rounded-full bg-gray-400" style="width: <%= percent %>%"></span>
       </span>
       <span class="tabular-nums"><%= percent.round %>%</span>
-    </div>
-  <% end %>
-</div>
+    <% end %>
+  </div>
+<% else %>
+  <div id="<%= dom_id(conversation, :context) %>"></div>
+<% end %>

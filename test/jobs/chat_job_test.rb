@@ -3,13 +3,14 @@ require "test_helper"
 class ChatJobTest < ActiveSupport::TestCase
   # Fake adapter that replays a canned Agent::UiEvent stream.
   class FakeAdapter
-    attr_reader :native_session_id, :token_totals, :context_usage
+    attr_reader :native_session_id, :token_totals, :context_usage, :model_info
 
-    def initialize(events, native_session_id: nil, token_totals: nil, context_usage: nil)
+    def initialize(events, native_session_id: nil, token_totals: nil, context_usage: nil, model_info: nil)
       @events = events
       @native_session_id = native_session_id
       @token_totals = token_totals
       @context_usage = context_usage
+      @model_info = model_info
     end
 
     def stream(_input, images: [], files: [])
@@ -114,6 +115,14 @@ class ChatJobTest < ActiveSupport::TestCase
              context_usage: { "tokens" => 195, "contextWindow" => 272000, "percent" => 0.07 })
 
     assert_equal 272000, @conversation.reload.context_usage["contextWindow"]
+  end
+
+  test "stores the resolved model on the conversation" do
+    run_with([ Agent::UiEvent.new(:turn_finished) ],
+             model_info: { "id" => "gpt-5.5", "name" => "GPT-5.5", "provider" => "openai-codex" })
+
+    assert_equal "GPT-5.5", @conversation.reload.agent_model["name"]
+    assert_equal "openai-codex", @conversation.agent_model["provider"]
   end
 
   test "marks the message errored for an unsupported backend" do
