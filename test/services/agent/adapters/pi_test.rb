@@ -72,6 +72,16 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     user.conversations.create!({ backend: :pi }.merge(attrs))
   end
 
+  # Set config.x.agent deployment defaults for the block, then restore.
+  def with_agent_config(**values)
+    agent = Rails.application.config.x.agent
+    original = values.keys.index_with { |key| agent.public_send(key) }
+    values.each { |key, value| agent.public_send("#{key}=", value) }
+    yield
+  ensure
+    original.each { |key, value| agent.public_send("#{key}=", value) }
+  end
+
   # --- translation ---------------------------------------------------
 
   test "translates message_start" do
@@ -235,6 +245,37 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
     assert_includes args, "--provider"
     refute_includes args, "--api-key"
+  end
+
+  test "credential flags fall back to the deployment config when settings are empty" do
+    conversation = create_conversation
+    with_agent_config(provider: "anthropic", model: "anthropic/claude-sonnet-4-5", api_key: "sk-deploy") do
+      args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+
+      assert_equal "anthropic/claude-sonnet-4-5", args[args.index("--model") + 1]
+      assert_equal "anthropic", args[args.index("--provider") + 1]
+      assert_equal "sk-deploy", args[args.index("--api-key") + 1]
+    end
+  end
+
+  test "conversation settings override the deployment config" do
+    conversation = create_conversation(settings: { "provider" => "openai", "model" => "openai/gpt-5" })
+    with_agent_config(provider: "anthropic", model: "anthropic/claude-sonnet-4-5", api_key: "sk-deploy") do
+      args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+
+      assert_equal "openai/gpt-5", args[args.index("--model") + 1]
+      assert_equal "openai", args[args.index("--provider") + 1]
+    end
+  end
+
+  test "a stored ApiKey overrides the deployment api key" do
+    conversation = create_conversation(settings: { "provider" => "anthropic" })
+    conversation.user.api_keys.create!(provider: "anthropic", key: "sk-user")
+    with_agent_config(provider: "anthropic", api_key: "sk-deploy") do
+      args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+
+      assert_equal "sk-user", args[args.index("--api-key") + 1]
+    end
   end
 
   # --- attachments ---------------------------------------------------

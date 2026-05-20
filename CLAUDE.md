@@ -78,9 +78,13 @@ not crash a turn the user already saw stream.
 
 ### Credentials
 
-pi's `--provider` / `--model` come from `conversation.settings` (jsonb);
-`--api-key` from the owner's `ApiKey` for that provider (`User#api_key_for`).
-All unset → pi uses its own config.
+pi's `--provider` / `--model` / `--api-key` resolve through a fallback chain:
+per-conversation `Conversation#settings` (jsonb) and the owner's `ApiKey`
+(`User#api_key_for`) override a deployment-level default in `config.x.agent`
+(`METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL` / `METIS_AGENT_API_KEY`; the key
+is also read from Rails credentials at `agent.api_key`). All unset → pi uses
+its own config. There is no per-user settings UI yet — the deployment default
+is the working path; `settings` / `ApiKey` are override seams.
 
 ## Conventions
 

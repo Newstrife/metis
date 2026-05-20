@@ -13,9 +13,10 @@ module Agent
     # its history. pi's session id is captured after the run for
     # Conversation#backend_session_id.
     #
-    # Credentials: --provider/--model from conversation.settings,
-    # --api-key from the owner's stored ApiKey. Unset -> pi falls back
-    # to its own configuration.
+    # Credentials: --provider/--model/--api-key resolve through a
+    # fallback chain — per-conversation settings and the owner's stored
+    # ApiKey override the deployment default in config.x.agent. All
+    # unset -> pi falls back to its own configuration.
     #
     # Attachments: images are sent inline via pi's vision protocol
     # (prompt images:); other files are handed to the runtime, which
@@ -110,15 +111,21 @@ module Agent
         conversation.backend_session_id.present? ? [ "--continue" ] : []
       end
 
+      # Per-conversation settings (and the owner's stored ApiKey) override
+      # the deployment-level default in config.x.agent. All unset -> no
+      # flags, and pi falls back to its own configuration.
       def credential_args
         settings = conversation.settings || {}
-        args = []
-        args += [ "--model", settings["model"] ] if settings["model"].present?
+        defaults = Rails.application.config.x.agent
 
-        provider = settings["provider"]
+        model = settings["model"].presence || defaults.model
+        provider = settings["provider"].presence || defaults.provider
+
+        args = []
+        args += [ "--model", model ] if model.present?
         if provider.present?
           args += [ "--provider", provider ]
-          key = conversation.user.api_key_for(provider)
+          key = conversation.user.api_key_for(provider).presence || defaults.api_key
           args += [ "--api-key", key ] if key.present?
         end
         args
