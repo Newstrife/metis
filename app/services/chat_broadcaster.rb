@@ -6,6 +6,7 @@ class ChatBroadcaster
   def initialize(conversation, assistant_message)
     @conversation = conversation
     @message = assistant_message
+    @text = +""
   end
 
   def handle(event)
@@ -29,10 +30,17 @@ class ChatBroadcaster
 
   def base_id = dom_id(@message)
 
+  # Accumulate the streamed text and re-render the whole body as Markdown.
+  # An innerHTML update (not append) keeps partial Markdown — open code
+  # fences, half-built tables — rendering correctly as more text arrives.
   def append_text(delta)
     return if delta.blank?
 
-    broadcast_append(target: "#{base_id}_body", html: ERB::Util.html_escape(delta))
+    @text << delta
+    Turbo::StreamsChannel.broadcast_update_to(
+      @conversation, target: "#{base_id}_body",
+      html: ApplicationController.helpers.markdown(@text)
+    )
   end
 
   def append_reasoning(delta)
@@ -56,8 +64,10 @@ class ChatBroadcaster
     Turbo::StreamsChannel.broadcast_remove_to(@conversation, target: "#{base_id}_indicator")
   end
 
+  # Append into the message card, not the body — the body's innerHTML is
+  # replaced on every text delta, which would otherwise swallow the error.
   def show_error(message)
-    broadcast(:append, target: "#{base_id}_body", partial: "messages/error",
+    broadcast(:append, target: base_id, partial: "messages/error",
                        locals: { message: message })
   end
 

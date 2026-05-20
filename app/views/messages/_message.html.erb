@@ -7,7 +7,7 @@
   <div id="<%= dom_id(message) %>_tools" class="space-y-2 empty:hidden mb-2"></div>
 
   <div id="<%= dom_id(message) %>_body"
-       class="whitespace-pre-wrap break-words"><%= message.content %></div>
+       class="chat-content break-words"><%= markdown(message.content) %></div>
 
   <% if message.assistant? && !message.done? %>
     <span id="<%= dom_id(message) %>_indicator"

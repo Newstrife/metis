@@ -20,6 +20,9 @@ gem "tailwindcss-rails"
 # Authentication
 gem "devise"
 
+# Render Markdown message content to HTML (GFM-compliant, native tables)
+gem "commonmarker"
+
 # Ruby client for the pi coding agent (drives `pi --mode rpc`)
 gem "pi-agent-rb", path: "../pi-agent-rb", require: "pi_agent"
 
