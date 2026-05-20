@@ -15,4 +15,10 @@ class Conversation < ApplicationRecord
   def display_title
     title.presence || "Untitled conversation"
   end
+
+  # True while a turn is running — an assistant message is still pending
+  # or streaming. Used to refuse a second concurrent turn.
+  def turn_in_progress?
+    messages.where(role: :assistant, streaming_status: %i[pending streaming]).exists?
+  end
 end

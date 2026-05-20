@@ -30,6 +30,16 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "rejects a new message while a turn is already in progress" do
+    @conversation.messages.create!(role: :assistant, content: "", streaming_status: :streaming)
+
+    assert_no_difference -> { @conversation.messages.count } do
+      post conversation_messages_path(@conversation),
+           params: { content: "second" }, as: :turbo_stream
+    end
+    assert_response :conflict
+  end
+
   test "does not let a user post to another user's conversation" do
     other = User.create!(email: "other-msg@example.com", password: "password123")
     other_conversation = other.conversations.create!(backend: :pi)
