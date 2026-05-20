@@ -4,8 +4,10 @@ require "rails/test_help"
 
 module ActiveSupport
   class TestCase
-    # Run tests in parallel with specified workers
-    parallelize(workers: :number_of_processors)
+    # Single-process until the suite is large enough to benefit. Parallel
+    # workers share the filesystem but not DB id sequences, which races
+    # tests that touch per-record scratch paths (Agent::Workspace).
+    parallelize(workers: :number_of_processors, threshold: 500)
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all

@@ -1,25 +1,19 @@
 require "fileutils"
 
 module Agent
-  # Resolves the durable on-disk location for a conversation's agent
-  # files. Today that means pi's session directory; a per-conversation
-  # working directory will live here too.
+  # Resolves the local scratch directory for a conversation's pi run.
   #
-  # pi session files are the agent's conversation memory — losing them
-  # breaks `--continue`. They therefore live under a persistent,
-  # configurable root (config.x.agent.root), never under tmp/.
+  # This is disposable working space — pi reads and writes session files
+  # here during a run. The durable, worker-independent copy of the
+  # session lives in Active Storage (see Agent::SessionArchive), which is
+  # restored into this directory before a run and captured back after.
+  # Because it is pure scratch, it correctly lives under tmp/.
   #
   # Paths are scoped per user; a tenant segment slots into #scope when
-  # multi-tenancy lands. This is the single place path layout is
-  # decided.
-  #
-  # Constraint: this is local-disk storage. It assumes the job worker
-  # that runs a conversation can see the same filesystem across that
-  # conversation's lifetime — true for a single-server deployment or a
-  # shared filesystem. Multi-worker deployments without shared storage
-  # will need session content backed by the DB or an object store and
-  # materialized here around each run; this class is the seam for that.
+  # multi-tenancy lands. This is the single place path layout is decided.
   class Workspace
+    ROOT = Rails.root.join("tmp/agent").freeze
+
     def self.for(conversation)
       new(conversation)
     end
@@ -29,12 +23,15 @@ module Agent
     end
 
     # Directory passed to `pi --session-dir`. Pure path — call #prepare!
-    # to make sure it exists on disk.
+    # to materialize a clean copy on disk.
     def session_dir
       scope.join("sessions")
     end
 
+    # Create an empty session directory, discarding any stale scratch
+    # from a previous run so it can be repopulated from the archive.
     def prepare!
+      FileUtils.rm_rf(session_dir)
       FileUtils.mkdir_p(session_dir)
       self
     end
@@ -43,11 +40,7 @@ module Agent
 
     def scope
       # A tenant segment (e.g. "t#{tenant_id}") slots in here later.
-      root.join("u#{@conversation.user_id}", "c#{@conversation.id}")
-    end
-
-    def root
-      Rails.application.config.x.agent.root
+      ROOT.join("u#{@conversation.user_id}", "c#{@conversation.id}")
     end
   end
 end

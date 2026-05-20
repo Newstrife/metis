@@ -3,11 +3,12 @@ module Agent
     # Drives the pi backend via pi-agent-rb (`pi --mode rpc`) and
     # translates pi's native event stream into Agent::UiEvent objects.
     #
-    # Continuity: each conversation gets a dedicated pi session directory
-    # (resolved by Agent::Workspace). The first run creates a session;
-    # later runs pass --continue so pi reloads its own history. pi's
-    # session id is captured after each run and persisted on
-    # Conversation#backend_session_id.
+    # Continuity: before each run the conversation's stored session
+    # archive is restored into a local scratch directory (Agent::Workspace);
+    # the first run has none, later runs pass --continue so pi reloads its
+    # own history. After the run the scratch directory is archived back to
+    # durable storage (Agent::SessionArchive) and pi's session id is
+    # captured for Conversation#backend_session_id.
     #
     # Credentials: --provider/--model come from conversation.settings;
     # --api-key from the owner's stored ApiKey for that provider. When
@@ -35,6 +36,7 @@ module Agent
         @native_session_id = capture_session_id(session)
       ensure
         close_session
+        persist_session_archive
       end
 
       def abort
@@ -102,10 +104,24 @@ module Agent
       end
 
       def active_session
-        @session ||= @injected_session || begin
-          workspace.prepare!
-          PiAgent.session(args: pi_args)
-        end
+        @session ||= @injected_session || build_real_session
+      end
+
+      def build_real_session
+        workspace.prepare!
+        Agent::SessionArchive.restore(conversation, into: workspace.session_dir)
+        PiAgent.session(args: pi_args)
+      end
+
+      # Capture the scratch session dir back to durable storage. Skipped
+      # for injected (test) sessions; failures are logged, never raised —
+      # a persistence failure must not crash the turn the user just saw.
+      def persist_session_archive
+        return if @injected_session
+
+        Agent::SessionArchive.store(conversation, from: workspace.session_dir)
+      rescue StandardError => e
+        Rails.logger.error("Pi session archive failed for conversation #{conversation.id}: #{e.message}")
       end
 
       def capture_session_id(session)

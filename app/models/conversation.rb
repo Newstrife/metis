@@ -6,6 +6,10 @@ class Conversation < ApplicationRecord
   belongs_to :user
   has_many :messages, dependent: :destroy
 
+  # The pi session directory, archived. Durable, worker-independent
+  # storage for the agent's conversation memory (see Agent::SessionArchive).
+  has_one_attached :pi_session_archive
+
   scope :recent, -> { order(updated_at: :desc) }
 
   def display_title
