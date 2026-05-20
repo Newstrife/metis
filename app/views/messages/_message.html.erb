@@ -1,0 +1,16 @@
+<div id="<%= dom_id(message) %>" class="rounded-lg border border-gray-200 px-4 py-3">
+  <div class="text-xs uppercase tracking-wide text-gray-400 mb-1"><%= message.role %></div>
+
+  <div id="<%= dom_id(message) %>_reasoning"
+       class="text-sm text-gray-500 italic whitespace-pre-wrap break-words empty:hidden mb-2"></div>
+
+  <div id="<%= dom_id(message) %>_tools" class="space-y-2 empty:hidden mb-2"></div>
+
+  <div id="<%= dom_id(message) %>_body"
+       class="whitespace-pre-wrap break-words"><%= message.content %></div>
+
+  <% if message.assistant? && !message.done? %>
+    <span id="<%= dom_id(message) %>_indicator"
+          class="inline-block animate-pulse text-gray-400">●</span>
+  <% end %>
+</div>

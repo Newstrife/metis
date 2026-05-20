@@ -1,0 +1,13 @@
+<%= turbo_stream.append "messages" do %>
+  <%= render @user_message %>
+<% end %>
+
+<%= turbo_stream.append "messages" do %>
+  <%= render @assistant_message %>
+<% end %>
+
+<%= turbo_stream.replace "composer" do %>
+  <div id="composer" class="sticky bottom-0 bg-white pt-4 pb-6 border-t border-gray-100">
+    <%= render "conversations/composer", conversation: @conversation %>
+  </div>
+<% end %>
