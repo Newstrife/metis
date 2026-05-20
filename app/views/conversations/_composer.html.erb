@@ -1,9 +1,36 @@
-<%= form_with url: conversation_messages_path(conversation), method: :post do |form| %>
-  <div class="flex gap-2">
-    <textarea name="content" rows="3" placeholder="Message the agent…"
-              class="flex-1 rounded-md border border-gray-300 px-3 py-2 resize-none
-                     focus:outline-none focus:ring-2 focus:ring-gray-400"></textarea>
-    <%= form.submit "Send",
-          class: "self-stretch rounded-md bg-gray-900 px-4 text-white text-sm font-medium hover:bg-gray-700" %>
-  </div>
-<% end %>
+<div id="composer" class="sticky bottom-0 bg-white pt-4 pb-6 border-t border-gray-100"
+     data-controller="file-upload"
+     data-action="dragover->file-upload#dragOver dragleave->file-upload#dragLeave drop->file-upload#drop">
+  <% if local_assigns[:error].present? %>
+    <div class="mb-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <%= error %>
+    </div>
+  <% end %>
+
+  <%= form_with url: conversation_messages_path(conversation), method: :post, multipart: true do |form| %>
+    <div data-file-upload-target="previews" class="flex flex-wrap gap-2 mb-2 empty:hidden"></div>
+
+    <div class="flex gap-2 items-stretch">
+      <label class="flex items-center px-3 rounded-md border border-gray-300 text-gray-400
+                    hover:text-gray-700 hover:border-gray-400 cursor-pointer"
+             title="Attach photos or files">
+        <input type="file" name="attachments[]" multiple
+               accept="<%= Message::ALLOWED_CONTENT_TYPES.join(",") %>"
+               class="hidden"
+               data-file-upload-target="input"
+               data-action="change->file-upload#filesPicked">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </label>
+
+      <textarea name="content" rows="3" placeholder="Message the agent…"
+                class="flex-1 rounded-md border border-gray-300 px-3 py-2 resize-none
+                       focus:outline-none focus:ring-2 focus:ring-gray-400"></textarea>
+
+      <%= form.submit "Send",
+            class: "rounded-md bg-gray-900 px-4 text-white text-sm font-medium hover:bg-gray-700" %>
+    </div>
+  <% end %>
+</div>

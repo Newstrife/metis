@@ -12,7 +12,12 @@ module Agent
 
       # Run +input+ against the backend, yielding Agent::UiEvent objects
       # until the turn finishes. Returns an Enumerator if no block given.
-      def stream(input, &block)
+      #
+      # +images+ and +files+ are the user message's attachments — objects
+      # responding to #filename, #content_type, and #download. How a
+      # backend delivers them (inline, staged into a workspace, ...) is
+      # its own concern.
+      def stream(input, images: [], files: [], &block)
         raise NotImplementedError, "#{self.class} must implement #stream"
       end
 

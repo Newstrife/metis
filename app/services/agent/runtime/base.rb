@@ -17,7 +17,11 @@ module Agent
       # Provision the runtime, open a PiAgent::Session running pi with
       # `pi_args`, yield it to the caller, then finalize (persist state,
       # tear down). The session is closed by the runtime, not the caller.
-      def run(pi_args:)
+      #
+      # `files` are uploaded files (responding to #filename and #open)
+      # staged into pi's working directory before the run — a filesystem
+      # operation, so each runtime stages them its own way.
+      def run(pi_args:, files: [])
         raise NotImplementedError, "#{self.class} must implement #run"
       end
     end

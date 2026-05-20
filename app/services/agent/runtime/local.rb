@@ -13,9 +13,10 @@ module Agent
         workspace.session_dir
       end
 
-      def run(pi_args:)
+      def run(pi_args:, files: [])
         workspace.prepare!
         Agent::SessionArchive.restore(conversation, into: workspace.scope_dir)
+        stage_files(files)
         session = PiAgent.session(args: pi_args, cwd: workspace.workspace_dir.to_s)
         begin
           yield session
@@ -29,6 +30,19 @@ module Agent
 
       def workspace
         @workspace ||= Agent::Workspace.for(conversation)
+      end
+
+      # Write uploaded files into pi's working directory. Filenames are
+      # basenamed so a crafted name cannot escape the workspace; the
+      # files are then archived with the scope, so they persist for
+      # later turns (and pi can edit them).
+      def stage_files(files)
+        files.each do |file|
+          name = File.basename(file.filename.to_s)
+          next if name.blank? || [ ".", ".." ].include?(name)
+
+          file.open { |io| IO.copy_stream(io, workspace.workspace_dir.join(name)) }
+        end
       end
 
       # Capture the scratch scope back to durable storage. A persistence

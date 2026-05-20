@@ -6,8 +6,5 @@
   <%= render @assistant_message %>
 <% end %>
 
-<%= turbo_stream.replace "composer" do %>
-  <div id="composer" class="sticky bottom-0 bg-white pt-4 pb-6 border-t border-gray-100">
-    <%= render "conversations/composer", conversation: @conversation %>
-  </div>
-<% end %>
+<%= turbo_stream.replace "composer",
+      partial: "conversations/composer", locals: { conversation: @conversation } %>

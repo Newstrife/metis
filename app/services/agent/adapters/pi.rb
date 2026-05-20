@@ -16,6 +16,11 @@ module Agent
     # Credentials: --provider/--model from conversation.settings,
     # --api-key from the owner's stored ApiKey. Unset -> pi falls back
     # to its own configuration.
+    #
+    # Attachments: images are sent inline via pi's vision protocol
+    # (prompt images:); other files are handed to the runtime, which
+    # stages them into pi's working directory, and a note in the prompt
+    # tells pi they are there.
     class Pi < Base
       def initialize(conversation:, runtime: nil, **opts)
         super(conversation: conversation, **opts)
@@ -26,12 +31,12 @@ module Agent
 
       attr_reader :native_session_id
 
-      def stream(input, &block)
-        return enum_for(:stream, input) unless block
+      def stream(input, images: [], files: [], &block)
+        return enum_for(:stream, input, images: images, files: files) unless block
 
-        @runtime.run(pi_args: pi_args) do |session|
+        @runtime.run(pi_args: pi_args, files: files) do |session|
           @session = session
-          session.prompt(input) do |pi_event|
+          session.prompt(prompt_with_files(input, files), images: pi_images(images)) do |pi_event|
             ui_event = translate(pi_event)
             block.call(ui_event) if ui_event
           end
@@ -82,6 +87,21 @@ module Agent
       end
 
       private
+
+      # Image attachments become pi's inline image content.
+      def pi_images(images)
+        images.map { |image| PiAgent::Image.from_bytes(image.download, mime_type: image.content_type) }
+      end
+
+      # The runtime stages non-image files into pi's working directory;
+      # name them in the prompt so pi knows to open them there.
+      def prompt_with_files(input, files)
+        names = files.map { |file| file.filename.to_s }
+        return input if names.empty?
+
+        note = "[Attached files in your working directory: #{names.join(', ')}]"
+        input.present? ? "#{input}\n\n#{note}" : note
+      end
 
       def resume_args
         conversation.backend_session_id.present? ? [ "--continue" ] : []

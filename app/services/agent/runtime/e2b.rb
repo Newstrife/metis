@@ -25,9 +25,10 @@ module Agent
         Pathname.new(SESSION_DIR)
       end
 
-      def run(pi_args:)
+      def run(pi_args:, files: [])
         sandbox = acquire_sandbox
         provision(sandbox)
+        stage_files(sandbox, files)
         session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args))
         begin
           yield session
@@ -38,6 +39,17 @@ module Agent
       end
 
       private
+
+      # Upload files into pi's in-sandbox working directory. Filenames
+      # are basenamed so a crafted name cannot escape the workspace.
+      def stage_files(sandbox, files)
+        files.each do |file|
+          name = File.basename(file.filename.to_s)
+          next if name.blank? || [ ".", ".." ].include?(name)
+
+          sandbox.files.write("#{WORKSPACE_DIR}/#{name}", file.download)
+        end
+      end
 
       def acquire_sandbox
         id = conversation.runtime_state["e2b_sandbox_id"]

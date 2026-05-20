@@ -22,10 +22,47 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     assert @conversation.messages.exists?(role: :assistant, streaming_status: :pending)
   end
 
-  test "rejects a blank message" do
+  test "rejects a blank message with no attachments" do
     assert_no_difference -> { @conversation.messages.count } do
       post conversation_messages_path(@conversation),
            params: { content: "   " }, as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+  end
+
+  test "attaches an uploaded file to the user message" do
+    assert_difference -> { @conversation.messages.count }, 2 do
+      assert_enqueued_with(job: ChatJob) do
+        post conversation_messages_path(@conversation), params: {
+          content: "see attached",
+          attachments: [ fixture_file_upload("sample.txt", "text/plain") ]
+        }, as: :turbo_stream
+      end
+    end
+
+    assert_response :success
+    user_message = @conversation.messages.find_by(role: :user)
+    assert user_message.files.attached?
+    assert_equal "sample.txt", user_message.files.first.filename.to_s
+  end
+
+  test "accepts an attachment-only message with no text" do
+    assert_difference -> { @conversation.messages.count }, 2 do
+      post conversation_messages_path(@conversation), params: {
+        attachments: [ fixture_file_upload("sample.png", "image/png") ]
+      }, as: :turbo_stream
+    end
+
+    assert_response :success
+    assert @conversation.messages.find_by(role: :user).images.attached?
+  end
+
+  test "rejects an unsupported attachment type" do
+    assert_no_difference -> { @conversation.messages.count } do
+      post conversation_messages_path(@conversation), params: {
+        content: "bad upload",
+        attachments: [ fixture_file_upload("sample.txt", "application/x-msdownload") ]
+      }, as: :turbo_stream
     end
     assert_response :unprocessable_entity
   end

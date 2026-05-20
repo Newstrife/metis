@@ -28,6 +28,20 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     session
   end
 
+  # A stand-in for an uploaded file: responds to #filename and #open.
+  class FakeUpload
+    def initialize(name, content)
+      @name = name
+      @content = content
+    end
+
+    def filename = @name
+
+    def open
+      yield StringIO.new(@content)
+    end
+  end
+
   test "session_dir is the workspace session directory" do
     assert_equal @workspace.session_dir, @runtime.session_dir
   end
@@ -69,5 +83,28 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
 
     assert session.closed?
     assert @conversation.pi_session_archive.attached?
+  end
+
+  test "run stages uploaded files into the workspace before yielding" do
+    staged = @workspace.workspace_dir.join("data.csv")
+
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ],
+                   files: [ FakeUpload.new("data.csv", "a,b\n1,2\n") ]) do |_s|
+        assert File.exist?(staged), "file staged before the run"
+      end
+    end
+
+    assert_equal "a,b\n1,2\n", File.read(staged)
+  end
+
+  test "run basenames staged filenames so a crafted name cannot escape the workspace" do
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ],
+                   files: [ FakeUpload.new("../escape.txt", "x") ]) do |_s|
+        assert File.exist?(@workspace.workspace_dir.join("escape.txt"))
+        assert_not File.exist?(@workspace.scope_dir.join("escape.txt"))
+      end
+    end
   end
 end

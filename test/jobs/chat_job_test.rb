@@ -10,7 +10,7 @@ class ChatJobTest < ActiveSupport::TestCase
       @native_session_id = native_session_id
     end
 
-    def stream(_input)
+    def stream(_input, images: [], files: [])
       @events.each { |event| yield event }
     end
   end

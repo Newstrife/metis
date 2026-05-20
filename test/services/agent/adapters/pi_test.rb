@@ -41,7 +41,7 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
       Pathname.new("/tmp/metis-fake-runtime/sessions")
     end
 
-    def run(pi_args:)
+    def run(pi_args:, files: [])
       yield @session
     ensure
       @session.close
@@ -218,5 +218,33 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
     assert_includes args, "--provider"
     refute_includes args, "--api-key"
+  end
+
+  # --- attachments ---------------------------------------------------
+
+  Upload = Struct.new(:filename, :content_type, :bytes) do
+    def download = bytes
+  end
+
+  test "pi_images builds inline pi image content from image attachments" do
+    png = Upload.new("shot.png", "image/png", "fake-png-bytes")
+    images = adapter.send(:pi_images, [ png ])
+
+    assert_equal 1, images.size
+    assert_instance_of PiAgent::Image, images.first
+    assert_equal "image/png", images.first.mime_type
+  end
+
+  test "prompt_with_files appends a note naming the staged files" do
+    files = [ Upload.new("data.csv", "text/csv", ""), Upload.new("notes.txt", "text/plain", "") ]
+    text = adapter.send(:prompt_with_files, "summarize these", files)
+
+    assert_includes text, "summarize these"
+    assert_includes text, "data.csv"
+    assert_includes text, "notes.txt"
+  end
+
+  test "prompt_with_files returns the input unchanged when there are no files" do
+    assert_equal "just text", adapter.send(:prompt_with_files, "just text", [])
   end
 end

@@ -25,7 +25,8 @@ class ChatJob < ApplicationJob
     buffer = +""
     errored = false
 
-    adapter.stream(user_message.content) do |event|
+    adapter.stream(user_message.content,
+                   images: user_message.images, files: user_message.files) do |event|
       buffer << event[:delta].to_s if event.type == :text_delta
       errored = true if event.type == :error
       broadcaster.handle(event)
