@@ -1,0 +1,30 @@
+<% content_for :title, "Conversations" %>
+
+<div class="w-full max-w-2xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-semibold">Conversations</h1>
+    <div class="flex items-center gap-3 text-sm">
+      <span class="text-gray-500"><%= current_user.email %></span>
+      <%= button_to "Sign out", destroy_user_session_path, method: :delete,
+            class: "text-gray-500 hover:text-gray-800" %>
+    </div>
+  </div>
+
+  <%= link_to "New conversation", new_conversation_path,
+        class: "inline-block mb-6 rounded-md bg-gray-900 px-4 py-2 text-white text-sm font-medium hover:bg-gray-700" %>
+
+  <% if @conversations.any? %>
+    <ul class="divide-y divide-gray-200 border border-gray-200 rounded-md">
+      <% @conversations.each do |conversation| %>
+        <li>
+          <%= link_to conversation, class: "flex items-center justify-between px-4 py-3 hover:bg-gray-50" do %>
+            <span class="font-medium"><%= conversation.display_title %></span>
+            <span class="text-xs uppercase tracking-wide text-gray-400"><%= conversation.backend %></span>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="text-gray-500">No conversations yet.</p>
+  <% end %>
+</div>
