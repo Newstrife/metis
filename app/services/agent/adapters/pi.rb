@@ -19,7 +19,7 @@ module Agent
     class Pi < Base
       def initialize(conversation:, runtime: nil, **opts)
         super(conversation: conversation, **opts)
-        @runtime = runtime || Agent::Runtime::Local.new(conversation: conversation)
+        @runtime = runtime || Agent::Runtime.for(conversation)
         @session = nil
         @native_session_id = nil
       end

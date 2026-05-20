@@ -26,6 +26,9 @@ gem "commonmarker"
 # Ruby client for the pi coding agent (drives `pi --mode rpc`)
 gem "pi-agent-rb", path: "../pi-agent-rb", require: "pi_agent"
 
+# E2B secure cloud sandboxes — the isolated runtime for the agent
+gem "e2b"
+
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
 

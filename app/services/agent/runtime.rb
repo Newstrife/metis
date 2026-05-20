@@ -10,8 +10,23 @@ module Agent
   #   #run(pi_args:) { |sess| } -> provision, open a PiAgent::Session,
   #                                yield it, finalize (persist + tear down)
   #
-  # v1 ships Runtime::Local — the agent as a local subprocess. Runtime::E2B
-  # — the agent inside a secure microVM — is the planned isolated runtime.
+  # Runtime::Local runs the agent as a local subprocess; Runtime::E2b runs
+  # it inside a secure E2B microVM.
   module Runtime
+    # Resolve the runtime for a conversation. The runtime is a
+    # per-deployment choice (config.x.agent.runtime), in contrast to the
+    # backend, which the user picks per conversation.
+    def self.for(conversation)
+      build(conversation, Rails.application.config.x.agent.runtime)
+    end
+
+    def self.build(conversation, name)
+      case name&.to_sym
+      when :local then Local.new(conversation: conversation)
+      when :e2b   then E2b.new(conversation: conversation)
+      else
+        raise Agent::Error, "Unknown agent runtime #{name.inspect} — set config.x.agent.runtime"
+      end
+    end
   end
 end
