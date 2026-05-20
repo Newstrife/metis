@@ -161,14 +161,14 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
   # --- argument building ---------------------------------------------
 
-  test "pi_args points at a per-conversation session directory" do
+  test "pi_args points at the workspace session directory" do
     conversation = create_conversation
     args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
 
     assert_includes args, "--mode"
     assert_includes args, "rpc"
     dir = args[args.index("--session-dir") + 1]
-    assert_match %r{tmp/pi_sessions/#{conversation.id}\z}, dir
+    assert_match %r{/u#{conversation.user_id}/c#{conversation.id}/sessions\z}, dir
   end
 
   test "pi_args omits --continue for a fresh conversation" do

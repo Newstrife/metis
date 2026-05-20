@@ -1,14 +1,13 @@
-require "fileutils"
-
 module Agent
   module Adapters
     # Drives the pi backend via pi-agent-rb (`pi --mode rpc`) and
     # translates pi's native event stream into Agent::UiEvent objects.
     #
-    # Continuity: each conversation gets a dedicated pi session directory.
-    # The first run creates a session; later runs pass --continue so pi
-    # reloads its own history. pi's session id is captured after each run
-    # and persisted on Conversation#backend_session_id.
+    # Continuity: each conversation gets a dedicated pi session directory
+    # (resolved by Agent::Workspace). The first run creates a session;
+    # later runs pass --continue so pi reloads its own history. pi's
+    # session id is captured after each run and persisted on
+    # Conversation#backend_session_id.
     #
     # Credentials: --provider/--model come from conversation.settings;
     # --api-key from the owner's stored ApiKey for that provider. When
@@ -16,8 +15,6 @@ module Agent
     #
     # `session:` may be injected for testing.
     class Pi < Base
-      SESSION_ROOT = Rails.root.join("tmp/pi_sessions")
-
       def initialize(conversation:, session: nil, **opts)
         super(conversation: conversation, **opts)
         @injected_session = session
@@ -77,7 +74,7 @@ module Agent
 
       # pi CLI arguments for this conversation's run.
       def pi_args
-        [ "--mode", "rpc", "--session-dir", session_dir.to_s, *resume_args, *credential_args ]
+        [ "--mode", "rpc", "--session-dir", workspace.session_dir.to_s, *resume_args, *credential_args ]
       end
 
       private
@@ -100,13 +97,13 @@ module Agent
         args
       end
 
-      def session_dir
-        SESSION_ROOT.join(conversation.id.to_s)
+      def workspace
+        @workspace ||= Agent::Workspace.for(conversation)
       end
 
       def active_session
         @session ||= @injected_session || begin
-          FileUtils.mkdir_p(session_dir)
+          workspace.prepare!
           PiAgent.session(args: pi_args)
         end
       end
