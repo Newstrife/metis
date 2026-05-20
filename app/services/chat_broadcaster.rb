@@ -26,6 +26,23 @@ class ChatBroadcaster
     finish
   end
 
+  # Called by ChatJob once a turn's token/context usage is persisted:
+  # repaints the conversation's context meter and this message's token
+  # footer.
+  def refresh_usage
+    Turbo::StreamsChannel.broadcast_replace_to(
+      @conversation,
+      target: dom_id(@conversation, :context),
+      partial: "conversations/context_meter",
+      locals: { conversation: @conversation }
+    )
+    Turbo::StreamsChannel.broadcast_update_to(
+      @conversation,
+      target: "#{base_id}_meta",
+      html: ApplicationController.helpers.token_summary(@message)
+    )
+  end
+
   private
 
   def base_id = dom_id(@message)

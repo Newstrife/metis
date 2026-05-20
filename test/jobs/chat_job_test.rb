@@ -3,11 +3,13 @@ require "test_helper"
 class ChatJobTest < ActiveSupport::TestCase
   # Fake adapter that replays a canned Agent::UiEvent stream.
   class FakeAdapter
-    attr_reader :native_session_id
+    attr_reader :native_session_id, :token_totals, :context_usage
 
-    def initialize(events, native_session_id: nil)
+    def initialize(events, native_session_id: nil, token_totals: nil, context_usage: nil)
       @events = events
       @native_session_id = native_session_id
+      @token_totals = token_totals
+      @context_usage = context_usage
     end
 
     def stream(_input, images: [], files: [])
@@ -31,8 +33,8 @@ class ChatJobTest < ActiveSupport::TestCase
     Agent::Adapters.define_singleton_method(:for, original)
   end
 
-  def run_with(events, native_session_id: nil)
-    with_adapter(FakeAdapter.new(events, native_session_id: native_session_id)) do
+  def run_with(events, **adapter_opts)
+    with_adapter(FakeAdapter.new(events, **adapter_opts)) do
       ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
     end
   end
@@ -81,6 +83,37 @@ class ChatJobTest < ActiveSupport::TestCase
                 Agent::UiEvent.new(:turn_finished) ])
     end
     assert_operator @conversation.reload.updated_at, :>, before
+  end
+
+  test "records this turn's token usage on the assistant message" do
+    run_with([ Agent::UiEvent.new(:turn_finished) ],
+             token_totals: { "input" => 100, "output" => 40, "cacheRead" => 10 })
+
+    @assistant_message.reload
+    assert_equal 100, @assistant_message.input_tokens
+    assert_equal 40, @assistant_message.output_tokens
+    assert_equal 10, @assistant_message.cache_read_tokens
+  end
+
+  test "token usage is this turn's rise over earlier turns' cumulative totals" do
+    @conversation.messages.create!(
+      role: :assistant, content: "earlier", streaming_status: :done,
+      input_tokens: 70, output_tokens: 25, cache_read_tokens: 5
+    )
+    run_with([ Agent::UiEvent.new(:turn_finished) ],
+             token_totals: { "input" => 100, "output" => 40, "cacheRead" => 10 })
+
+    @assistant_message.reload
+    assert_equal 30, @assistant_message.input_tokens
+    assert_equal 15, @assistant_message.output_tokens
+    assert_equal 5, @assistant_message.cache_read_tokens
+  end
+
+  test "stores the context-window usage on the conversation" do
+    run_with([ Agent::UiEvent.new(:turn_finished) ],
+             context_usage: { "tokens" => 195, "contextWindow" => 272000, "percent" => 0.07 })
+
+    assert_equal 272000, @conversation.reload.context_usage["contextWindow"]
   end
 
   test "marks the message errored for an unsupported backend" do

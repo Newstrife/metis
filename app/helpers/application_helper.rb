@@ -23,6 +23,25 @@ module ApplicationHelper
     html.html_safe
   end
 
+  # A compact per-message token line, or "" when none was recorded.
+  def token_summary(message)
+    return "" if message.input_tokens.blank? && message.output_tokens.blank?
+
+    parts = []
+    parts << "#{format_tokens(message.input_tokens)} in" if message.input_tokens
+    parts << "#{format_tokens(message.output_tokens)} out" if message.output_tokens
+    parts << "#{format_tokens(message.cache_read_tokens)} cached" if message.cache_read_tokens.to_i.positive?
+    parts.join(" · ")
+  end
+
+  # Abbreviate a token count: 1530 -> "1.5k", 940 -> "940".
+  def format_tokens(count)
+    count = count.to_i
+    return count.to_s if count < 1000
+
+    format("%gk", (count / 100.0).round / 10.0)
+  end
+
   private
 
   def add_link_target_blank(html)

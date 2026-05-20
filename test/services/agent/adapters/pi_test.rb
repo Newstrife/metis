@@ -25,7 +25,11 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
         emit({ "type" => "agent_end", "messages" => [] })
       when "get_session_stats"
         emit({ "id" => msg["id"], "type" => "response", "command" => "get_session_stats",
-               "success" => true, "data" => { "sessionId" => "stub-session-1" } })
+               "success" => true, "data" => {
+                 "sessionId" => "stub-session-1",
+                 "tokens" => { "input" => 120, "output" => 45, "cacheRead" => 30 },
+                 "contextUsage" => { "tokens" => 195, "contextWindow" => 272000, "percent" => 0.07 }
+               } })
       end
     end
   RUBY
@@ -175,6 +179,19 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     adapter.stream("hi") { |_event| nil }
 
     assert_equal "stub-session-1", adapter.native_session_id
+  end
+
+  test "stream captures token totals and context usage from session stats" do
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.stream("hi") { |_event| nil }
+
+    assert_equal({ "input" => 120, "output" => 45, "cacheRead" => 30 }, adapter.token_totals)
+    assert_equal 272000, adapter.context_usage["contextWindow"]
+  end
+
+  test "token_totals and context_usage are nil before a run" do
+    assert_nil adapter.token_totals
+    assert_nil adapter.context_usage
   end
 
   # --- argument building ---------------------------------------------

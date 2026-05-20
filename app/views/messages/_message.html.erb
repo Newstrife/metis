@@ -17,4 +17,7 @@
     <span id="<%= dom_id(message) %>_indicator"
           class="inline-block animate-pulse text-gray-400">●</span>
   <% end %>
+
+  <div id="<%= dom_id(message) %>_meta"
+       class="mt-2 text-xs text-gray-400 tabular-nums empty:hidden"><%= token_summary(message) %></div>
 </div>

@@ -34,10 +34,13 @@ class ChatJob < ApplicationJob
 
     assistant_message.update!(
       content: buffer,
-      streaming_status: errored ? :errored : :done
+      streaming_status: errored ? :errored : :done,
+      **turn_token_columns(conversation, adapter)
     )
     persist_session_id(conversation, adapter)
+    persist_context_usage(conversation, adapter)
     conversation.touch
+    broadcaster.refresh_usage
   end
 
   # Record pi's session id so the next message resumes the same session.
@@ -46,6 +49,32 @@ class ChatJob < ApplicationJob
     return if session_id.blank? || session_id == conversation.backend_session_id
 
     conversation.update_column(:backend_session_id, session_id)
+  end
+
+  # pi reports cumulative session token counts; this turn's share is the
+  # rise over what earlier messages already account for. Computed before
+  # the assistant message's own tokens are written.
+  def turn_token_columns(conversation, adapter)
+    totals = adapter.token_totals
+    return {} if totals.blank?
+
+    {
+      input_tokens:      turn_delta(totals["input"],     conversation.messages.sum(:input_tokens)),
+      output_tokens:     turn_delta(totals["output"],    conversation.messages.sum(:output_tokens)),
+      cache_read_tokens: turn_delta(totals["cacheRead"], conversation.messages.sum(:cache_read_tokens))
+    }
+  end
+
+  def turn_delta(total, prior)
+    [ total.to_i - prior.to_i, 0 ].max
+  end
+
+  # Store the latest context-window snapshot for the conversation header.
+  def persist_context_usage(conversation, adapter)
+    usage = adapter.context_usage
+    return if usage.blank?
+
+    conversation.update_column(:context_usage, usage)
   end
 
   def fail_message(assistant_message, broadcaster, message)

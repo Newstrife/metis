@@ -10,6 +10,7 @@
       <h1 class="text-xl font-semibold"><%= @conversation.display_title %></h1>
       <span class="text-xs uppercase tracking-wide text-gray-400"><%= @conversation.backend %></span>
     </div>
+    <div class="mt-2"><%= render "context_meter", conversation: @conversation %></div>
   </header>
 
   <div id="messages" data-chat-target="messages" class="space-y-4 pb-32">

@@ -26,10 +26,8 @@ module Agent
         super(conversation: conversation, **opts)
         @runtime = runtime || Agent::Runtime.for(conversation)
         @session = nil
-        @native_session_id = nil
+        @session_stats = nil
       end
-
-      attr_reader :native_session_id
 
       def stream(input, images: [], files: [], &block)
         return enum_for(:stream, input, images: images, files: files) unless block
@@ -40,11 +38,16 @@ module Agent
             ui_event = translate(pi_event)
             block.call(ui_event) if ui_event
           end
-          @native_session_id = capture_session_id(session)
+          @session_stats = capture_stats(session)
         end
       ensure
         @session = nil
       end
+
+      # pi's session_stats, captured after the last run (see #stream).
+      def native_session_id = @session_stats&.dig("sessionId")
+      def token_totals = @session_stats&.dig("tokens")
+      def context_usage = @session_stats&.dig("contextUsage")
 
       def abort
         @session&.abort
@@ -121,8 +124,10 @@ module Agent
         args
       end
 
-      def capture_session_id(session)
-        session.session_stats["sessionId"]
+      # pi's token usage, cost, and context-window stats for the run.
+      # Never raised — stats are reporting, not the turn itself.
+      def capture_stats(session)
+        session.session_stats
       rescue StandardError
         nil
       end

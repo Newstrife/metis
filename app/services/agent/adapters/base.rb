@@ -31,6 +31,18 @@ module Agent
       def native_session_id
         nil
       end
+
+      # Cumulative token counts for the session after the last run —
+      # a hash with "input"/"output"/"cacheRead" keys, or nil.
+      def token_totals
+        nil
+      end
+
+      # Context-window usage after the last run — a hash with
+      # "tokens"/"contextWindow"/"percent" keys, or nil.
+      def context_usage
+        nil
+      end
     end
   end
 end
