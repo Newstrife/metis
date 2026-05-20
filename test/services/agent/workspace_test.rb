@@ -10,26 +10,32 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
     FileUtils.rm_rf(Agent::Workspace::ROOT.join("u#{@user.id}"))
   end
 
-  test "session_dir is scoped per user and conversation under tmp/agent" do
-    expected = Agent::Workspace::ROOT.join("u#{@user.id}", "c#{@conversation.id}", "sessions")
-    assert_equal expected, Agent::Workspace.for(@conversation).session_dir
+  test "scopes session_dir and workspace_dir per user and conversation" do
+    scope = Agent::Workspace::ROOT.join("u#{@user.id}", "c#{@conversation.id}")
+    workspace = Agent::Workspace.for(@conversation)
+
+    assert_equal scope, workspace.scope_dir
+    assert_equal scope.join("sessions"), workspace.session_dir
+    assert_equal scope.join("workspace"), workspace.workspace_dir
   end
 
-  test "prepare! creates the session directory" do
+  test "prepare! creates both the session and workspace directories" do
     workspace = Agent::Workspace.for(@conversation)
-    refute Dir.exist?(workspace.session_dir)
+    refute Dir.exist?(workspace.scope_dir)
 
     workspace.prepare!
     assert Dir.exist?(workspace.session_dir)
+    assert Dir.exist?(workspace.workspace_dir)
   end
 
   test "prepare! discards stale scratch from a previous run" do
     workspace = Agent::Workspace.for(@conversation)
     workspace.prepare!
     File.write(workspace.session_dir.join("stale.jsonl"), "old")
+    File.write(workspace.workspace_dir.join("stale.rb"), "old")
 
     workspace.prepare!
-    assert Dir.exist?(workspace.session_dir)
     refute File.exist?(workspace.session_dir.join("stale.jsonl"))
+    refute File.exist?(workspace.workspace_dir.join("stale.rb"))
   end
 end

@@ -1,14 +1,14 @@
 require "tempfile"
 
 module Agent
-  # Durable, worker-independent persistence for a conversation's pi
-  # session directory.
+  # Durable, worker-independent persistence for a conversation's agent
+  # scratch scope — pi's session directory *and* its working directory
+  # (see Agent::Workspace).
   #
-  # pi reads and writes session files on local disk; that local copy is
-  # scratch (Agent::Workspace, under tmp/). The durable copy is a gzipped
-  # tar of the session directory, held as the conversation's Active
-  # Storage attachment — so any job worker can rehydrate the session
-  # regardless of which worker ran the previous turn.
+  # The local scope is scratch (under tmp/). The durable copy is a
+  # gzipped tar of the whole scope, held as the conversation's Active
+  # Storage attachment — so any job worker can rehydrate it regardless
+  # of which worker ran the previous turn.
   #
   #   SessionArchive.restore(conversation, into: scratch_dir)  # before a run
   #   SessionArchive.store(conversation, from: scratch_dir)    # after a run

@@ -1,24 +1,25 @@
 module Agent
   module Adapters
-    # Drives the pi backend via pi-agent-rb (`pi --mode rpc`) and
-    # translates pi's native event stream into Agent::UiEvent objects.
+    # The pi agent (one axis of composition). Drives a PiAgent::Session
+    # obtained from a Runtime and translates pi's native event stream
+    # into Agent::UiEvent objects.
     #
-    # Continuity: before each run the conversation's stored session
-    # archive is restored into a local scratch directory (Agent::Workspace);
-    # the first run has none, later runs pass --continue so pi reloads its
-    # own history. After the run the scratch directory is archived back to
-    # durable storage (Agent::SessionArchive) and pi's session id is
-    # captured for Conversation#backend_session_id.
+    # The adapter knows pi — its RPC protocol, event vocabulary, and CLI
+    # arguments. It knows nothing about where pi runs; that is the
+    # Runtime's job. v1 binds to Runtime::Local by default.
     #
-    # Credentials: --provider/--model come from conversation.settings;
-    # --api-key from the owner's stored ApiKey for that provider. When
-    # unset, pi falls back to its own configuration.
+    # Continuity: when the conversation already has a pi session
+    # (backend_session_id present), --continue is passed so pi reloads
+    # its history. pi's session id is captured after the run for
+    # Conversation#backend_session_id.
     #
-    # `session:` may be injected for testing.
+    # Credentials: --provider/--model from conversation.settings,
+    # --api-key from the owner's stored ApiKey. Unset -> pi falls back
+    # to its own configuration.
     class Pi < Base
-      def initialize(conversation:, session: nil, **opts)
+      def initialize(conversation:, runtime: nil, **opts)
         super(conversation: conversation, **opts)
-        @injected_session = session
+        @runtime = runtime || Agent::Runtime::Local.new(conversation: conversation)
         @session = nil
         @native_session_id = nil
       end
@@ -28,15 +29,16 @@ module Agent
       def stream(input, &block)
         return enum_for(:stream, input) unless block
 
-        session = active_session
-        session.prompt(input) do |pi_event|
-          ui_event = translate(pi_event)
-          block.call(ui_event) if ui_event
+        @runtime.run(pi_args: pi_args) do |session|
+          @session = session
+          session.prompt(input) do |pi_event|
+            ui_event = translate(pi_event)
+            block.call(ui_event) if ui_event
+          end
+          @native_session_id = capture_session_id(session)
         end
-        @native_session_id = capture_session_id(session)
       ensure
-        close_session
-        persist_session_archive
+        @session = nil
       end
 
       def abort
@@ -76,7 +78,7 @@ module Agent
 
       # pi CLI arguments for this conversation's run.
       def pi_args
-        [ "--mode", "rpc", "--session-dir", workspace.session_dir.to_s, *resume_args, *credential_args ]
+        [ "--mode", "rpc", "--session-dir", @runtime.session_dir.to_s, *resume_args, *credential_args ]
       end
 
       private
@@ -99,40 +101,10 @@ module Agent
         args
       end
 
-      def workspace
-        @workspace ||= Agent::Workspace.for(conversation)
-      end
-
-      def active_session
-        @session ||= @injected_session || build_real_session
-      end
-
-      def build_real_session
-        workspace.prepare!
-        Agent::SessionArchive.restore(conversation, into: workspace.session_dir)
-        PiAgent.session(args: pi_args)
-      end
-
-      # Capture the scratch session dir back to durable storage. Skipped
-      # for injected (test) sessions; failures are logged, never raised —
-      # a persistence failure must not crash the turn the user just saw.
-      def persist_session_archive
-        return if @injected_session
-
-        Agent::SessionArchive.store(conversation, from: workspace.session_dir)
-      rescue StandardError => e
-        Rails.logger.error("Pi session archive failed for conversation #{conversation.id}: #{e.message}")
-      end
-
       def capture_session_id(session)
         session.session_stats["sessionId"]
       rescue StandardError
         nil
-      end
-
-      def close_session
-        @session&.close
-        @session = nil
       end
 
       def translate_update(event)

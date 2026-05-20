@@ -30,12 +30,37 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     end
   RUBY
 
+  # A runtime that yields a caller-supplied stub session, bypassing any
+  # real pi process — so adapter behaviour is tested in isolation.
+  class FakeRuntime
+    def initialize(session)
+      @session = session
+    end
+
+    def session_dir
+      Pathname.new("/tmp/metis-fake-runtime/sessions")
+    end
+
+    def run(pi_args:)
+      yield @session
+    ensure
+      @session.close
+    end
+  end
+
   def adapter
     Agent::Adapters::Pi.new(conversation: Conversation.new(backend: :pi))
   end
 
   def pi_event(hash)
     PiAgent::Event.new(hash)
+  end
+
+  # Adapter wired to a FakeRuntime backed by `ruby -e <stub>` as pi.
+  def streaming_adapter(stub)
+    client = PiAgent::Client.new(bin: "ruby", args: [ "-e", stub ])
+    session = PiAgent::Session.new(client.start)
+    Agent::Adapters::Pi.new(conversation: Conversation.new(backend: :pi), runtime: FakeRuntime.new(session))
   end
 
   def create_conversation(**attrs)
@@ -135,12 +160,8 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
   # --- streaming -----------------------------------------------------
 
   test "stream translates a full pi prompt run into UiEvents" do
-    client = PiAgent::Client.new(bin: "ruby", args: [ "-e", PROMPT_STUB ])
-    session = PiAgent::Session.new(client.start)
-    streaming_adapter = Agent::Adapters::Pi.new(conversation: Conversation.new(backend: :pi), session: session)
-
     events = []
-    streaming_adapter.stream("hi") { |event| events << event }
+    streaming_adapter(PROMPT_STUB).stream("hi") { |event| events << event }
 
     assert_equal %i[message_started text_delta text_delta message_finished turn_finished],
                  events.map(&:type)
@@ -150,13 +171,10 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
   end
 
   test "stream captures pi's session id" do
-    client = PiAgent::Client.new(bin: "ruby", args: [ "-e", PROMPT_STUB ])
-    session = PiAgent::Session.new(client.start)
-    streaming_adapter = Agent::Adapters::Pi.new(conversation: Conversation.new(backend: :pi), session: session)
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.stream("hi") { |_event| nil }
 
-    streaming_adapter.stream("hi") { |_event| nil }
-
-    assert_equal "stub-session-1", streaming_adapter.native_session_id
+    assert_equal "stub-session-1", adapter.native_session_id
   end
 
   # --- argument building ---------------------------------------------
