@@ -22,6 +22,14 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     assert @conversation.messages.exists?(role: :assistant, streaming_status: :pending)
   end
 
+  test "stamps started_at on the assistant message when the turn starts" do
+    post conversation_messages_path(@conversation),
+         params: { content: "Hello agent" }, as: :turbo_stream
+
+    assert_response :success
+    assert_not_nil @conversation.messages.find_by(role: :assistant)&.started_at
+  end
+
   test "rejects a blank message with no attachments" do
     assert_no_difference -> { @conversation.messages.count } do
       post conversation_messages_path(@conversation),

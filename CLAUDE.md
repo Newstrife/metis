@@ -78,13 +78,13 @@ not crash a turn the user already saw stream.
 
 ### Credentials
 
-pi's `--provider` / `--model` / `--api-key` resolve through a fallback chain:
-per-conversation `Conversation#settings` (jsonb) and the owner's `ApiKey`
-(`User#api_key_for`) override a deployment-level default in `config.x.agent`
-(`METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL` / `METIS_AGENT_API_KEY`; the key
-is also read from Rails credentials at `agent.api_key`). All unset → pi uses
-its own config. There is no per-user settings UI yet — the deployment default
-is the working path; `settings` / `ApiKey` are override seams.
+pi's `--provider` / `--model` come from the conversation's `settings` (jsonb,
+set by the new-chat composer) or fall back to `config.x.agent` deployment
+defaults (`METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL`). The `--api-key` is
+chosen by provider: the owner's `ApiKey` (`User#api_key_for`) if set, else the
+per-provider deployment key in `config.x.agent.api_keys` (`ANTHROPIC_API_KEY` /
+`OPENAI_API_KEY` / `GOOGLE_API_KEY`, read from the environment — `.env` in
+development, loaded by foreman). All unset → pi uses its own config.
 
 ## Conventions
 

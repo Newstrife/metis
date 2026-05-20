@@ -39,7 +39,7 @@ class ChatBroadcaster
     Turbo::StreamsChannel.broadcast_update_to(
       @conversation,
       target: "#{base_id}_meta",
-      html: ApplicationController.helpers.token_summary(@message)
+      html: ApplicationController.helpers.message_meta(@message)
     )
   end
 

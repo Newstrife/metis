@@ -16,6 +16,17 @@ class Conversation < ApplicationRecord
     title.presence || "Untitled conversation"
   end
 
+  # The provider/model in use, preferring the model pi actually resolved
+  # (captured in agent_model after a turn) over the choice made at
+  # creation (settings). nil before either is known.
+  def provider_label
+    agent_model["provider"].presence || settings["provider"].presence
+  end
+
+  def model_label
+    agent_model["name"].presence || settings["model"].presence
+  end
+
   # True while a turn is running — an assistant message is still pending
   # or streaming. Used to refuse a second concurrent turn.
   def turn_in_progress?

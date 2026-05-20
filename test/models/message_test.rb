@@ -16,4 +16,21 @@ class MessageTest < ActiveSupport::TestCase
     message.files.attach(io: StringIO.new("data"), filename: "notes.txt", content_type: "text/plain")
     assert message.attachments?
   end
+
+  test "duration is nil until the turn has both timestamps" do
+    message = @conversation.messages.create!(role: :assistant, content: "", streaming_status: :pending)
+    assert_nil message.duration
+
+    message.update!(started_at: Time.current)
+    assert_nil message.duration
+  end
+
+  test "duration is the seconds between started_at and finished_at" do
+    start = Time.current
+    message = @conversation.messages.create!(
+      role: :assistant, content: "hi", streaming_status: :done,
+      started_at: start, finished_at: start + 4.2.seconds
+    )
+    assert_in_delta 4.2, message.duration, 0.001
+  end
 end

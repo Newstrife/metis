@@ -35,6 +35,7 @@ class ChatJob < ApplicationJob
     assistant_message.update!(
       content: buffer,
       streaming_status: errored ? :errored : :done,
+      finished_at: Time.current,
       **turn_token_columns(conversation, adapter)
     )
     persist_session_id(conversation, adapter)
@@ -90,7 +91,7 @@ class ChatJob < ApplicationJob
   def fail_message(assistant_message, broadcaster, message)
     return unless assistant_message
 
-    assistant_message.update!(streaming_status: :errored)
+    assistant_message.update!(streaming_status: :errored, finished_at: Time.current)
     broadcaster&.fail(message)
   end
 end

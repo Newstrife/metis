@@ -254,17 +254,20 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_equal "sk-test", args[args.index("--api-key") + 1]
   end
 
-  test "pi_args omits --api-key when no key is stored for the provider" do
+  test "pi_args omits --api-key when no key is configured for the provider" do
     conversation = create_conversation(settings: { "provider" => "anthropic" })
-    args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+    with_agent_config(api_keys: {}) do
+      args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
 
-    assert_includes args, "--provider"
-    refute_includes args, "--api-key"
+      assert_includes args, "--provider"
+      refute_includes args, "--api-key"
+    end
   end
 
   test "credential flags fall back to the deployment config when settings are empty" do
     conversation = create_conversation
-    with_agent_config(provider: "anthropic", model: "anthropic/claude-sonnet-4-5", api_key: "sk-deploy") do
+    with_agent_config(provider: "anthropic", model: "anthropic/claude-sonnet-4-5",
+                      api_keys: { "anthropic" => "sk-deploy" }) do
       args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
 
       assert_equal "anthropic/claude-sonnet-4-5", args[args.index("--model") + 1]
@@ -275,7 +278,7 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
   test "conversation settings override the deployment config" do
     conversation = create_conversation(settings: { "provider" => "openai", "model" => "openai/gpt-5" })
-    with_agent_config(provider: "anthropic", model: "anthropic/claude-sonnet-4-5", api_key: "sk-deploy") do
+    with_agent_config(provider: "anthropic", model: "anthropic/claude-sonnet-4-5") do
       args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
 
       assert_equal "openai/gpt-5", args[args.index("--model") + 1]
@@ -283,10 +286,19 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     end
   end
 
+  test "the deployment api key is matched to the conversation's provider" do
+    conversation = create_conversation(settings: { "provider" => "openai" })
+    with_agent_config(api_keys: { "anthropic" => "sk-ant", "openai" => "sk-oai" }) do
+      args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+
+      assert_equal "sk-oai", args[args.index("--api-key") + 1]
+    end
+  end
+
   test "a stored ApiKey overrides the deployment api key" do
     conversation = create_conversation(settings: { "provider" => "anthropic" })
     conversation.user.api_keys.create!(provider: "anthropic", key: "sk-user")
-    with_agent_config(provider: "anthropic", api_key: "sk-deploy") do
+    with_agent_config(api_keys: { "anthropic" => "sk-deploy" }) do
       args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
 
       assert_equal "sk-user", args[args.index("--api-key") + 1]

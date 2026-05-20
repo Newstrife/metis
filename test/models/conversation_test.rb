@@ -36,4 +36,27 @@ class ConversationTest < ActiveSupport::TestCase
       @conversation.messages.create!(role: :assistant, content: "", streaming_status: :pending)
     end
   end
+
+  test "provider and model labels read from settings before a turn runs" do
+    conversation = @user.conversations.create!(
+      backend: :pi, settings: { "provider" => "openai", "model" => "gpt-5.5" }
+    )
+    assert_equal "openai", conversation.provider_label
+    assert_equal "gpt-5.5", conversation.model_label
+  end
+
+  test "provider and model labels prefer the model pi resolved" do
+    conversation = @user.conversations.create!(
+      backend: :pi,
+      settings: { "provider" => "openai", "model" => "gpt-5.5" },
+      agent_model: { "provider" => "openai-codex", "name" => "GPT-5.5" }
+    )
+    assert_equal "openai-codex", conversation.provider_label
+    assert_equal "GPT-5.5", conversation.model_label
+  end
+
+  test "provider and model labels are nil when nothing is known" do
+    assert_nil @conversation.provider_label
+    assert_nil @conversation.model_label
+  end
 end

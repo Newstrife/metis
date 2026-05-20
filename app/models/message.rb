@@ -26,4 +26,11 @@ class Message < ApplicationRecord
   def attachments?
     images.attached? || files.attached?
   end
+
+  # End-to-end turn duration in seconds; nil until the turn finishes.
+  def duration
+    return unless started_at && finished_at
+
+    finished_at - started_at
+  end
 end

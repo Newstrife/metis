@@ -10,21 +10,28 @@
     </div>
   </div>
 
-  <%= link_to "New conversation", new_conversation_path,
-        class: "inline-block mb-6 rounded-md bg-gray-900 px-4 py-2 text-white text-sm font-medium hover:bg-gray-700" %>
+  <div class="pb-32">
+    <% if @conversations.any? %>
+      <ul class="divide-y divide-gray-200 border border-gray-200 rounded-md">
+        <% @conversations.each do |conversation| %>
+          <li>
+            <%= link_to conversation, class: "block px-4 py-3 hover:bg-gray-50" do %>
+              <div class="flex items-baseline justify-between gap-3">
+                <span class="font-medium truncate"><%= conversation.display_title %></span>
+                <span class="shrink-0 text-xs text-gray-400">
+                  <%= time_ago_in_words(conversation.updated_at) %> ago
+                </span>
+              </div>
+              <% meta = [ conversation.backend, conversation.provider_label, conversation.model_label ].compact %>
+              <div class="mt-0.5 text-xs text-gray-400"><%= meta.join(" · ") %></div>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="text-gray-500">No conversations yet — start one below.</p>
+    <% end %>
+  </div>
 
-  <% if @conversations.any? %>
-    <ul class="divide-y divide-gray-200 border border-gray-200 rounded-md">
-      <% @conversations.each do |conversation| %>
-        <li>
-          <%= link_to conversation, class: "flex items-center justify-between px-4 py-3 hover:bg-gray-50" do %>
-            <span class="font-medium"><%= conversation.display_title %></span>
-            <span class="text-xs uppercase tracking-wide text-gray-400"><%= conversation.backend %></span>
-          <% end %>
-        </li>
-      <% end %>
-    </ul>
-  <% else %>
-    <p class="text-gray-500">No conversations yet.</p>
-  <% end %>
+  <%= render "composer", conversation: nil %>
 </div>

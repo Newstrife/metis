@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_20_202716) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_20_223329) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -71,10 +71,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_20_202716) do
     t.text "content"
     t.bigint "conversation_id", null: false
     t.datetime "created_at", null: false
+    t.datetime "finished_at"
     t.integer "input_tokens"
     t.jsonb "native_ref"
     t.integer "output_tokens"
     t.integer "role", null: false
+    t.datetime "started_at"
     t.integer "streaming_status", default: 0, null: false
     t.string "tool_call_id"
     t.datetime "updated_at", null: false

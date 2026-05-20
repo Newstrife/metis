@@ -1,3 +1,7 @@
+<%# conversation: the chat being messaged, or nil to start a new one. %>
+<% conversation = local_assigns[:conversation] %>
+<% new_chat = conversation.nil? %>
+<% post_url = new_chat ? conversations_path : conversation_messages_path(conversation) %>
 <div id="composer" class="sticky bottom-0 bg-white pt-4 pb-6 border-t border-gray-100"
      data-controller="file-upload"
      data-action="dragover->file-upload#dragOver dragleave->file-upload#dragLeave drop->file-upload#drop">
@@ -7,7 +11,35 @@
     </div>
   <% end %>
 
-  <%= form_with url: conversation_messages_path(conversation), method: :post, multipart: true do |form| %>
+  <%= form_with url: post_url, method: :post, multipart: true do |form| %>
+    <% if new_chat %>
+      <div class="flex gap-2 mb-2" data-controller="model-select"
+           data-model-select-catalog-value="<%= Agent::Catalog.models_by_provider.to_json %>">
+        <select name="backend"
+                class="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700">
+          <% Conversation.backends.each_key do |backend| %>
+            <% supported = Agent::Adapters.supported?(backend) %>
+            <option value="<%= backend %>"
+                    <%= "selected" if backend == Agent::Adapters::SUPPORTED.first %>
+                    <%= "disabled" unless supported %>>
+              <%= backend.titleize %><%= " (soon)" unless supported %>
+            </option>
+          <% end %>
+        </select>
+        <select name="provider" data-model-select-target="provider"
+                data-action="model-select#providerChanged"
+                class="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700">
+          <%= options_for_select(Agent::Catalog.provider_options, Agent::Catalog.default_provider) %>
+        </select>
+        <select name="model" data-model-select-target="model"
+                class="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700">
+          <% Agent::Catalog.models_by_provider[Agent::Catalog.default_provider].each do |model| %>
+            <option value="<%= model["value"] %>"><%= model["label"] %></option>
+          <% end %>
+        </select>
+      </div>
+    <% end %>
+
     <div data-file-upload-target="previews" class="flex flex-wrap gap-2 mb-2 empty:hidden"></div>
 
     <div class="flex gap-2 items-stretch">
@@ -25,12 +57,13 @@
         </svg>
       </label>
 
-      <textarea name="content" rows="3" placeholder="Message the agent…"
+      <textarea name="content" rows="3"
+                placeholder="<%= new_chat ? "Ask anything to start a new chat…" : "Message the agent…" %>"
                 class="flex-1 rounded-md border border-gray-300 px-3 py-2 resize-none
                        focus:outline-none focus:ring-2 focus:ring-gray-400"></textarea>
 
-      <%= form.submit "Send",
-            class: "rounded-md bg-gray-900 px-4 text-white text-sm font-medium hover:bg-gray-700" %>
+      <%= form.submit(new_chat ? "Start" : "Send",
+            class: "rounded-md bg-gray-900 px-4 text-white text-sm font-medium hover:bg-gray-700") %>
     </div>
   <% end %>
 </div>

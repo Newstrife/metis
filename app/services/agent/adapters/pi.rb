@@ -116,8 +116,9 @@ module Agent
       end
 
       # Per-conversation settings (and the owner's stored ApiKey) override
-      # the deployment-level default in config.x.agent. All unset -> no
-      # flags, and pi falls back to its own configuration.
+      # the deployment-level defaults in config.x.agent. The api key is
+      # matched to the provider. All unset -> no flags, and pi falls back
+      # to its own configuration.
       def credential_args
         settings = conversation.settings || {}
         defaults = Rails.application.config.x.agent
@@ -129,7 +130,8 @@ module Agent
         args += [ "--model", model ] if model.present?
         if provider.present?
           args += [ "--provider", provider ]
-          key = conversation.user.api_key_for(provider).presence || defaults.api_key
+          key = conversation.user.api_key_for(provider).presence ||
+                defaults.api_keys.to_h[provider]
           args += [ "--api-key", key ] if key.present?
         end
         args

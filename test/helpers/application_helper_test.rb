@@ -55,4 +55,23 @@ class ApplicationHelperTest < ActionView::TestCase
     assert_includes summary, "340 out"
     assert_not_includes summary, "cached"
   end
+
+  test "format_duration shows seconds under a minute and m/s above" do
+    assert_equal "2.3s", format_duration(2.34)
+    assert_equal "9.0s", format_duration(9.0)
+    assert_equal "1m 05s", format_duration(65.7)
+  end
+
+  test "message_meta is blank with no duration or tokens" do
+    assert_equal "", message_meta(Message.new)
+  end
+
+  test "message_meta joins the turn duration and token counts" do
+    now = Time.current
+    message = Message.new(started_at: now, finished_at: now + 3.seconds, input_tokens: 1200)
+    meta = message_meta(message)
+    assert_includes meta, "3.0s"
+    assert_includes meta, "1.2k in"
+    assert_includes meta, " · "
+  end
 end

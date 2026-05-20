@@ -142,4 +142,25 @@ class ChatJobTest < ActiveSupport::TestCase
     end
     assert @assistant_message.reload.errored?
   end
+
+  test "stamps finished_at so a completed turn has a duration" do
+    @assistant_message.update!(started_at: 3.seconds.ago)
+    run_with([ Agent::UiEvent.new(:turn_finished) ])
+
+    @assistant_message.reload
+    assert_not_nil @assistant_message.finished_at
+    assert_operator @assistant_message.duration, :>, 0
+  end
+
+  test "stamps finished_at even when the turn fails" do
+    raiser = Object.new
+    def raiser.stream(*)
+      raise "pi crashed"
+    end
+
+    with_adapter(raiser) do
+      ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
+    end
+    assert_not_nil @assistant_message.reload.finished_at
+  end
 end

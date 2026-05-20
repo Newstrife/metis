@@ -23,6 +23,23 @@ module ApplicationHelper
     html.html_safe
   end
 
+  # The compact per-message footer: turn duration and token counts.
+  # "" when neither was recorded, so the footer collapses.
+  def message_meta(message)
+    parts = []
+    parts << format_duration(message.duration) if message.duration
+    parts << token_summary(message)
+    parts.reject(&:blank?).join(" · ")
+  end
+
+  # Human-readable turn duration: "2.3s", "1m 04s".
+  def format_duration(seconds)
+    return "#{seconds.round(1)}s" if seconds < 60
+
+    minutes, rest = seconds.divmod(60)
+    format("%dm %02ds", minutes, rest)
+  end
+
   # A compact per-message token line, or "" when none was recorded.
   def token_summary(message)
     return "" if message.input_tokens.blank? && message.output_tokens.blank?
