@@ -1,9 +1,22 @@
-# This file should ensure the existence of records required to run the application in every environment (production,
-# development, test). The code here should be idempotent so that it can be executed at any point in every environment.
-# The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
-#
-# Example:
-#
-#   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
-#     MovieGenre.find_or_create_by!(name: genre_name)
-#   end
+# Seed data. Idempotent — safe to re-run with `bin/rails db:seed`.
+
+# Local login accounts for development. Skipped in production so a
+# known-password account never lands on a live database.
+if Rails.env.local?
+  accounts = [
+    { email: "admin@metis.local", password: "password" }
+  ]
+
+  accounts.each do |attrs|
+    user = User.find_or_initialize_by(email: attrs[:email])
+    if user.new_record?
+      user.password = attrs[:password]
+      user.save!
+      puts "Created login: #{user.email} (password: #{attrs[:password]})"
+    else
+      puts "Login already exists: #{user.email}"
+    end
+  end
+else
+  puts "Skipping development login seeds in #{Rails.env}."
+end
