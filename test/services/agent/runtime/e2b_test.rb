@@ -1,4 +1,5 @@
 require "test_helper"
+require "tmpdir"
 
 class Agent::Runtime::E2bTest < ActiveSupport::TestCase
   setup do
@@ -8,22 +9,58 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
   end
 
   class FakeCommands
-    def run(*_args, **_kwargs) = nil
-  end
+    attr_reader :runs
 
-  # Minimal fake E2B sandbox.
-  class FakeSandbox
-    attr_reader :sandbox_id
-
-    def initialize(sandbox_id)
-      @sandbox_id = sandbox_id
-      @paused = false
+    def initialize
+      @runs = []
     end
 
-    def commands = FakeCommands.new
-    def resume(**) = self
-    def pause = (@paused = true)
-    def paused? = @paused
+    def run(cmd, **_kwargs)
+      @runs << cmd
+    end
+  end
+
+  class FakeFiles
+    attr_reader :writes
+
+    def initialize(read_bytes)
+      @read_bytes = read_bytes
+      @writes = {}
+    end
+
+    def write(path, data)
+      @writes[path] = data
+    end
+
+    def read(_path, format: nil)
+      @read_bytes
+    end
+  end
+
+  # Fake E2B sandbox recording commands, file writes, and termination.
+  class FakeSandbox
+    attr_reader :commands, :files
+
+    def initialize(read_bytes: "captured-archive-bytes")
+      @commands = FakeCommands.new
+      @files = FakeFiles.new(read_bytes)
+      @killed = false
+    end
+
+    def kill
+      @killed = true
+    end
+
+    def killed?
+      @killed
+    end
+  end
+
+  # Upload double — responds to #filename and #download.
+  FakeUpload = Struct.new(:filename, :bytes) do
+    def download
+      bytes
+    end
   end
 
   def fake_session
@@ -32,23 +69,15 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     session
   end
 
-  # Swap PiAgent.session and only the requested E2B::Sandbox class methods
-  # for the block (:skip leaves a method untouched).
-  def with_e2b(create: :skip, connect: :skip, session:)
-    originals = {}
-    if create != :skip
-      originals[:create] = E2B::Sandbox.method(:create)
-      E2B::Sandbox.define_singleton_method(:create) { |**| create }
-    end
-    if connect != :skip
-      originals[:connect] = E2B::Sandbox.method(:connect)
-      E2B::Sandbox.define_singleton_method(:connect) { |*, **| connect }
-    end
+  # Stub E2B::Sandbox.create and PiAgent.session for the block.
+  def with_e2b(sandbox:, session:)
+    create_original = E2B::Sandbox.method(:create)
     session_original = PiAgent.method(:session)
+    E2B::Sandbox.define_singleton_method(:create) { |**| sandbox }
     PiAgent.define_singleton_method(:session) { |*, **| session }
     yield
   ensure
-    originals.each { |name, method| E2B::Sandbox.define_singleton_method(name, method) }
+    E2B::Sandbox.define_singleton_method(:create, create_original)
     PiAgent.define_singleton_method(:session, session_original)
   end
 
@@ -56,42 +85,62 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     assert_equal Agent::Runtime::E2b::SESSION_DIR, @runtime.session_dir.to_s
   end
 
-  test "creates a sandbox on the first turn and records its id" do
-    sandbox = FakeSandbox.new("sbx-new")
+  test "creates a sandbox, runs the turn, and kills the sandbox" do
+    sandbox = FakeSandbox.new
 
-    with_e2b(create: sandbox, session: fake_session) do
+    with_e2b(sandbox: sandbox, session: fake_session) do
       @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
     end
 
-    assert_equal "sbx-new", @conversation.reload.runtime_state["e2b_sandbox_id"]
-    assert sandbox.paused?
+    assert sandbox.killed?, "sandbox terminated after the turn"
   end
 
-  test "resumes the recorded sandbox on a later turn" do
-    @conversation.update!(runtime_state: { "e2b_sandbox_id" => "sbx-existing" })
-    sandbox = FakeSandbox.new("sbx-existing")
+  test "persists the scope to durable storage after the turn" do
+    sandbox = FakeSandbox.new(read_bytes: "the-tarball")
 
-    with_e2b(connect: sandbox, session: fake_session) do
+    with_e2b(sandbox: sandbox, session: fake_session) do
       @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
     end
 
-    assert sandbox.paused?
+    assert @conversation.pi_session_archive.attached?
+    assert_equal "the-tarball", @conversation.pi_session_archive.download
+    assert_includes sandbox.commands.runs.join("\n"), "tar -czf"
   end
 
-  test "falls back to a fresh sandbox when resume fails" do
-    @conversation.update!(runtime_state: { "e2b_sandbox_id" => "sbx-expired" })
-    fresh = FakeSandbox.new("sbx-fresh")
+  test "does not hydrate on the first turn (no prior archive)" do
+    sandbox = FakeSandbox.new
 
-    connect_original = E2B::Sandbox.method(:connect)
-    E2B::Sandbox.define_singleton_method(:connect) { |*, **| raise E2B::NotFoundError, "gone" }
-    begin
-      with_e2b(create: fresh, session: fake_session) do
-        @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
-      end
-    ensure
-      E2B::Sandbox.define_singleton_method(:connect, connect_original)
+    with_e2b(sandbox: sandbox, session: fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
     end
 
-    assert_equal "sbx-fresh", @conversation.reload.runtime_state["e2b_sandbox_id"]
+    refute_includes sandbox.commands.runs.join("\n"), "tar -xzf"
+  end
+
+  test "hydrates the sandbox from a stored archive" do
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "marker"), "x")
+      Agent::SessionArchive.store(@conversation, from: dir)
+    end
+    sandbox = FakeSandbox.new
+
+    with_e2b(sandbox: sandbox, session: fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert sandbox.files.writes.key?(Agent::Runtime::E2b::REMOTE_ARCHIVE), "archive uploaded into the sandbox"
+    assert_includes sandbox.commands.runs.join("\n"), "tar -xzf"
+  end
+
+  test "stages uploaded files into the sandbox workspace" do
+    sandbox = FakeSandbox.new
+    upload = FakeUpload.new("notes.txt", "file contents")
+
+    with_e2b(sandbox: sandbox, session: fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ], files: [ upload ]) { |_s| nil }
+    end
+
+    staged = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/notes.txt"
+    assert_equal "file contents", sandbox.files.writes[staged]
   end
 end

@@ -1,44 +1,88 @@
 require "shellwords"
+require "tempfile"
 
 module Agent
   module Runtime
     # Runs pi inside an E2B secure microVM — the isolated runtime.
     #
-    # Each conversation owns one sandbox: created on the first turn,
-    # paused after each turn, resumed on the next (pi's session directory
-    # and workspace persist in the frozen microVM). The sandbox id is kept
-    # in Conversation#runtime_state. An expired/missing sandbox falls back
-    # to a fresh one.
+    # The microVM is disposable execution infrastructure, not the
+    # conversation's memory. Each turn: a fresh sandbox is created,
+    # hydrated from the conversation's durable archive (Active Storage),
+    # runs pi, has its scope captured back to the archive, and is killed.
+    # State lives outside E2B — an expired or unreachable sandbox costs
+    # nothing and loses nothing.
     #
     # This IS an isolation boundary: pi's shell is confined to the
     # microVM — the host, Metis's secrets, and other conversations are
     # unreachable.
     #
     # pi must be present in the sandbox image (config.x.agent.e2b_template
-    # — a template with pi baked in; see lib/tasks or the build script).
+    # — a template with pi baked in; see the e2b:template rake task).
     class E2b < Base
-      SESSION_DIR = "/home/user/metis/sessions".freeze
-      WORKSPACE_DIR = "/home/user/metis/workspace".freeze
+      SCOPE_DIR = "/home/user/metis".freeze
+      SESSION_DIR = "#{SCOPE_DIR}/sessions".freeze
+      WORKSPACE_DIR = "#{SCOPE_DIR}/workspace".freeze
+      REMOTE_ARCHIVE = "/tmp/pi-session.tar.gz".freeze
       SANDBOX_TIMEOUT = 600
 
       def session_dir
         Pathname.new(SESSION_DIR)
       end
 
-      def run(pi_args:, files: [])
-        sandbox = acquire_sandbox
+      def run(pi_args:, files: [], &block)
+        sandbox = create_sandbox
+        execute(sandbox, pi_args: pi_args, files: files, &block)
+      ensure
+        terminate(sandbox)
+      end
+
+      private
+
+      def execute(sandbox, pi_args:, files:)
         provision(sandbox)
+        hydrate(sandbox)
         stage_files(sandbox, files)
         session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args))
         begin
           yield session
         ensure
           session.close
-          finalize(sandbox)
+          persist(sandbox)
         end
       end
 
-      private
+      def create_sandbox
+        E2B::Sandbox.create(template: template, timeout: SANDBOX_TIMEOUT)
+      end
+
+      def provision(sandbox)
+        sandbox.commands.run("mkdir -p #{SESSION_DIR} #{WORKSPACE_DIR}")
+      end
+
+      # Restore the conversation's durable archive into the sandbox. No-op
+      # on the first turn (no archive yet).
+      def hydrate(sandbox)
+        Agent::SessionArchive.with_archive(conversation) do |archive_path|
+          sandbox.files.write(REMOTE_ARCHIVE, File.binread(archive_path))
+          sandbox.commands.run("tar -xzf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR}")
+        end
+      end
+
+      # Capture the sandbox's scope (session + workspace) back to durable
+      # storage. Logged, never raised — it must not crash the turn the
+      # user already saw stream.
+      def persist(sandbox)
+        sandbox.commands.run("tar -czf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR} .")
+        data = sandbox.files.read(REMOTE_ARCHIVE, format: "bytes")
+        Tempfile.create([ "pi-session", ".tar.gz" ]) do |tmp|
+          tmp.binmode
+          tmp.write(data)
+          tmp.flush
+          Agent::SessionArchive.attach(conversation, tmp.path)
+        end
+      rescue StandardError => e
+        Rails.logger.error("E2B archive failed for conversation #{conversation.id}: #{e.message}")
+      end
 
       # Upload files into pi's in-sandbox working directory. Filenames
       # are basenamed so a crafted name cannot escape the workspace.
@@ -51,33 +95,6 @@ module Agent
         end
       end
 
-      def acquire_sandbox
-        id = conversation.runtime_state["e2b_sandbox_id"]
-        if id.present?
-          begin
-            return resume_sandbox(id)
-          rescue E2B::E2BError => e
-            Rails.logger.warn("E2B resume failed for conversation #{conversation.id} " \
-                              "(#{e.message}); creating a fresh sandbox")
-          end
-        end
-        create_sandbox
-      end
-
-      def resume_sandbox(id)
-        sandbox = E2B::Sandbox.connect(id, timeout: SANDBOX_TIMEOUT)
-        sandbox.resume(timeout: SANDBOX_TIMEOUT)
-        sandbox
-      end
-
-      def create_sandbox
-        E2B::Sandbox.create(template: template, timeout: SANDBOX_TIMEOUT)
-      end
-
-      def provision(sandbox)
-        sandbox.commands.run("mkdir -p #{SESSION_DIR} #{WORKSPACE_DIR}")
-      end
-
       def transport_factory(sandbox, pi_args)
         command = Shellwords.join([ "pi", *pi_args ])
         lambda do |on_message:, on_stderr:|
@@ -88,16 +105,10 @@ module Agent
         end
       end
 
-      # Pause the sandbox (freezing pi's session + workspace) and record
-      # its id so the next turn resumes it. Failures are logged, never
-      # raised — they must not crash a turn the user already saw.
-      def finalize(sandbox)
-        sandbox.pause
-        conversation.update_column(
-          :runtime_state, conversation.runtime_state.merge("e2b_sandbox_id" => sandbox.sandbox_id)
-        )
-      rescue E2B::E2BError, ActiveRecord::ActiveRecordError => e
-        Rails.logger.error("E2B finalize failed for conversation #{conversation.id}: #{e.message}")
+      def terminate(sandbox)
+        sandbox&.kill
+      rescue E2B::E2BError => e
+        Rails.logger.warn("E2B sandbox kill failed for conversation #{conversation.id}: #{e.message}")
       end
 
       def template

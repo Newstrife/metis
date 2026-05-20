@@ -5,13 +5,15 @@ module Agent
   # scratch scope — pi's session directory *and* its working directory
   # (see Agent::Workspace).
   #
-  # The local scope is scratch (under tmp/). The durable copy is a
-  # gzipped tar of the whole scope, held as the conversation's Active
-  # Storage attachment — so any job worker can rehydrate it regardless
-  # of which worker ran the previous turn.
+  # The durable copy is a gzipped tar of the whole scope, held as the
+  # conversation's Active Storage attachment — so any job worker, and
+  # any runtime, can rehydrate it regardless of where the previous turn
+  # ran. It is the conversation's source of truth; the runtime's sandbox
+  # (local scratch dir, or an E2B microVM) is disposable.
   #
-  #   SessionArchive.restore(conversation, into: scratch_dir)  # before a run
-  #   SessionArchive.store(conversation, from: scratch_dir)    # after a run
+  #   restore/store   — local-directory convenience (Runtime::Local)
+  #   with_archive/attach — blob access for runtimes that tar elsewhere
+  #                         (Runtime::E2b tars inside the sandbox)
   class SessionArchive
     FILENAME = "pi-session.tar.gz".freeze
     CONTENT_TYPE = "application/gzip".freeze
@@ -19,26 +21,41 @@ module Agent
     class ArchiveError < StandardError; end
 
     class << self
-      # Unpack the conversation's stored session archive into `dir`.
-      # No-op when the conversation has no archive yet (first turn).
-      def restore(conversation, into:)
-        return unless conversation.pi_session_archive.attached?
+      def archived?(conversation)
+        conversation.pi_session_archive.attached?
+      end
+
+      # Yield a local path to the downloaded archive. No-op (no yield)
+      # when the conversation has no archive yet — the first turn.
+      def with_archive(conversation)
+        return unless archived?(conversation)
 
         conversation.pi_session_archive.open do |archive|
-          extract(archive.path, into)
+          yield archive.path
         end
       end
 
-      # Tar `dir` and attach it to the conversation, replacing any prior
-      # archive. No-op when `dir` is empty (pi wrote nothing).
+      # Attach the gzipped tar at `path`, replacing any prior archive.
+      def attach(conversation, path)
+        conversation.pi_session_archive.attach(
+          io: File.open(path), filename: FILENAME, content_type: CONTENT_TYPE
+        )
+      end
+
+      # --- local-directory convenience (Runtime::Local) ----------------
+
+      # Unpack the conversation's stored archive into `dir`.
+      def restore(conversation, into:)
+        with_archive(conversation) { |path| extract(path, into) }
+      end
+
+      # Tar `dir` and attach it. No-op when `dir` is empty (nothing ran).
       def store(conversation, from:)
         return unless Dir.exist?(from) && !Dir.empty?(from)
 
         Tempfile.create([ "pi-session", ".tar.gz" ]) do |tmp|
           compress(from, tmp.path)
-          conversation.pi_session_archive.attach(
-            io: File.open(tmp.path), filename: FILENAME, content_type: CONTENT_TYPE
-          )
+          attach(conversation, tmp.path)
         end
       end
 
