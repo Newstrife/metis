@@ -31,9 +31,16 @@ module Agent
 
       def run(pi_args:, files: [], &block)
         sandbox = create_sandbox
+        @sandbox_id = sandbox.sandbox_id
         execute(sandbox, pi_args: pi_args, files: files, &block)
       ensure
         terminate(sandbox)
+      end
+
+      # Adds the microVM's id, so a turn can be traced to its sandbox in
+      # E2B's logs even though the sandbox itself is killed after the run.
+      def runtime_info
+        super.merge("sandbox_id" => @sandbox_id)
       end
 
       private

@@ -1,23 +1,35 @@
-<div id="<%= dom_id(message) %>" class="rounded-lg border border-gray-200 px-4 py-3">
-  <div class="text-xs uppercase tracking-wide text-gray-400 mb-1"><%= message.role %></div>
+<% if message.user? %>
+  <%# User: a contained bubble, aligned to the right. %>
+  <div id="<%= dom_id(message) %>" class="flex justify-end">
+    <div class="max-w-[85%] rounded-2xl bg-gray-100 px-4 py-2.5">
+      <% if message.attachments? %>
+        <%= render "messages/attachments", message: message %>
+      <% end %>
+      <div id="<%= dom_id(message) %>_body"
+           class="chat-content break-words"><%= markdown(message.content) %></div>
+    </div>
+  </div>
+<% else %>
+  <%# Assistant: full width, no bubble, so code and tables have room. %>
+  <div id="<%= dom_id(message) %>" class="pr-6">
+    <% if message.attachments? %>
+      <%= render "messages/attachments", message: message %>
+    <% end %>
 
-  <% if message.attachments? %>
-    <%= render "messages/attachments", message: message %>
-  <% end %>
+    <div id="<%= dom_id(message) %>_reasoning"
+         class="text-sm text-gray-500 italic whitespace-pre-wrap break-words empty:hidden mb-2"></div>
 
-  <div id="<%= dom_id(message) %>_reasoning"
-       class="text-sm text-gray-500 italic whitespace-pre-wrap break-words empty:hidden mb-2"></div>
+    <div id="<%= dom_id(message) %>_tools" class="space-y-2 empty:hidden mb-2"></div>
 
-  <div id="<%= dom_id(message) %>_tools" class="space-y-2 empty:hidden mb-2"></div>
+    <div id="<%= dom_id(message) %>_body"
+         class="chat-content break-words"><%= markdown(message.content) %></div>
 
-  <div id="<%= dom_id(message) %>_body"
-       class="chat-content break-words"><%= markdown(message.content) %></div>
+    <% unless message.done? %>
+      <span id="<%= dom_id(message) %>_indicator"
+            class="inline-block animate-pulse text-gray-400">●</span>
+    <% end %>
 
-  <% if message.assistant? && !message.done? %>
-    <span id="<%= dom_id(message) %>_indicator"
-          class="inline-block animate-pulse text-gray-400">●</span>
-  <% end %>
-
-  <div id="<%= dom_id(message) %>_meta"
-       class="mt-2 text-xs text-gray-400 tabular-nums empty:hidden"><%= message_meta(message) %></div>
-</div>
+    <div id="<%= dom_id(message) %>_meta"
+         class="mt-2 text-xs text-gray-400 tabular-nums empty:hidden"><%= message_meta(message) %></div>
+  </div>
+<% end %>

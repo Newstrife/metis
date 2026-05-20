@@ -1,12 +1,17 @@
-<%# The model pi resolved + its context-window usage. The element id is
-    stable so ChatJob can repaint it after each turn. %>
+<%# The model pi resolved, where it ran, and its context-window usage.
+    The element id is stable so ChatJob can repaint it after each turn. %>
 <% model = conversation.agent_model %>
+<% runtime = conversation.runtime_state %>
 <% usage = conversation.context_usage %>
 <% window = usage["contextWindow"].to_i %>
-<% if model["name"].present? || window.positive? %>
+<% if model["name"].present? || runtime["runtime"].present? || window.positive? %>
   <div id="<%= dom_id(conversation, :context) %>" class="flex items-center gap-2 text-xs text-gray-400">
     <% if model["name"].present? %>
       <span class="font-medium text-gray-500" title="<%= model["provider"] %>"><%= model["name"] %></span>
+    <% end %>
+    <% if runtime["runtime"].present? %>
+      <span class="rounded bg-gray-100 px-1.5 py-0.5 font-medium uppercase tracking-wide text-gray-500"
+            title="<%= runtime["sandbox_id"] %>"><%= runtime["runtime"] %></span>
     <% end %>
     <% if window.positive? %>
       <% percent = usage["percent"].to_f.clamp(0, 100) %>

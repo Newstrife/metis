@@ -53,6 +53,7 @@ module Agent
       def token_totals = @session_stats&.dig("tokens")
       def context_usage = @session_stats&.dig("contextUsage")
       def model_info = @model_info
+      def runtime_info = @runtime.runtime_info
 
       def abort
         @session&.abort

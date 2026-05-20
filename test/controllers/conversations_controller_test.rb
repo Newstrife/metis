@@ -80,6 +80,17 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Mine"
   end
 
+  test "shows the runtime a conversation ran on in the context meter" do
+    sign_in @user
+    conversation = @user.conversations.create!(
+      backend: :pi, title: "Ran", runtime_state: { "runtime" => "e2b", "sandbox_id" => "sbx-7" }
+    )
+    get conversation_path(conversation)
+
+    assert_response :success
+    assert_select "##{ActionView::RecordIdentifier.dom_id(conversation, :context)}", /e2b/i
+  end
+
   test "does not expose another user's conversation" do
     other = User.create!(email: "other@example.com", password: "password123")
     conversation = other.conversations.create!(backend: :pi, title: "Secret")

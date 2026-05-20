@@ -24,6 +24,12 @@ module Agent
       def run(pi_args:, files: [])
         raise NotImplementedError, "#{self.class} must implement #run"
       end
+
+      # A record of where the turn ran, persisted on the Conversation:
+      # the runtime name, plus whatever per-run detail a subclass adds.
+      def runtime_info
+        { "runtime" => self.class.name.demodulize.underscore }
+      end
     end
   end
 end

@@ -3,14 +3,16 @@ require "test_helper"
 class ChatJobTest < ActiveSupport::TestCase
   # Fake adapter that replays a canned Agent::UiEvent stream.
   class FakeAdapter
-    attr_reader :native_session_id, :token_totals, :context_usage, :model_info
+    attr_reader :native_session_id, :token_totals, :context_usage, :model_info, :runtime_info
 
-    def initialize(events, native_session_id: nil, token_totals: nil, context_usage: nil, model_info: nil)
+    def initialize(events, native_session_id: nil, token_totals: nil, context_usage: nil,
+                   model_info: nil, runtime_info: nil)
       @events = events
       @native_session_id = native_session_id
       @token_totals = token_totals
       @context_usage = context_usage
       @model_info = model_info
+      @runtime_info = runtime_info
     end
 
     def stream(_input, images: [], files: [])
@@ -141,6 +143,13 @@ class ChatJobTest < ActiveSupport::TestCase
       ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
     end
     assert @assistant_message.reload.errored?
+  end
+
+  test "records where the turn ran on the conversation" do
+    run_with([ Agent::UiEvent.new(:turn_finished) ],
+             runtime_info: { "runtime" => "e2b", "sandbox_id" => "sbx-1" })
+
+    assert_equal({ "runtime" => "e2b", "sandbox_id" => "sbx-1" }, @conversation.reload.runtime_state)
   end
 
   test "stamps finished_at so a completed turn has a duration" do

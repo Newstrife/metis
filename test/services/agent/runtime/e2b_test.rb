@@ -39,11 +39,12 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
 
   # Fake E2B sandbox recording commands, file writes, and termination.
   class FakeSandbox
-    attr_reader :commands, :files
+    attr_reader :commands, :files, :sandbox_id
 
-    def initialize(read_bytes: "captured-archive-bytes")
+    def initialize(read_bytes: "captured-archive-bytes", sandbox_id: "sbx-fake")
       @commands = FakeCommands.new
       @files = FakeFiles.new(read_bytes)
+      @sandbox_id = sandbox_id
       @killed = false
     end
 
@@ -142,5 +143,15 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
 
     staged = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/notes.txt"
     assert_equal "file contents", sandbox.files.writes[staged]
+  end
+
+  test "runtime_info reports the runtime name and the run's sandbox id" do
+    sandbox = FakeSandbox.new(sandbox_id: "sbx-99")
+
+    with_e2b(sandbox: sandbox, session: fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_equal({ "runtime" => "e2b", "sandbox_id" => "sbx-99" }, @runtime.runtime_info)
   end
 end

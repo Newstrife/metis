@@ -46,6 +46,10 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     assert_equal @workspace.session_dir, @runtime.session_dir
   end
 
+  test "runtime_info names the local runtime" do
+    assert_equal({ "runtime" => "local" }, @runtime.runtime_info)
+  end
+
   test "run provisions the workspace and yields the session" do
     session = fake_session
     yielded = nil

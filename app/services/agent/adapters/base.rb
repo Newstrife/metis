@@ -49,6 +49,12 @@ module Agent
       def model_info
         nil
       end
+
+      # Where the last run physically executed — a hash with a "runtime"
+      # name and per-runtime detail — or nil.
+      def runtime_info
+        nil
+      end
     end
   end
 end

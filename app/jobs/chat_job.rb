@@ -41,6 +41,7 @@ class ChatJob < ApplicationJob
     persist_session_id(conversation, adapter)
     persist_context_usage(conversation, adapter)
     persist_agent_model(conversation, adapter)
+    persist_runtime(conversation, adapter)
     conversation.touch
     broadcaster.refresh_usage
   end
@@ -86,6 +87,15 @@ class ChatJob < ApplicationJob
     return if model.blank? || model == conversation.agent_model
 
     conversation.update_column(:agent_model, model)
+  end
+
+  # Record where the turn ran — the runtime name and, for E2B, the
+  # sandbox id — on the conversation.
+  def persist_runtime(conversation, adapter)
+    info = adapter.runtime_info
+    return if info.blank? || info == conversation.runtime_state
+
+    conversation.update_column(:runtime_state, info)
   end
 
   def fail_message(assistant_message, broadcaster, message)

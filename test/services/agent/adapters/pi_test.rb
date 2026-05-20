@@ -51,6 +51,10 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
       Pathname.new("/tmp/metis-fake-runtime/sessions")
     end
 
+    def runtime_info
+      { "runtime" => "fake" }
+    end
+
     def run(pi_args:, files: [])
       yield @session
     ensure
@@ -217,6 +221,10 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_nil adapter.token_totals
     assert_nil adapter.context_usage
     assert_nil adapter.model_info
+  end
+
+  test "runtime_info delegates to the runtime" do
+    assert_equal({ "runtime" => "fake" }, streaming_adapter(PROMPT_STUB).runtime_info)
   end
 
   # --- argument building ---------------------------------------------
