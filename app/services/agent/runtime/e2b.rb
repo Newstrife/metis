@@ -22,11 +22,21 @@ module Agent
       SCOPE_DIR = "/home/user/metis".freeze
       SESSION_DIR = "#{SCOPE_DIR}/sessions".freeze
       WORKSPACE_DIR = "#{SCOPE_DIR}/workspace".freeze
+      # Outside SCOPE_DIR on purpose — extensions are code, not session
+      # state, and must not be captured into the conversation's archive.
+      EXTENSIONS_DIR = "/home/user/pi-extensions".freeze
       REMOTE_ARCHIVE = "/tmp/pi-session.tar.gz".freeze
       SANDBOX_TIMEOUT = 600
 
       def session_dir
         Pathname.new(SESSION_DIR)
+      end
+
+      # The app's pi extensions at their planned in-sandbox paths. These
+      # are deterministic so pi_args can be built before the sandbox
+      # exists; #stage_extensions uploads the files to them.
+      def extension_paths
+        Agent::Runtime.extension_sources.map { |source| Pathname.new(sandbox_extension_path(source)) }
       end
 
       def run(pi_args:, files: [], &block)
@@ -47,6 +57,7 @@ module Agent
 
       def execute(sandbox, pi_args:, files:)
         provision(sandbox)
+        stage_extensions(sandbox)
         hydrate(sandbox)
         stage_files(sandbox, files)
         session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args))
@@ -89,6 +100,26 @@ module Agent
         end
       rescue StandardError => e
         Rails.logger.error("E2B archive failed for conversation #{conversation.id}: #{e.message}")
+      end
+
+      # Upload the app's pi extensions into the sandbox so `pi --extension`
+      # can load them. Written outside SCOPE_DIR — they are code, and must
+      # not be captured into the conversation's session archive.
+      def stage_extensions(sandbox)
+        sources = Agent::Runtime.extension_sources
+        return if sources.empty?
+
+        sandbox.commands.run("mkdir -p #{EXTENSIONS_DIR}")
+        sources.each do |source|
+          sandbox.files.write(sandbox_extension_path(source), File.binread(source))
+        end
+      end
+
+      # An extension's path inside the sandbox. Each extension is a
+      # <name>/index.ts; the upload is named <name>.ts so distinct
+      # extensions do not collide on the shared index.ts basename.
+      def sandbox_extension_path(source)
+        "#{EXTENSIONS_DIR}/#{source.parent.basename}.ts"
       end
 
       # Upload files into pi's in-sandbox working directory. Filenames

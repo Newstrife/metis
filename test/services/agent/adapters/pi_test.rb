@@ -51,6 +51,10 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
       Pathname.new("/tmp/metis-fake-runtime/sessions")
     end
 
+    def extension_paths
+      []
+    end
+
     def runtime_info
       { "runtime" => "fake" }
     end
@@ -107,6 +111,20 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
                                     "assistantMessageEvent" => { "type" => "text_delta", "delta" => "hello" }))
     assert_equal :text_delta, ui.type
     assert_equal "hello", ui[:delta]
+  end
+
+  test "text_delta inserts a paragraph break when pi text crosses into a new message" do
+    pi = adapter
+    delta = lambda do |id, text|
+      pi.translate(pi_event("type" => "message_update", "message" => { "id" => id },
+                            "assistantMessageEvent" => { "type" => "text_delta", "delta" => text }))[:delta]
+    end
+
+    # First segment is not prefixed; deltas within a message are verbatim;
+    # a new message id gets a leading paragraph break.
+    assert_equal "Checking tools.",        delta.call("m1", "Checking tools.")
+    assert_equal " Found them.",           delta.call("m1", " Found them.")
+    assert_equal "\n\nHere is the answer.", delta.call("m2", "Here is the answer.")
   end
 
   test "translates a thinking_delta message_update to reasoning_delta" do
@@ -237,6 +255,14 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_includes args, "rpc"
     dir = args[args.index("--session-dir") + 1]
     assert_match %r{/u#{conversation.user_id}/c#{conversation.id}/sessions\z}, dir
+  end
+
+  test "pi_args loads the app's bundled pi extensions" do
+    args = Agent::Adapters::Pi.new(conversation: create_conversation).pi_args
+    loaded = args.each_index.select { |i| args[i] == "--extension" }.map { |i| args[i + 1] }
+
+    assert loaded.any? { |path| path.end_with?(".pi/extensions/web-tools/index.ts") },
+           "the web-tools extension is passed to pi"
   end
 
   test "pi_args omits --continue for a fresh conversation" do

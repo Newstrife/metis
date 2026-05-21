@@ -133,6 +133,26 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     assert_includes sandbox.commands.runs.join("\n"), "tar -xzf"
   end
 
+  test "uploads the app's pi extensions into the sandbox, outside the archived scope" do
+    sandbox = FakeSandbox.new
+
+    with_e2b(sandbox: sandbox, session: fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    staged = sandbox.files.writes.keys.grep(%r{\A#{Agent::Runtime::E2b::EXTENSIONS_DIR}/})
+    assert staged.any? { |path| path.end_with?("/web-tools.ts") },
+           "web-tools extension uploaded into the sandbox"
+    refute staged.any? { |path| path.start_with?(Agent::Runtime::E2b::SCOPE_DIR) },
+           "extensions live outside the scope that gets archived"
+  end
+
+  test "extension_paths point at the uploaded extensions inside the sandbox" do
+    paths = @runtime.extension_paths.map(&:to_s)
+
+    assert_includes paths, "#{Agent::Runtime::E2b::EXTENSIONS_DIR}/web-tools.ts"
+  end
+
   test "stages uploaded files into the sandbox workspace" do
     sandbox = FakeSandbox.new
     upload = FakeUpload.new("notes.txt", "file contents")

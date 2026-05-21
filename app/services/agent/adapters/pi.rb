@@ -29,11 +29,13 @@ module Agent
         @session = nil
         @session_stats = nil
         @model_info = nil
+        @last_text_message_id = nil
       end
 
       def stream(input, images: [], files: [], &block)
         return enum_for(:stream, input, images: images, files: files) unless block
 
+        @last_text_message_id = nil
         @runtime.run(pi_args: pi_args, files: files) do |session|
           @session = session
           session.prompt(prompt_with_files(input, files), images: pi_images(images)) do |pi_event|
@@ -92,7 +94,8 @@ module Agent
 
       # pi CLI arguments for this conversation's run.
       def pi_args
-        [ "--mode", "rpc", "--session-dir", @runtime.session_dir.to_s, *resume_args, *credential_args ]
+        [ "--mode", "rpc", "--session-dir", @runtime.session_dir.to_s,
+          *resume_args, *credential_args, *extension_args ]
       end
 
       private
@@ -138,6 +141,12 @@ module Agent
         args
       end
 
+      # Load the app's bundled pi extensions (web tools, …). The runtime
+      # resolves paths reachable from pi's execution environment.
+      def extension_args
+        @runtime.extension_paths.flat_map { |path| [ "--extension", path.to_s ] }
+      end
+
       # pi's token usage, cost, and context-window stats for the run.
       # Never raised — stats are reporting, not the turn itself.
       def capture_stats(session)
@@ -156,10 +165,25 @@ module Agent
 
       def translate_update(event)
         case event.raw.dig("assistantMessageEvent", "type")
-        when "text_delta"     then ui(:text_delta, event, id: message_id(event), delta: event.delta)
+        when "text_delta"     then ui(:text_delta, event, id: message_id(event), delta: segmented_delta(event))
         when "thinking_delta" then ui(:reasoning_delta, event, id: message_id(event), delta: event.delta)
         when "error"          then ui(:error, event, message: event.error_message)
         end
+      end
+
+      # pi splits a turn's assistant text across several messages — one per
+      # run of text between tool calls — and the first delta of each new
+      # message carries no leading whitespace. Concatenated naively that
+      # fuses the segments ("project.The"); insert a paragraph break
+      # whenever the text stream crosses into a new pi message.
+      def segmented_delta(event)
+        delta = event.delta.to_s
+        return delta if delta.empty?
+
+        id = message_id(event)
+        delta = "\n\n#{delta}" if @last_text_message_id && id && id != @last_text_message_id
+        @last_text_message_id = id if id
+        delta
       end
 
       def ui(type, pi_event, **data)

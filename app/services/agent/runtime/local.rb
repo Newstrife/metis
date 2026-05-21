@@ -13,6 +13,12 @@ module Agent
         workspace.session_dir
       end
 
+      # pi runs on this host, so it loads the repo's extension files in
+      # place — no staging needed.
+      def extension_paths
+        Agent::Runtime.extension_sources
+      end
+
       def run(pi_args:, files: [])
         workspace.prepare!
         Agent::SessionArchive.restore(conversation, into: workspace.scope_dir)

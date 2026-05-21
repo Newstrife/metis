@@ -14,6 +14,15 @@ module Agent
         raise NotImplementedError, "#{self.class} must implement #session_dir"
       end
 
+      # Paths to the app's pi extensions (Agent::Runtime.extension_sources)
+      # as reachable from this runtime's execution environment, for the Pi
+      # adapter to load with `pi --extension`. A runtime that runs pi where
+      # the repo files are absent must make them reachable and return those
+      # paths. Default: none.
+      def extension_paths
+        []
+      end
+
       # Provision the runtime, open a PiAgent::Session running pi with
       # `pi_args`, yield it to the caller, then finalize (persist state,
       # tear down). The session is closed by the runtime, not the caller.

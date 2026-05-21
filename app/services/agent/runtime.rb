@@ -27,5 +27,14 @@ module Agent
         raise Agent::Error, "Unknown agent runtime #{name.inspect} — set config.x.agent.runtime"
       end
     end
+
+    # The pi extensions shipped with the app, version-controlled under
+    # .pi/extensions/ (one self-contained <name>/index.ts each). pi runs
+    # in a scratch workspace, so they are not on its discovery path: each
+    # runtime makes them reachable from pi's execution environment and the
+    # Pi adapter loads them explicitly with `pi --extension`.
+    def self.extension_sources
+      Dir.glob(Rails.root.join(".pi/extensions/*/index.ts")).sort.map { |path| Pathname.new(path) }
+    end
   end
 end

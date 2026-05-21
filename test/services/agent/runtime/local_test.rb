@@ -50,6 +50,14 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     assert_equal({ "runtime" => "local" }, @runtime.runtime_info)
   end
 
+  test "extension_paths offers the repo's bundled pi extensions in place" do
+    paths = @runtime.extension_paths.map(&:to_s)
+
+    assert paths.any? { |path| path.end_with?(".pi/extensions/web-tools/index.ts") },
+           "web-tools extension is offered to pi"
+    assert paths.all? { |path| File.exist?(path) }, "extension files exist on this host"
+  end
+
   test "run provisions the workspace and yields the session" do
     session = fake_session
     yielded = nil
