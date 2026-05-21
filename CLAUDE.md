@@ -36,8 +36,7 @@ touches those models (including tests).
 ### The Agent service layer (`app/services/agent/`)
 
 This is the core of the app. Metis runs on a single coding-agent
-foundation — pi (see `docs/single-coding-agent-foundation.md`). The Agent
-layer separates two concerns:
+foundation — pi. The Agent layer separates two concerns:
 
 1. **`Agent::Adapters`** — *the agent*. `Adapters.for(conversation)` builds
    the `Pi` adapter, which drives pi and translates its native event

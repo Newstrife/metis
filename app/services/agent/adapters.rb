@@ -6,7 +6,7 @@ module Agent
   #
   # Metis runs on a single coding-agent foundation — pi. This layer keeps
   # the chat UI decoupled from pi's wire protocol; it is not a
-  # multi-backend seam. See docs/single-coding-agent-foundation.md.
+  # multi-backend seam.
   module Adapters
     def self.for(conversation, **opts)
       Pi.new(conversation: conversation, **opts)
