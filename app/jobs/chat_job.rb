@@ -22,18 +22,27 @@ class ChatJob < ApplicationJob
   def run(conversation, user_message, assistant_message, broadcaster)
     assistant_message.update!(streaming_status: :streaming)
     adapter = Agent::Adapters.for(conversation)
-    buffer = +""
+    text = +""
+    reasoning = +""
+    tools = {}
     errored = false
 
     adapter.stream(user_message.content,
                    images: user_message.images, files: user_message.files) do |event|
-      buffer << event[:delta].to_s if event.type == :text_delta
-      errored = true if event.type == :error
+      case event.type
+      when :text_delta      then text << event[:delta].to_s
+      when :reasoning_delta then reasoning << event[:delta].to_s
+      when :tool_call_started, :tool_call_progress, :tool_call_finished
+        record_tool_call(tools, event)
+      when :error           then errored = true
+      end
       broadcaster.handle(event)
     end
 
     assistant_message.update!(
-      content: buffer,
+      content: text,
+      reasoning: reasoning.presence,
+      tool_calls: tools.values,
       streaming_status: errored ? :errored : :done,
       finished_at: Time.current,
       **turn_token_columns(conversation, adapter)
@@ -44,6 +53,17 @@ class ChatJob < ApplicationJob
     persist_runtime(conversation, adapter)
     conversation.touch
     broadcaster.refresh_usage
+  end
+
+  # Accumulate one tool call across its started/progress/finished events,
+  # keyed by id so progress and result land on the right entry.
+  def record_tool_call(tools, event)
+    call = (tools[event[:tool_call_id]] ||= { "tool_call_id" => event[:tool_call_id] })
+    call["name"]     = event[:name]     if event.data.key?(:name)
+    call["args"]     = event[:args]     if event.data.key?(:args)
+    call["output"]   = event[:output]   if event.data.key?(:output)
+    call["is_error"] = event[:is_error] if event.data.key?(:is_error)
+    call["status"]   = event.type == :tool_call_finished ? "done" : "running"
   end
 
   # Record pi's session id so the next message resumes the same session.

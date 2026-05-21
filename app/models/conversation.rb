@@ -16,15 +16,16 @@ class Conversation < ApplicationRecord
     title.presence || "Untitled conversation"
   end
 
-  # The provider/model in use, preferring the model pi actually resolved
-  # (captured in agent_model after a turn) over the choice made at
-  # creation (settings). nil before either is known.
-  def provider_label
-    agent_model["provider"].presence || settings["provider"].presence
-  end
-
+  # The model in use, preferring the one pi actually resolved (captured
+  # in agent_model after a turn) over the choice made at creation
+  # (settings). nil before either is known.
   def model_label
     agent_model["name"].presence || settings["model"].presence
+  end
+
+  # The runtime the last turn ran on (local, e2b), or nil before any.
+  def runtime_label
+    runtime_state["runtime"].presence
   end
 
   # True while a turn is running — an assistant message is still pending

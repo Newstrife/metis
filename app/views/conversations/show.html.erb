@@ -6,7 +6,12 @@
   <header class="mb-6">
     <%= link_to "← Conversations", conversations_path,
           class: "text-sm text-gray-500 hover:text-gray-800" %>
-    <h1 class="mt-1 text-xl font-semibold"><%= @conversation.display_title %></h1>
+    <div class="mt-1 flex items-baseline justify-between gap-3">
+      <h1 class="text-xl font-semibold"><%= @conversation.display_title %></h1>
+      <span class="shrink-0 text-xs text-gray-400">
+        <%= time_ago_in_words(@conversation.created_at) %> ago
+      </span>
+    </div>
     <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
       <span class="uppercase tracking-wide"><%= @conversation.backend %></span>
       <%= render "context_meter", conversation: @conversation %>

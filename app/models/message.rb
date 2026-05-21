@@ -11,6 +11,7 @@ class Message < ApplicationRecord
   has_many_attached :files
 
   encrypts :content
+  encrypts :reasoning
 
   ALLOWED_IMAGE_TYPES = %w[image/jpeg image/png image/gif image/webp].freeze
   ALLOWED_FILE_TYPES = %w[

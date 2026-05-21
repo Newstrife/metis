@@ -56,6 +56,27 @@ class ChatJobTest < ActiveSupport::TestCase
     assert @assistant_message.done?
   end
 
+  test "persists the reasoning log and tool calls so they survive a refresh" do
+    run_with([
+               Agent::UiEvent.new(:reasoning_delta, data: { delta: "thinking " }),
+               Agent::UiEvent.new(:reasoning_delta, data: { delta: "hard" }),
+               Agent::UiEvent.new(:tool_call_started,
+                                  data: { tool_call_id: "t1", name: "bash", args: { "command" => "ls" } }),
+               Agent::UiEvent.new(:tool_call_finished,
+                                  data: { tool_call_id: "t1", output: "file.txt", is_error: false }),
+               Agent::UiEvent.new(:turn_finished)
+             ])
+
+    @assistant_message.reload
+    assert_equal "thinking hard", @assistant_message.reasoning
+
+    call = @assistant_message.tool_calls.sole
+    assert_equal "bash", call["name"]
+    assert_equal({ "command" => "ls" }, call["args"])
+    assert_equal "file.txt", call["output"]
+    assert_equal "done", call["status"]
+  end
+
   test "marks the message errored when an error event arrives" do
     run_with([
                Agent::UiEvent.new(:text_delta, data: { delta: "partial" }),

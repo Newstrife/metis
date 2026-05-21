@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_20_223329) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_20_232914) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -75,10 +75,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_20_223329) do
     t.integer "input_tokens"
     t.jsonb "native_ref"
     t.integer "output_tokens"
+    t.text "reasoning"
     t.integer "role", null: false
     t.datetime "started_at"
     t.integer "streaming_status", default: 0, null: false
     t.string "tool_call_id"
+    t.jsonb "tool_calls", default: [], null: false
     t.datetime "updated_at", null: false
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["conversation_id"], name: "index_messages_on_one_in_progress_turn", unique: true, where: "((role = 1) AND (streaming_status = ANY (ARRAY[0, 1])))"

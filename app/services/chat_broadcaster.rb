@@ -7,6 +7,7 @@ class ChatBroadcaster
     @conversation = conversation
     @message = assistant_message
     @text = +""
+    @tools = {}
   end
 
   def handle(event)
@@ -68,13 +69,13 @@ class ChatBroadcaster
 
   def start_tool(event)
     broadcast(:append, target: "#{base_id}_tools", partial: "messages/tool_call",
-                       locals: tool_locals(event, status: :running))
+                       locals: record_tool(event, status: :running))
   end
 
   def update_tool(event)
     status = event.type == :tool_call_finished ? :done : :running
     broadcast(:replace, target: "tool_#{event[:tool_call_id]}", partial: "messages/tool_call",
-                        locals: tool_locals(event, status:))
+                        locals: record_tool(event, status: status))
   end
 
   def finish
@@ -88,13 +89,26 @@ class ChatBroadcaster
                        locals: { message: message })
   end
 
-  def tool_locals(event, status:)
+  # Merge an event into the tool call's accumulated state (keyed by id)
+  # and return the full set of `messages/tool_call` locals.
+  #
+  # tool_call_progress / tool_call_finished carry no name or args — those
+  # arrive only on tool_call_started — so without accumulating, replacing
+  # the card on a later event would blank the tool name and command. The
+  # returned hash always carries every local so the partial never sees
+  # an undefined variable.
+  def record_tool(event, status:)
+    call = (@tools[event[:tool_call_id]] ||= {})
+    call[:name]     = event[:name]     if event.data.key?(:name)
+    call[:args]     = event[:args]     if event.data.key?(:args)
+    call[:output]   = event[:output]   if event.data.key?(:output)
+    call[:is_error] = event[:is_error] if event.data.key?(:is_error)
     {
       tool_call_id: event[:tool_call_id],
-      name: event[:name],
-      args: event[:args],
-      output: event[:output],
-      is_error: event[:is_error],
+      name: call[:name],
+      args: call[:args],
+      output: call[:output],
+      is_error: call[:is_error],
       status: status
     }
   end

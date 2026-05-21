@@ -37,26 +37,29 @@ class ConversationTest < ActiveSupport::TestCase
     end
   end
 
-  test "provider and model labels read from settings before a turn runs" do
+  test "model_label reads from settings before a turn runs" do
     conversation = @user.conversations.create!(
       backend: :pi, settings: { "provider" => "openai", "model" => "gpt-5.5" }
     )
-    assert_equal "openai", conversation.provider_label
     assert_equal "gpt-5.5", conversation.model_label
   end
 
-  test "provider and model labels prefer the model pi resolved" do
+  test "model_label prefers the model pi resolved" do
     conversation = @user.conversations.create!(
       backend: :pi,
-      settings: { "provider" => "openai", "model" => "gpt-5.5" },
+      settings: { "model" => "gpt-5.5" },
       agent_model: { "provider" => "openai-codex", "name" => "GPT-5.5" }
     )
-    assert_equal "openai-codex", conversation.provider_label
     assert_equal "GPT-5.5", conversation.model_label
   end
 
-  test "provider and model labels are nil when nothing is known" do
-    assert_nil @conversation.provider_label
+  test "model_label and runtime_label are nil when nothing is known" do
     assert_nil @conversation.model_label
+    assert_nil @conversation.runtime_label
+  end
+
+  test "runtime_label is the runtime the last turn ran on" do
+    @conversation.update!(runtime_state: { "runtime" => "e2b", "sandbox_id" => "sbx-7" })
+    assert_equal "e2b", @conversation.runtime_label
   end
 end

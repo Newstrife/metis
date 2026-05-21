@@ -17,9 +17,15 @@
     <% end %>
 
     <div id="<%= dom_id(message) %>_reasoning"
-         class="text-sm text-gray-500 italic whitespace-pre-wrap break-words empty:hidden mb-2"></div>
+         class="text-sm text-gray-500 italic whitespace-pre-wrap break-words empty:hidden mb-2"><%= message.reasoning %></div>
 
-    <div id="<%= dom_id(message) %>_tools" class="space-y-2 empty:hidden mb-2"></div>
+    <div id="<%= dom_id(message) %>_tools" class="space-y-2 empty:hidden mb-2">
+      <% message.tool_calls.each do |call| %>
+        <%= render "messages/tool_call",
+              tool_call_id: call["tool_call_id"], name: call["name"], args: call["args"],
+              output: call["output"], is_error: call["is_error"], status: call["status"] %>
+      <% end %>
+    </div>
 
     <div id="<%= dom_id(message) %>_body"
          class="chat-content break-words"><%= markdown(message.content) %></div>
