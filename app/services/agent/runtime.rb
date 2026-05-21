@@ -10,8 +10,9 @@ module Agent
   #   #run(pi_args:) { |sess| } -> provision, open a PiAgent::Session,
   #                                yield it, finalize (persist + tear down)
   #
-  # Runtime::Local runs the agent as a local subprocess; Runtime::E2b runs
-  # it inside a secure E2B microVM.
+  # Runtime::Local runs the agent as a local subprocess; Runtime::Docker
+  # runs it in a Docker container; Runtime::E2b runs it inside a secure
+  # E2B microVM.
   module Runtime
     # Resolve the runtime for a conversation — a per-deployment choice
     # (config.x.agent.runtime).
@@ -21,8 +22,9 @@ module Agent
 
     def self.build(conversation, name)
       case name&.to_sym
-      when :local then Local.new(conversation: conversation)
-      when :e2b   then E2b.new(conversation: conversation)
+      when :local  then Local.new(conversation: conversation)
+      when :docker then Docker.new(conversation: conversation)
+      when :e2b    then E2b.new(conversation: conversation)
       else
         raise Agent::Error, "Unknown agent runtime #{name.inspect} — set config.x.agent.runtime"
       end

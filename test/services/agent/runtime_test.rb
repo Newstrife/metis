@@ -20,6 +20,12 @@ class Agent::RuntimeTest < ActiveSupport::TestCase
     end
   end
 
+  test "for resolves :docker to Runtime::Docker" do
+    with_runtime_config(:docker) do
+      assert_instance_of Agent::Runtime::Docker, Agent::Runtime.for(@conversation)
+    end
+  end
+
   test "for resolves :e2b to Runtime::E2b" do
     with_runtime_config(:e2b) do
       assert_instance_of Agent::Runtime::E2b, Agent::Runtime.for(@conversation)

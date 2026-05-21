@@ -43,8 +43,9 @@ pi. The Agent layer separates two concerns:
    stream. `#stream(input)` yields events. This layer decouples the chat
    UI from pi's wire protocol; it is not a multi-backend seam.
 2. **`Agent::Runtime`** — *where* the agent runs. `Runtime::Local` runs pi
-   as a local subprocess; `Runtime::E2b` runs it in an isolated microVM.
-   **`Runtime::Local` is not a security boundary** — pi has shell access.
+   as a local subprocess, `Runtime::Docker` in a container, `Runtime::E2b`
+   in an isolated microVM. **`Runtime::Local` is not a security boundary** —
+   pi has shell access.
 
 pi's native events are translated into **`Agent::UiEvent`**, a canonical
 vocabulary (`text_delta`, `tool_call_started`, `turn_finished`, …) that

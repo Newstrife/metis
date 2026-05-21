@@ -30,7 +30,8 @@ See [`PLAN.md`](PLAN.md) for direction and roadmap.
 - PostgreSQL
 - **`pi-agent-rb`** checked out as a sibling directory at `../pi-agent-rb`.
   The `Gemfile` references it as a local path gem, so `bundle` fails without it.
-- An [E2B](https://e2b.dev) account — only for the isolated runtime.
+- Docker — only for the `docker` runtime.
+- An [E2B](https://e2b.dev) account — only for the `e2b` runtime.
 
 ## Setup
 
@@ -57,9 +58,10 @@ pi's runtime and credentials are configured through the environment
 
 | Variable | Purpose |
 |---|---|
-| `METIS_AGENT_RUNTIME` | `local` (default) or `e2b` |
+| `METIS_AGENT_RUNTIME` | `local` (default), `docker`, or `e2b` |
 | `METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL` | default LLM provider/model for pi |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` | provider API keys |
+| `METIS_DOCKER_IMAGE` | image for the `docker` runtime (default `metis-pi`) |
 | `E2B_API_KEY` / `METIS_E2B_TEMPLATE` | required by the `e2b` runtime |
 
 ### Runtimes
@@ -67,6 +69,13 @@ pi's runtime and credentials are configured through the environment
 - **`local`** — pi runs as a local subprocess. Fast, but **not an
   isolation boundary**: pi has shell access to the host. For
   single-operator / development use.
+- **`docker`** — pi runs in a Docker container: namespace isolation,
+  dropped capabilities, and resource limits, on a shared kernel.
+  Self-hosted, needs a Docker daemon. Build the image once:
+
+  ```sh
+  rake "docker:image[metis-pi]"
+  ```
 - **`e2b`** — pi runs inside an isolated [E2B](https://e2b.dev) microVM.
   Build the sandbox template once:
 

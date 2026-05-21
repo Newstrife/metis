@@ -4,10 +4,12 @@
 # choice. See
 # Agent::Runtime.
 #
-#   :local — pi as a local subprocess. NOT isolated; single-operator /
-#            development only.
-#   :e2b   — pi inside a secure E2B microVM. The isolated runtime;
-#            requires E2B_API_KEY and a template with pi baked in.
+#   :local  — pi as a local subprocess. NOT isolated; single-operator /
+#             development only.
+#   :docker — pi in a Docker container. Namespace-isolated; self-hosted,
+#             needs a Docker daemon and an image (see docker:image).
+#   :e2b    — pi inside a secure E2B microVM. The isolated runtime;
+#             requires E2B_API_KEY and a template with pi baked in.
 Rails.application.config.x.agent.runtime =
   ENV.fetch("METIS_AGENT_RUNTIME", "local").to_sym
 
@@ -15,6 +17,11 @@ Rails.application.config.x.agent.runtime =
 # installed. See the e2b:template rake task for the build definition.
 Rails.application.config.x.agent.e2b_template =
   ENV.fetch("METIS_E2B_TEMPLATE", "base")
+
+# Docker image used by the :docker runtime — pi baked in. Build it with
+# the docker:image rake task.
+Rails.application.config.x.agent.docker_image =
+  ENV.fetch("METIS_DOCKER_IMAGE", "metis-pi")
 
 # pi's default provider/model — used when a conversation sets none of
 # its own (the new-chat composer normally does). See
