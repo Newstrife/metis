@@ -1,17 +1,25 @@
 # Metis
 
-A web chat UI for a coding agent. Metis puts a live, streaming chat
-interface in front of **pi**, run either as a local process or inside an
-isolated microVM.
+**Metis is an open-source, self-hostable agent platform for individuals
+and teams.**
 
-Metis is built on a **single coding-agent foundation** by design — it is
-an opinionated product, not a generic shell over swappable agent
-backends.
+It runs **pi** — a fast, open agent harness — behind a live, streaming
+web chat UI. pi ships with coding tools, but its extensions and skills
+make Metis a general-purpose personal agent: coding is one capability,
+not the boundary. The agent runs in a sandbox, so it is safe to let it
+run untrusted code, and the LLM provider is yours to choose — Metis is
+not provider-locked.
+
+Metis is web-first and multi-user by design. Personal productivity is
+the start, not the end: the goal is a platform where people build their
+own tools and share them — across their devices, and with their teams.
+
+See [`PLAN.md`](PLAN.md) for direction and roadmap.
 
 ## Stack
 
 - **Rails 8.1**, Ruby 4.0.5, PostgreSQL
-- **pi** coding agent, driven via the `pi-agent-rb` gem
+- **pi** agent harness, driven via the `pi-agent-rb` gem
 - **Hotwire** (Turbo + Stimulus, importmap) and **Tailwind** for the live chat UI
 - **Devise** for authentication
 - **Solid Queue / Cache / Cable** for jobs, cache, and Action Cable

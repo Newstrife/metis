@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 
 Metis is a Rails 8.1 web app (Ruby 4.0.5, PostgreSQL) that puts a chat UI in
-front of coding agents. v1 ships the **pi** backend, driven via the
+front of an agent harness. v1 ships the **pi** backend, driven via the
 `pi-agent-rb` gem. Hotwire (Turbo + Stimulus, importmap, Tailwind) renders the
 live streaming chat; Devise handles auth.
 
@@ -35,8 +35,8 @@ touches those models (including tests).
 
 ### The Agent service layer (`app/services/agent/`)
 
-This is the core of the app. Metis runs on a single coding-agent
-foundation — pi. The Agent layer separates two concerns:
+This is the core of the app. Metis runs on a single agent harness —
+pi. The Agent layer separates two concerns:
 
 1. **`Agent::Adapters`** — *the agent*. `Adapters.for(conversation)` builds
    the `Pi` adapter, which drives pi and translates its native event
