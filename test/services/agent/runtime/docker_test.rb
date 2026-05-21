@@ -5,13 +5,13 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     @user = User.create!(email: "rt-docker@example.com", password: "password123")
     @conversation = @user.conversations.create!
     @runtime = Agent::Runtime::Docker.new(conversation: @conversation)
-    @workspace = Agent::Workspace.for(@conversation)
+    @workspace = Agent::Workspace.scratch(@conversation)
     # Never shell out to `docker` for teardown in a unit test.
     @runtime.define_singleton_method(:remove_container) { nil }
   end
 
   teardown do
-    FileUtils.rm_rf(Agent::Workspace::ROOT.join("u#{@user.id}"))
+    FileUtils.rm_rf(Agent::Workspace::SCRATCH_ROOT.join("u#{@user.id}"))
   end
 
   # Swap PiAgent.session so #run never spawns `docker run`.

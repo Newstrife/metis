@@ -5,11 +5,11 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     @user = User.create!(email: "rt@example.com", password: "password123")
     @conversation = @user.conversations.create!
     @runtime = Agent::Runtime::Local.new(conversation: @conversation)
-    @workspace = Agent::Workspace.for(@conversation)
+    @workspace = Agent::Workspace.persistent(@conversation)
   end
 
   teardown do
-    FileUtils.rm_rf(Agent::Workspace::ROOT.join("u#{@user.id}"))
+    FileUtils.rm_rf(Agent::Workspace::PERSISTENT_ROOT.join("u#{@user.id}"))
   end
 
   # Swap PiAgent.session so #run never spawns a real pi process.
@@ -28,21 +28,7 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     session
   end
 
-  # A stand-in for an uploaded file: responds to #filename and #open.
-  class FakeUpload
-    def initialize(name, content)
-      @name = name
-      @content = content
-    end
-
-    def filename = @name
-
-    def open
-      yield StringIO.new(@content)
-    end
-  end
-
-  test "session_dir is the workspace session directory" do
+  test "session_dir is the persistent workspace session directory" do
     assert_equal @workspace.session_dir, @runtime.session_dir
   end
 
@@ -65,26 +51,47 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     with_pi_session(session) do
       @runtime.run(pi_args: [ "--mode", "rpc" ]) do |s|
         yielded = s
-        assert Dir.exist?(@workspace.session_dir), "session dir provisioned"
-        assert Dir.exist?(@workspace.workspace_dir), "workspace dir provisioned"
+        assert Dir.exist?(@workspace.workspace_dir), "workspace provisioned"
       end
     end
 
     assert_equal session, yielded
+    assert session.closed?, "session closed by the runtime"
   end
 
-  test "run closes the session and archives the scope afterward" do
-    session = fake_session
-
-    with_pi_session(session) do
-      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+  test "run keeps the scope between turns and never archives" do
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        File.write(@workspace.workspace_dir.join("turn1.rb"), "code")
+      end
     end
 
-    assert session.closed?, "session was closed by the runtime"
-    assert @conversation.pi_session_archive.attached?, "scope archived"
+    seen_on_turn2 = nil
+    with_pi_session(fake_session) do
+      Agent::Runtime::Local.new(conversation: @conversation).run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        seen_on_turn2 = File.exist?(@workspace.workspace_dir.join("turn1.rb"))
+      end
+    end
+
+    assert seen_on_turn2, "turn 1's workspace files are still there on turn 2 (pi-native persistence)"
+    assert_not @conversation.reload.pi_session_archive.attached?, "Local does not archive"
   end
 
-  test "run closes and archives even when the block raises" do
+  test "run projects the conversation's uploaded files into uploads/" do
+    message = @conversation.messages.create!(role: :user, content: "hi", streaming_status: :done)
+    message.files.attach(io: StringIO.new("a,b\n1,2\n"), filename: "data.csv", content_type: "text/csv")
+    staged = @workspace.uploads_dir.join("data.csv")
+
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        assert File.exist?(staged), "upload projected before the run"
+      end
+    end
+
+    assert_equal "a,b\n1,2\n", File.read(staged)
+  end
+
+  test "run closes the session even when the block raises" do
     session = fake_session
 
     assert_raises(RuntimeError) do
@@ -94,29 +101,5 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     end
 
     assert session.closed?
-    assert @conversation.pi_session_archive.attached?
-  end
-
-  test "run stages uploaded files into the workspace before yielding" do
-    staged = @workspace.workspace_dir.join("data.csv")
-
-    with_pi_session(fake_session) do
-      @runtime.run(pi_args: [ "--mode", "rpc" ],
-                   files: [ FakeUpload.new("data.csv", "a,b\n1,2\n") ]) do |_s|
-        assert File.exist?(staged), "file staged before the run"
-      end
-    end
-
-    assert_equal "a,b\n1,2\n", File.read(staged)
-  end
-
-  test "run basenames staged filenames so a crafted name cannot escape the workspace" do
-    with_pi_session(fake_session) do
-      @runtime.run(pi_args: [ "--mode", "rpc" ],
-                   files: [ FakeUpload.new("../escape.txt", "x") ]) do |_s|
-        assert File.exist?(@workspace.workspace_dir.join("escape.txt"))
-        assert_not File.exist?(@workspace.scope_dir.join("escape.txt"))
-      end
-    end
   end
 end

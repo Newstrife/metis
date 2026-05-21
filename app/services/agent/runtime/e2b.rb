@@ -39,10 +39,10 @@ module Agent
         Agent::Runtime.extension_sources.map { |source| Pathname.new(sandbox_extension_path(source)) }
       end
 
-      def run(pi_args:, files: [], &block)
+      def run(pi_args:, &block)
         sandbox = create_sandbox
         @sandbox_id = sandbox.sandbox_id
-        execute(sandbox, pi_args: pi_args, files: files, &block)
+        execute(sandbox, pi_args: pi_args, &block)
       ensure
         terminate(sandbox)
       end
@@ -55,11 +55,11 @@ module Agent
 
       private
 
-      def execute(sandbox, pi_args:, files:)
+      def execute(sandbox, pi_args:)
         provision(sandbox)
         stage_extensions(sandbox)
         hydrate(sandbox)
-        stage_files(sandbox, files)
+        stage_uploads(sandbox)
         session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args))
         begin
           yield session
@@ -74,7 +74,7 @@ module Agent
       end
 
       def provision(sandbox)
-        sandbox.commands.run("mkdir -p #{SESSION_DIR} #{WORKSPACE_DIR}")
+        sandbox.commands.run("mkdir -p #{SESSION_DIR} #{WORKSPACE_DIR}/uploads")
       end
 
       # Restore the conversation's durable archive into the sandbox. No-op
@@ -90,7 +90,10 @@ module Agent
       # storage. Logged, never raised — it must not crash the turn the
       # user already saw stream.
       def persist(sandbox)
-        sandbox.commands.run("tar -czf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR} .")
+        # Exclude staged uploads — projected inputs, not archived state.
+        sandbox.commands.run(
+          "tar -czf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR} --exclude=./workspace/uploads ."
+        )
         data = sandbox.files.read(REMOTE_ARCHIVE, format: "bytes")
         Tempfile.create([ "pi-session", ".tar.gz" ]) do |tmp|
           tmp.binmode
@@ -122,14 +125,16 @@ module Agent
         "#{EXTENSIONS_DIR}/#{source.parent.basename}.ts"
       end
 
-      # Upload files into pi's in-sandbox working directory. Filenames
-      # are basenamed so a crafted name cannot escape the workspace.
-      def stage_files(sandbox, files)
-        files.each do |file|
-          name = File.basename(file.filename.to_s)
+      # Project the conversation's uploaded files into uploads/. They are
+      # excluded from the archive (durable as Message attachments), so
+      # all of them are re-staged into the fresh sandbox every turn.
+      # Filenames are basenamed so a crafted name cannot escape.
+      def stage_uploads(sandbox)
+        conversation.uploaded_files.each do |attachment|
+          name = File.basename(attachment.filename.to_s)
           next if name.blank? || [ ".", ".." ].include?(name)
 
-          sandbox.files.write("#{WORKSPACE_DIR}/#{name}", file.download)
+          sandbox.files.write("#{WORKSPACE_DIR}/uploads/#{name}", attachment.download)
         end
       end
 

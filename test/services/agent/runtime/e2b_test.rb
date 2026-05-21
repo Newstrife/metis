@@ -57,13 +57,6 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     end
   end
 
-  # Upload double — responds to #filename and #download.
-  FakeUpload = Struct.new(:filename, :bytes) do
-    def download
-      bytes
-    end
-  end
-
   def fake_session
     session = Object.new
     def session.close = nil
@@ -153,15 +146,16 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     assert_includes paths, "#{Agent::Runtime::E2b::EXTENSIONS_DIR}/web-tools.ts"
   end
 
-  test "stages uploaded files into the sandbox workspace" do
+  test "projects the conversation's uploaded files into the sandbox uploads dir" do
     sandbox = FakeSandbox.new
-    upload = FakeUpload.new("notes.txt", "file contents")
+    message = @conversation.messages.create!(role: :user, content: "hi", streaming_status: :done)
+    message.files.attach(io: StringIO.new("file contents"), filename: "notes.txt", content_type: "text/plain")
 
     with_e2b(sandbox: sandbox, session: fake_session) do
-      @runtime.run(pi_args: [ "--mode", "rpc" ], files: [ upload ]) { |_s| nil }
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
     end
 
-    staged = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/notes.txt"
+    staged = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/uploads/notes.txt"
     assert_equal "file contents", sandbox.files.writes[staged]
   end
 

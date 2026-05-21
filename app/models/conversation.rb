@@ -35,4 +35,12 @@ class Conversation < ApplicationRecord
   def request_cancel!
     update_column(:cancel_requested_at, Time.current)
   end
+
+  # Every file uploaded across the conversation, as Active Storage
+  # attachments. Runtimes project these into pi's workspace each turn —
+  # they are durable input, not archived session state (see
+  # docs/session-persistence.md).
+  def uploaded_files
+    messages.with_attached_files.flat_map { |message| message.files.attachments }
+  end
 end

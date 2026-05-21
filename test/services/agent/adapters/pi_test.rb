@@ -59,7 +59,7 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
       { "runtime" => "fake" }
     end
 
-    def run(pi_args:, files: [])
+    def run(pi_args:)
       yield @session
     ensure
       @session.close

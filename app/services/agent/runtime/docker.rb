@@ -10,10 +10,10 @@ module Agent
     # which bridges an HTTP API).
     #
     # The conversation's scope directory is bind-mounted into the
-    # container, so state is managed host-side exactly as Runtime::Local
-    # does it: a scratch Workspace restored from / captured back to the
-    # durable archive (Agent::SessionArchive) around each run. The
-    # container is disposable — fresh per turn, removed after.
+    # container. The container is disposable — fresh per turn, removed
+    # after — so the scope is scratch, restored from / captured back to
+    # the durable archive (Agent::SessionArchive) around each run. See
+    # docs/session-persistence.md.
     #
     # Isolation: namespace + cgroup confinement and dropped capabilities
     # — stronger than Local (pi cannot reach the host filesystem beyond
@@ -44,10 +44,10 @@ module Agent
         end
       end
 
-      def run(pi_args:, files: [])
-        workspace.prepare!
+      def run(pi_args:)
+        workspace.reset!
         Agent::SessionArchive.restore(conversation, into: workspace.scope_dir)
-        stage_files(files)
+        workspace.stage_uploads(conversation.uploaded_files)
         session = PiAgent.session(bin: "docker", args: docker_args(pi_args))
         begin
           yield session
@@ -67,7 +67,7 @@ module Agent
       private
 
       def workspace
-        @workspace ||= Agent::Workspace.for(conversation)
+        @workspace ||= Agent::Workspace.scratch(conversation)
       end
 
       def container_name
@@ -102,27 +102,15 @@ module Agent
         [ "--volume", "#{Rails.root.join('.pi/extensions')}:#{EXTENSIONS_DIR}:ro" ]
       end
 
-      # Write uploaded files into pi's working directory (host side; the
-      # bind mount surfaces them in the container). Filenames are
-      # basenamed so a crafted name cannot escape the workspace.
-      def stage_files(files)
-        files.each do |file|
-          name = File.basename(file.filename.to_s)
-          next if name.blank? || [ ".", ".." ].include?(name)
-
-          file.open { |io| IO.copy_stream(io, workspace.workspace_dir.join(name)) }
-        end
-      end
-
       # Force-remove the container — a net for when the docker client was
       # killed before --rm could fire (e.g. an aborted turn). Best effort.
       def remove_container
         system("docker", "rm", "--force", container_name, out: File::NULL, err: File::NULL)
       end
 
-      # Capture the scratch scope back to durable storage. A persistence
-      # failure is logged, never raised — it must not crash the turn the
-      # user just saw stream.
+      # Capture the scratch scope back to durable storage (uploads
+      # excluded — see SessionArchive). A persistence failure is logged,
+      # never raised — it must not crash the turn the user just saw.
       def persist
         Agent::SessionArchive.store(conversation, from: workspace.scope_dir)
       rescue StandardError => e

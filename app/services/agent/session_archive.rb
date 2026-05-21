@@ -62,7 +62,11 @@ module Agent
       private
 
       def compress(dir, archive_path)
-        ok = system("tar", "-czf", archive_path.to_s, "-C", dir.to_s, ".", %i[out err] => File::NULL)
+        # Exclude staged uploads — they are projected inputs (durable as
+        # Message attachments), not archived state. See
+        # docs/session-persistence.md.
+        ok = system("tar", "-czf", archive_path.to_s, "-C", dir.to_s,
+                    "--exclude=./workspace/uploads", ".", %i[out err] => File::NULL)
         raise ArchiveError, "failed to archive pi session dir #{dir}" unless ok
       end
 

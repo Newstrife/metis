@@ -67,16 +67,21 @@ these separate.
 
 ### Session continuity & storage
 
-pi keeps its conversation memory in a session directory. The local copy is
-**disposable scratch** under `tmp/agent/u<user>/c<conversation>/`
-(`Agent::Workspace` — the single place path layout is decided). The **durable,
-worker-independent copy** is a gzipped tar held as the conversation's Active
-Storage attachment (`Agent::SessionArchive`): restored before a run, captured
-after. Combined with `Conversation#backend_session_id` + pi's `--continue`
-flag, any job worker can resume any conversation.
+pi keeps a conversation's state in a scope directory (`Agent::Workspace`):
+`sessions/` (its transcript), `workspace/` (its working files), and
+`workspace/uploads/` (staged user uploads). How that scope survives between
+turns is a **per-runtime concern** — see `docs/session-persistence.md`:
 
-Archive persistence failures are logged, never raised — a storage failure must
-not crash a turn the user already saw stream.
+- `Runtime::Local` keeps the scope in a persistent directory and relies on
+  pi's own `--continue`; no archiving.
+- `Runtime::Docker` / `Runtime::E2b` run in disposable environments, so the
+  scope is archived to Active Storage (`Agent::SessionArchive`) after each
+  turn and restored before the next.
+
+Uploaded files are projected into `workspace/uploads/` each turn from their
+durable `Message` attachments, and excluded from the archive. Archive
+failures are logged, never raised — a storage failure must not crash a turn
+the user already saw stream.
 
 ### Credentials
 

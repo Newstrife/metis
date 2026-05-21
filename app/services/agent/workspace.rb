@@ -1,53 +1,71 @@
 require "fileutils"
 
 module Agent
-  # Resolves the local scratch directories for a conversation's agent run.
+  # Resolves the on-disk scope for a conversation's agent run, and stages
+  # uploads into it.
   #
-  # A conversation's scope contains two directories:
-  #   sessions/   — pi's --session-dir (the agent's transcript)
-  #   workspace/  — pi's working directory (where its bash/edit operate)
+  # A scope holds:
+  #   sessions/           pi's --session-dir (the transcript)
+  #   workspace/          pi's working directory
+  #   workspace/uploads/  staged user uploads — projected each turn from
+  #                       the durable Message attachments, never archived
+  #                       (see docs/session-persistence.md)
   #
-  # This is disposable working space. The durable, worker-independent
-  # copy of the whole scope lives in Active Storage (Agent::SessionArchive),
-  # restored here before a run and captured back after. Because it is pure
-  # scratch, it correctly lives under tmp/.
-  #
-  # Paths are scoped per user; a tenant segment slots into #scope_dir when
-  # multi-tenancy lands. This is the single place path layout is decided.
+  # Two roots, because persistence is a per-runtime concern:
+  #   Workspace.scratch    — under tmp/, for a runtime that re-hydrates
+  #                          the scope from the archive each turn (Docker)
+  #   Workspace.persistent — under storage/, for Runtime::Local, which
+  #                          keeps the scope between turns and relies on
+  #                          pi's own file-based session management
   class Workspace
-    ROOT = Rails.root.join("tmp/agent").freeze
+    SCRATCH_ROOT = Rails.root.join("tmp/agent").freeze
+    PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
 
-    def self.for(conversation)
-      new(conversation)
+    def self.scratch(conversation)
+      new(conversation, SCRATCH_ROOT)
     end
 
-    def initialize(conversation)
+    def self.persistent(conversation)
+      new(conversation, PERSISTENT_ROOT)
+    end
+
+    def initialize(conversation, root)
       @conversation = conversation
+      @root = root
     end
 
-    # The conversation's whole scratch scope — this is what gets archived.
+    # The conversation's whole scope.
     def scope_dir
-      # A tenant segment (e.g. "t#{tenant_id}") slots in here later.
-      ROOT.join("u#{@conversation.user_id}", "c#{@conversation.id}")
+      @root.join("u#{@conversation.user_id}", "c#{@conversation.id}")
     end
 
-    # Directory passed to `pi --session-dir`.
-    def session_dir
-      scope_dir.join("sessions")
-    end
+    def session_dir = scope_dir.join("sessions")
+    def workspace_dir = scope_dir.join("workspace")
+    def uploads_dir = workspace_dir.join("uploads")
 
-    # Directory pi runs in — its bash/edit/write operate relative to here.
-    def workspace_dir
-      scope_dir.join("workspace")
-    end
-
-    # Discard any stale scratch from a previous run and recreate the empty
-    # scope, ready to be repopulated from the archive.
-    def prepare!
+    # Discard any stale scope and recreate it empty — for a runtime that
+    # repopulates it from the archive.
+    def reset!
       FileUtils.rm_rf(scope_dir)
-      FileUtils.mkdir_p(session_dir)
-      FileUtils.mkdir_p(workspace_dir)
+      ensure!
+    end
+
+    # Create the scope directories if absent, leaving existing content.
+    def ensure!
+      [ session_dir, workspace_dir, uploads_dir ].each { |dir| FileUtils.mkdir_p(dir) }
       self
+    end
+
+    # Project uploaded file attachments into uploads/. Filenames are
+    # basenamed so a crafted name cannot escape the workspace.
+    def stage_uploads(attachments)
+      FileUtils.mkdir_p(uploads_dir)
+      attachments.each do |attachment|
+        name = File.basename(attachment.filename.to_s)
+        next if name.blank? || [ ".", ".." ].include?(name)
+
+        attachment.open { |io| IO.copy_stream(io, uploads_dir.join(name)) }
+      end
     end
   end
 end

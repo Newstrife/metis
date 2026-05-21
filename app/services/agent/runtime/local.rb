@@ -1,13 +1,15 @@
 module Agent
   module Runtime
-    # Runs pi as a local subprocess in a per-conversation scratch
-    # workspace, restoring and persisting that workspace via Active
-    # Storage around each run.
+    # Runs pi as a local subprocess — the single-operator / development
+    # runtime. NOT an isolation boundary: pi has shell access and `bash`
+    # escapes the workspace. Isolation is what Docker and E2b are for.
     #
-    # NOT an isolation boundary: pi has shell access and `bash` escapes
-    # the workspace directory. Runtime::Local is for single-operator,
-    # trusted use (development). Runtime::E2B — pi inside a secure
-    # microVM — is the isolated runtime for multi-tenant exposure.
+    # Persistence is pi-native. The scope lives in a persistent,
+    # conversation-stable directory, and pi's own --session-dir +
+    # --continue carry continuity between turns — no archiving. That
+    # (Agent::SessionArchive) is the sandbox runtimes' mechanism, forced
+    # by their disposable environments; Local, running on a stable host
+    # filesystem, does not need it. See docs/session-persistence.md.
     class Local < Base
       def session_dir
         workspace.session_dir
@@ -19,45 +21,21 @@ module Agent
         Agent::Runtime.extension_sources
       end
 
-      def run(pi_args:, files: [])
-        workspace.prepare!
-        Agent::SessionArchive.restore(conversation, into: workspace.scope_dir)
-        stage_files(files)
+      def run(pi_args:)
+        workspace.ensure!
+        workspace.stage_uploads(conversation.uploaded_files)
         session = PiAgent.session(args: pi_args, cwd: workspace.workspace_dir.to_s)
         begin
           yield session
         ensure
           session.close
-          persist
         end
       end
 
       private
 
       def workspace
-        @workspace ||= Agent::Workspace.for(conversation)
-      end
-
-      # Write uploaded files into pi's working directory. Filenames are
-      # basenamed so a crafted name cannot escape the workspace; the
-      # files are then archived with the scope, so they persist for
-      # later turns (and pi can edit them).
-      def stage_files(files)
-        files.each do |file|
-          name = File.basename(file.filename.to_s)
-          next if name.blank? || [ ".", ".." ].include?(name)
-
-          file.open { |io| IO.copy_stream(io, workspace.workspace_dir.join(name)) }
-        end
-      end
-
-      # Capture the scratch scope back to durable storage. A persistence
-      # failure is logged, never raised — it must not crash the turn the
-      # user just saw stream.
-      def persist
-        Agent::SessionArchive.store(conversation, from: workspace.scope_dir)
-      rescue StandardError => e
-        Rails.logger.error("Runtime::Local archive failed for conversation #{conversation.id}: #{e.message}")
+        @workspace ||= Agent::Workspace.persistent(conversation)
       end
     end
   end

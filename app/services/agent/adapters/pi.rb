@@ -19,9 +19,9 @@ module Agent
     # unset -> pi falls back to its own configuration.
     #
     # Attachments: images are sent inline via pi's vision protocol
-    # (prompt images:); other files are handed to the runtime, which
-    # stages them into pi's working directory, and a note in the prompt
-    # tells pi they are there.
+    # (prompt images:); other files are projected into pi's
+    # workspace/uploads/ by the runtime, and a note in the prompt tells
+    # pi this turn's uploads are there.
     class Pi < Base
       def initialize(conversation:, runtime: nil, **opts)
         super(conversation: conversation, **opts)
@@ -36,7 +36,7 @@ module Agent
         return enum_for(:stream, input, images: images, files: files) unless block
 
         @last_text_message_id = nil
-        @runtime.run(pi_args: pi_args, files: files) do |session|
+        @runtime.run(pi_args: pi_args) do |session|
           @session = session
           session.prompt(prompt_with_files(input, files), images: pi_images(images)) do |pi_event|
             ui_event = translate(pi_event)
@@ -105,13 +105,13 @@ module Agent
         images.map { |image| PiAgent::Image.from_bytes(image.download, mime_type: image.content_type) }
       end
 
-      # The runtime stages non-image files into pi's working directory;
-      # name them in the prompt so pi knows to open them there.
+      # The runtime projects uploaded files into ./uploads/; name this
+      # turn's uploads in the prompt so pi knows to open them there.
       def prompt_with_files(input, files)
         names = files.map { |file| file.filename.to_s }
         return input if names.empty?
 
-        note = "[Attached files in your working directory: #{names.join(', ')}]"
+        note = "[Attached files, available in ./uploads/: #{names.join(', ')}]"
         input.present? ? "#{input}\n\n#{note}" : note
       end
 
