@@ -65,6 +65,16 @@ a server like Metabase's MCP server — is the highest-value capability on
 this roadmap. pi has **no built-in MCP** (a deliberate upstream omission),
 so Metis adds it on purpose.
 
+**Connectors are MCP, not CLIs.** pi's own guidance favors wrapping CLI
+tools as skills — but a CLI assumes it is the top-level app run by an
+interactive human: its auth (browser device flows, local config files)
+has nowhere to land in a server-side, sandboxed, multi-user runtime, and
+every CLI invents its own credential scheme. MCP has a host/client/server
+model — Metis is a first-class host — and a standard OAuth 2.0 flow, so
+Metis implements connector auth *once* instead of per-tool glue. Accepted
+tradeoff: a service with only a CLI and no MCP server is not a connector
+until an MCP server exists for it.
+
 **One bridge, many connectors.** A single pi extension bridges the Model
 Context Protocol into pi: it opens MCP clients and registers each MCP
 server's tools as native pi tools via `registerTool`. Written once, it
@@ -118,11 +128,10 @@ Concrete deliverables:
 - [ ] **OAuth & onboarding** — omniauth (Google / GitHub) on Devise, and a
   first-run flow (provider + key, first conversation). Establishes real
   authenticated users.
-- [ ] **MCP bridge spike** — pi has no built-in MCP, so connectors arrive
-  via a bridge extension (see *MCP & connectors* above). Decide
-  adopt-vs-build: survey pi's package ecosystem for an existing MCP-bridge
-  extension, else scope building one. Output: a decision and a build/adopt
-  plan — no connector implementation yet.
+- [ ] **MCP bridge spike** — adopt vs build the bridge extension (see
+  *MCP & connectors*). Survey pi's package ecosystem for an existing
+  MCP-bridge extension; if none fits, scope building one. Output: a
+  decision and a build/adopt plan — no connector implementation yet.
 - [ ] **Docs** — keep `README.md` and `CLAUDE.md` current as the above
   lands.
 

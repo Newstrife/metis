@@ -93,6 +93,30 @@ bin/ci           # rubocop, security scans, and tests
 
 ## Architecture
 
+One turn flows from the browser down to pi and streams back up, live:
+
+```
+   Browser · Hotwire chat UI
+      │  new message                  ▲  Turbo Stream
+      ▼                               │  (live text, tool calls)
+   MessagesController                 ChatBroadcaster
+      │  persist + enqueue            ▲  UiEvent
+      ▼                               │
+   ChatJob · Solid Queue ─────────────┘
+      │  one turn — stream UiEvents, persist the final message
+      ▼
+   Agent service layer  (app/services/agent/)
+      ├─ Adapters::Pi   the agent — drives pi, native events → UiEvent
+      └─ Runtime        where pi runs — Local · Docker · E2b
+      │
+      ▼  pi-agent-rb · JSONL over stdio
+   pi --mode rpc · the agent harness — LLM loop, tools, extensions
+
+   Persistence
+      ├─ PostgreSQL       conversations & messages
+      └─ Active Storage   Agent::SessionArchive · durable pi session
+```
+
 The core is the **Agent service layer** (`app/services/agent/`): an
 *adapter* drives pi and translates its native event stream into a
 canonical `UiEvent` vocabulary, and a *runtime* decides where pi runs.
