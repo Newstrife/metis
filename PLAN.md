@@ -75,20 +75,20 @@ Metis implements connector auth *once* instead of per-tool glue. Accepted
 tradeoff: a service with only a CLI and no MCP server is not a connector
 until an MCP server exists for it.
 
-**One bridge, many connectors.** A single pi extension bridges the Model
-Context Protocol into pi: it opens MCP clients and registers each MCP
-server's tools as native pi tools via `registerTool`. Written once, it
-makes the *entire* MCP ecosystem — Metabase, GitHub, Slack, Notion,
-Linear, … — available. Every connector after the bridge is
-**configuration, not code**.
+**One bridge, many connectors.** A single pi extension —
+[`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter), the
+mature MIT-licensed bridge Metis adopts — connects pi to MCP servers and
+exposes their tools to the agent. Adopted once, it makes the *entire* MCP
+ecosystem — Metabase, GitHub, Slack, Notion, Linear, … — available. Every
+connector after the bridge is **configuration, not code**.
 
 ```
 Team ─▶ Connector configs  (Metis: encrypted, team-scoped)
-            │  staged into the run, per turn
+            │  staged per run as .mcp.json
             ▼
       pi runtime  (Docker / E2b sandbox)
-        └─ mcp-bridge extension ──▶ Metabase MCP server ──▶ Metabase
-             registers each MCP tool as a native pi tool
+        └─ pi-mcp-adapter ──▶ Metabase MCP server ──▶ Metabase
+             exposes MCP tools to the agent
         └─ agent calls them like any other tool
 ```
 
@@ -96,11 +96,12 @@ Pieces:
 
 - **`Connector` model** — team-scoped (user-scoped for personal): which MCP
   server, its config, its credentials. Encrypted, like `ApiKey`.
-- **`mcp-bridge` extension** — bundled in `.pi/extensions/`, loaded through
-  the existing `pi --extension` wiring. Reads the connector config, opens
-  the MCP clients, registers their tools.
-- **Adapter stages the config** — same pattern as `credential_args` and
-  `extension_paths`; the runtime hands the extension its connector config.
+- **`pi-mcp-adapter`** — the adopted bridge extension, vendored into
+  `.pi/extensions/` and loaded through the existing `pi --extension`
+  wiring. Reads its MCP server list from an on-disk `.mcp.json`.
+- **`.mcp.json` staged per run** — the runtime writes a `.mcp.json` into
+  the pi workspace from the conversation's `Connector` records, with
+  credentials injected as env vars / bearer tokens.
 - **MCP servers run inside the sandbox** — third-party MCP server code is
   contained by the Docker/E2b runtime. Principle 3 earns its keep here.
 - **Marketplace** — a catalog of MCP servers a team can enable and
@@ -111,9 +112,10 @@ team-level connector governance — whose credentials, who may use them,
 audit. Metis owning the `Connector` and credential layer is the right
 design, and that governance layer *is* the multi-tenant product.
 
-Two things to resolve: **adopt vs build** the bridge (the week-1 spike),
-and **per-turn lifecycle cost** (Open Questions) — Metis runs pi per turn,
-so a naive bridge re-spawns every MCP server on every turn.
+**Adopt vs build** is resolved — adopt `pi-mcp-adapter`, with a fork as
+the fallback (full rationale and review: `docs/connectors.md`). One
+concern remains: **per-turn lifecycle cost** (Open Questions) — Metis
+runs pi per turn, so the bridge reconnects every MCP server on every turn.
 
 ## Week 1
 
@@ -128,10 +130,11 @@ Concrete deliverables:
 - [ ] **OAuth & onboarding** — omniauth (Google / GitHub) on Devise, and a
   first-run flow (provider + key, first conversation). Establishes real
   authenticated users.
-- [ ] **MCP bridge spike** — adopt vs build the bridge extension (see
-  *MCP & connectors*). Survey pi's package ecosystem for an existing
-  MCP-bridge extension; if none fits, scope building one. Output: a
-  decision and a build/adopt plan — no connector implementation yet.
+- [x] **MCP bridge spike — resolved.** Adopt
+  [`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter)
+  (mature, MIT, current); Metis stages a per-run `.mcp.json`. Fork is the
+  fallback if upstream's programmatic-config gap stalls. Connector
+  implementation is week 2+ — see `docs/connectors.md`.
 - [ ] **Docs** — keep `README.md` and `CLAUDE.md` current as the above
   lands.
 
