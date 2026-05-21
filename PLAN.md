@@ -28,8 +28,9 @@ tools and share them** — across their own devices, and with their teams.
 4. **Not provider-locked.** LLM provider and model are chosen per
    conversation.
 5. **Web-first.** Server-rendered Hotwire. No SPA.
-6. **Build on pi's native systems.** Skills, extensions, MCP — surface and
-   manage them; do not reinvent them in Rails.
+6. **Capability runs in pi; Rails governs.** Skills and extensions are
+   pi-native; MCP connectors arrive through a pi extension. Rails manages
+   and governs them — it does not reimplement them as Rails-side tools.
 7. **Made to share.** Tools and skills are built to be shared — personally
    and across a team.
 
@@ -52,10 +53,57 @@ Themes, roughly in dependency order:
 | **Runtimes** | Add `Docker`. A sandboxed runtime is mandatory for any shared deployment. |
 | **Auth & tenancy** | OAuth, onboarding, then teams/orgs. Team-aware ownership from the start. |
 | **Skills** | Project-bundled skills first, then user/team-managed skills with a UI. |
-| **MCP & connectors** | Research pi's MCP support; build a connector marketplace — GitHub, Slack, Notion first. |
+| **MCP & connectors** | One MCP-bridge extension + a team-scoped `Connector` model — the whole MCP ecosystem through a single bridge. |
 | **Collaboration** | Shared conversations, shared tools, team spaces. |
 | **Web UI** | A design system in the Hotwire stack — a consistent component set + design tokens. |
 | **Docs** | Continuous. |
+
+## MCP & connectors
+
+Connecting business data to the agent — querying operational data through
+a server like Metabase's MCP server — is the highest-value capability on
+this roadmap. pi has **no built-in MCP** (a deliberate upstream omission),
+so Metis adds it on purpose.
+
+**One bridge, many connectors.** A single pi extension bridges the Model
+Context Protocol into pi: it opens MCP clients and registers each MCP
+server's tools as native pi tools via `registerTool`. Written once, it
+makes the *entire* MCP ecosystem — Metabase, GitHub, Slack, Notion,
+Linear, … — available. Every connector after the bridge is
+**configuration, not code**.
+
+```
+Team ─▶ Connector configs  (Metis: encrypted, team-scoped)
+            │  staged into the run, per turn
+            ▼
+      pi runtime  (Docker / E2b sandbox)
+        └─ mcp-bridge extension ──▶ Metabase MCP server ──▶ Metabase
+             registers each MCP tool as a native pi tool
+        └─ agent calls them like any other tool
+```
+
+Pieces:
+
+- **`Connector` model** — team-scoped (user-scoped for personal): which MCP
+  server, its config, its credentials. Encrypted, like `ApiKey`.
+- **`mcp-bridge` extension** — bundled in `.pi/extensions/`, loaded through
+  the existing `pi --extension` wiring. Reads the connector config, opens
+  the MCP clients, registers their tools.
+- **Adapter stages the config** — same pattern as `credential_args` and
+  `extension_paths`; the runtime hands the extension its connector config.
+- **MCP servers run inside the sandbox** — third-party MCP server code is
+  contained by the Docker/E2b runtime. Principle 3 earns its keep here.
+- **Marketplace** — a catalog of MCP servers a team can enable and
+  configure. The catalog is metadata; the capability is the one bridge.
+
+**pi executes, Metis governs.** pi is single-user and could never own
+team-level connector governance — whose credentials, who may use them,
+audit. Metis owning the `Connector` and credential layer is the right
+design, and that governance layer *is* the multi-tenant product.
+
+Two things to resolve: **adopt vs build** the bridge (the week-1 spike),
+and **per-turn lifecycle cost** (Open Questions) — Metis runs pi per turn,
+so a naive bridge re-spawns every MCP server on every turn.
 
 ## Week 1
 
@@ -70,9 +118,11 @@ Concrete deliverables:
 - [ ] **OAuth & onboarding** — omniauth (Google / GitHub) on Devise, and a
   first-run flow (provider + key, first conversation). Establishes real
   authenticated users.
-- [ ] **MCP research spike** — does pi consume MCP servers, and how?
-  Written findings plus a connector-marketplace design sketch. No
-  implementation yet.
+- [ ] **MCP bridge spike** — pi has no built-in MCP, so connectors arrive
+  via a bridge extension (see *MCP & connectors* above). Decide
+  adopt-vs-build: survey pi's package ecosystem for an existing MCP-bridge
+  extension, else scope building one. Output: a decision and a build/adopt
+  plan — no connector implementation yet.
 - [ ] **Docs** — keep `README.md` and `CLAUDE.md` current as the above
   lands.
 
@@ -82,15 +132,17 @@ teams slot in without a migration.
 
 ## Deferred to week 2+
 
-User/team-managed skills + UI · MCP connector marketplace · the teams/orgs
-model · Web-UI design-system rollout.
+User/team-managed skills + UI · the MCP bridge + `Connector` model +
+marketplace · the teams/orgs model · Web-UI design-system rollout.
 
 ## Open questions
 
 1. **Team model.** How are teams created, joined, and (if hosted) billed?
    Where exactly is the personal-vs-team ownership boundary?
-2. **MCP.** Does pi support MCP natively, or does that integration live in
-   Metis? (The week-1 spike answers this.)
+2. **MCP runtime cost.** Metis runs pi per-turn in a fresh runtime; a
+   naive bridge re-spawns and re-auths every MCP server each turn.
+   Connection reuse, a warm runtime pool, or remote (HTTP/SSE) MCP servers
+   — which mix?
 3. **Sharing mechanism.** How does "build a tool and share it" work —
    export/import, a hosted registry, git-backed? Applies to skills,
    extensions, and connectors alike.
