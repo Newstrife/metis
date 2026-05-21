@@ -4,12 +4,16 @@
  * Adds two tools analogous to Claude Code's web capabilities:
  *
  *   web_fetch  — fetch a URL and return readable text (strips HTML)
- *   web_search — search the web via Brave Search API or Serper.dev
+ *   web_search — search the web with no API key, via DuckDuckGo
+ *                (default) or a SearXNG instance
  *
- * Configuration (environment variables):
- *   BRAVE_SEARCH_API_KEY  — Brave Search API key (https://api.search.brave.com)
- *   SERPER_API_KEY        — Serper.dev API key (https://serper.dev)
- *                           Brave is preferred when both are set.
+ * Configuration (optional — search works with no configuration):
+ *   SEARXNG_URL — base URL of a SearXNG instance, e.g. https://searx.example.
+ *                 When set, search uses its JSON API instead of DuckDuckGo.
+ *                 The instance must have the `json` format enabled
+ *                 (search.formats in its settings.yml). This is the most
+ *                 reliable keyless option — DuckDuckGo rate-limits
+ *                 datacenter IPs, so it can fail inside a sandbox.
  *
  * Placement:
  *   Project-local: .pi/extensions/web-tools/index.ts   ← this file
@@ -18,6 +22,11 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+
+// A browser-like User-Agent — plain/script UAs are refused by some hosts.
+const BROWSER_UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 // ---------------------------------------------------------------------------
 // HTML → plain text (no external deps needed)
@@ -38,6 +47,7 @@ function htmlToText(html: string): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
     .replace(/&nbsp;/g, " ")
     .replace(/&mdash;/g, "—")
     .replace(/&ndash;/g, "–")
@@ -56,7 +66,7 @@ function truncate(text: string, maxChars: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Search providers
+// Search providers — all keyless
 // ---------------------------------------------------------------------------
 
 interface SearchResult {
@@ -65,74 +75,123 @@ interface SearchResult {
   snippet: string;
 }
 
-async function braveSearch(
-  query: string,
-  count: number,
-  signal: AbortSignal,
-): Promise<SearchResult[]> {
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY;
-  if (!apiKey) throw new Error("BRAVE_SEARCH_API_KEY is not set");
-
-  const url = new URL("https://api.search.brave.com/res/v1/web/search");
-  url.searchParams.set("q", query);
-  url.searchParams.set("count", String(count));
-
-  const res = await fetch(url.toString(), {
-    headers: {
-      Accept: "application/json",
-      "Accept-Encoding": "gzip",
-      "X-Subscription-Token": apiKey,
-    },
-    signal,
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Brave Search API error ${res.status}: ${body}`);
+// DuckDuckGo wraps result links in a redirector:
+// //duckduckgo.com/l/?uddg=<encoded real url>&rut=… — unwrap it.
+function resolveDuckDuckGoUrl(href: string): string {
+  const wrapped = href.match(/[?&]uddg=([^&]+)/);
+  if (wrapped) {
+    try {
+      return decodeURIComponent(wrapped[1]);
+    } catch {
+      return "";
+    }
   }
-
-  const data = (await res.json()) as {
-    web?: { results?: Array<{ title: string; url: string; description?: string }> };
-  };
-
-  return (data.web?.results ?? []).map((r) => ({
-    title: r.title ?? "",
-    url: r.url ?? "",
-    snippet: r.description ?? "",
-  }));
+  return href.startsWith("//") ? `https:${href}` : href;
 }
 
-async function serperSearch(
+// Scrape the no-JS DuckDuckGo HTML endpoint. Its result blocks carry
+// `result__a` (title link) and `result__snippet` anchors; each snippet
+// belongs to the nearest preceding link.
+function parseDuckDuckGoHtml(html: string): SearchResult[] {
+  const links: Array<{ pos: number; href: string; title: string }> = [];
+  const linkRe =
+    /<a\b[^>]*class="[^"]*\bresult__a\b[^"]*"[^>]*\bhref="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+  for (let m = linkRe.exec(html); m; m = linkRe.exec(html)) {
+    links.push({ pos: m.index, href: m[1], title: htmlToText(m[2]) });
+  }
+
+  const snippets: Array<{ pos: number; text: string }> = [];
+  const snippetRe =
+    /<a\b[^>]*class="[^"]*\bresult__snippet\b[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+  for (let m = snippetRe.exec(html); m; m = snippetRe.exec(html)) {
+    snippets.push({ pos: m.index, text: htmlToText(m[1]) });
+  }
+
+  return links
+    .map((link, i) => {
+      const nextPos = links[i + 1]?.pos ?? Number.POSITIVE_INFINITY;
+      const snippet = snippets.find((s) => s.pos > link.pos && s.pos < nextPos);
+      return {
+        title: link.title,
+        url: resolveDuckDuckGoUrl(link.href),
+        snippet: snippet?.text ?? "",
+      };
+    })
+    .filter((r) => /^https?:\/\//i.test(r.url) && r.title.length > 0);
+}
+
+async function duckDuckGoSearch(
   query: string,
   count: number,
   signal: AbortSignal,
 ): Promise<SearchResult[]> {
-  const apiKey = process.env.SERPER_API_KEY;
-  if (!apiKey) throw new Error("SERPER_API_KEY is not set");
-
-  const res = await fetch("https://google.serper.dev/search", {
+  const res = await fetch("https://html.duckduckgo.com/html/", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
-      "X-API-KEY": apiKey,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": BROWSER_UA,
+      Accept: "text/html",
     },
-    body: JSON.stringify({ q: query, num: count }),
+    body: new URLSearchParams({ q: query }).toString(),
     signal,
+    redirect: "follow",
   });
 
+  // 202 is DuckDuckGo's bot-challenge response — common from datacenter IPs.
+  if (res.status === 202) {
+    throw new Error(
+      "DuckDuckGo declined the request (it rate-limits this IP — common in " +
+        "datacenter/sandbox environments). Set SEARXNG_URL to a SearXNG " +
+        "instance for reliable keyless search.",
+    );
+  }
+  if (!res.ok) throw new Error(`DuckDuckGo HTTP ${res.status}`);
+
+  const results = parseDuckDuckGoHtml(await res.text());
+  if (results.length === 0) {
+    throw new Error(
+      "DuckDuckGo returned no parseable results — it may be rate-limiting, " +
+        "or its page layout changed. Set SEARXNG_URL for a reliable alternative.",
+    );
+  }
+  return results.slice(0, count);
+}
+
+async function searxngSearch(
+  query: string,
+  count: number,
+  signal: AbortSignal,
+): Promise<SearchResult[]> {
+  const base = process.env.SEARXNG_URL as string;
+  const url = new URL("/search", base);
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "json");
+
+  const res = await fetch(url.toString(), {
+    headers: { Accept: "application/json", "User-Agent": BROWSER_UA },
+    signal,
+  });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Serper API error ${res.status}: ${body}`);
+    throw new Error(
+      `SearXNG HTTP ${res.status} at ${base} — the instance may have the ` +
+        "JSON format disabled (enable `json` under search.formats in its settings.yml).",
+    );
   }
 
-  const data = (await res.json()) as {
-    organic?: Array<{ title: string; link: string; snippet?: string }>;
-  };
+  const data = (await res.json().catch(() => null)) as {
+    results?: Array<{ title?: string; url?: string; content?: string }>;
+  } | null;
+  if (!data) {
+    throw new Error(
+      `SearXNG at ${base} did not return JSON — the instance likely has the ` +
+        "JSON format disabled.",
+    );
+  }
 
-  return (data.organic ?? []).map((r) => ({
+  return (data.results ?? []).slice(0, count).map((r) => ({
     title: r.title ?? "",
-    url: r.link ?? "",
-    snippet: r.snippet ?? "",
+    url: r.url ?? "",
+    snippet: r.content ?? "",
   }));
 }
 
@@ -182,8 +241,7 @@ export default function webToolsExtension(pi: ExtensionAPI) {
       try {
         res = await fetch(url, {
           headers: {
-            "User-Agent":
-              "Mozilla/5.0 (compatible; pi-web-tools/1.0; +https://github.com/earendil-works/pi)",
+            "User-Agent": BROWSER_UA,
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
           },
           signal,
@@ -237,8 +295,8 @@ export default function webToolsExtension(pi: ExtensionAPI) {
     label: "Web Search",
     description:
       "Search the web and return the top results (title, URL, snippet). " +
-      "Requires BRAVE_SEARCH_API_KEY or SERPER_API_KEY to be set. " +
-      "Brave is used when both keys are present.",
+      "No API key required — uses DuckDuckGo by default, or a SearXNG " +
+      "instance when SEARXNG_URL is set.",
     promptSnippet: "Search the web for current information",
     promptGuidelines: [
       "Use web_search when the user asks about recent events, news, or anything that may have changed after your training cutoff.",
@@ -257,40 +315,16 @@ export default function webToolsExtension(pi: ExtensionAPI) {
 
     async execute(_toolCallId, params, signal, onUpdate) {
       const { query, count = 5 } = params;
-      const n = Math.min(count, 10);
+      const n = Math.min(Math.max(count, 1), 10);
 
-      const hasBrave = Boolean(process.env.BRAVE_SEARCH_API_KEY);
-      const hasSerper = Boolean(process.env.SERPER_API_KEY);
-
-      if (!hasBrave && !hasSerper) {
-        return {
-          content: [
-            {
-              type: "text",
-              text:
-                "web_search is not configured. Set BRAVE_SEARCH_API_KEY " +
-                "(https://api.search.brave.com) or SERPER_API_KEY (https://serper.dev) " +
-                "in your environment.",
-            },
-          ],
-          isError: true,
-          details: {},
-        };
-      }
-
-      onUpdate?.({ content: [{ type: "text", text: `Searching: ${query} …` }] });
+      const provider = process.env.SEARXNG_URL ? "SearXNG" : "DuckDuckGo";
+      onUpdate?.({ content: [{ type: "text", text: `Searching ${provider}: ${query} …` }] });
 
       let results: SearchResult[];
-      let provider: string;
-
       try {
-        if (hasBrave) {
-          results = await braveSearch(query, n, signal);
-          provider = "Brave Search";
-        } else {
-          results = await serperSearch(query, n, signal);
-          provider = "Serper (Google)";
-        }
+        results = process.env.SEARXNG_URL
+          ? await searxngSearch(query, n, signal)
+          : await duckDuckGoSearch(query, n, signal);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return {
@@ -308,10 +342,8 @@ export default function webToolsExtension(pi: ExtensionAPI) {
       }
 
       const lines = results.map(
-        (r, i) =>
-          `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`,
+        (r, i) => `[${i + 1}] ${r.title}\n    ${r.url}\n    ${r.snippet}`,
       );
-
       const text = `Search results for "${query}" (via ${provider}):\n\n` + lines.join("\n\n");
 
       return {
