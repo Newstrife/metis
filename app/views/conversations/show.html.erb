@@ -12,10 +12,7 @@
         <%= time_ago_in_words(@conversation.created_at) %> ago
       </span>
     </div>
-    <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
-      <span class="uppercase tracking-wide"><%= @conversation.backend %></span>
-      <%= render "context_meter", conversation: @conversation %>
-    </div>
+    <div class="mt-2"><%= render "context_meter", conversation: @conversation %></div>
   </header>
 
   <div id="messages" data-chat-target="messages" class="space-y-4 pb-32">

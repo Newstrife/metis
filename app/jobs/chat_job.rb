@@ -53,6 +53,7 @@ class ChatJob < ApplicationJob
     persist_runtime(conversation, adapter)
     conversation.touch
     broadcaster.refresh_usage
+    broadcaster.collapse_activity
   end
 
   # Accumulate one tool call across its started/progress/finished events,

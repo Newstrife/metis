@@ -74,4 +74,18 @@ class ApplicationHelperTest < ActionView::TestCase
     assert_includes meta, "1.2k in"
     assert_includes meta, " · "
   end
+
+  test "activity_summary says Working while the turn streams" do
+    assert_equal "Working…", activity_summary(Message.new(streaming_status: :streaming))
+  end
+
+  test "activity_summary describes a finished turn's reasoning and tool calls" do
+    message = Message.new(streaming_status: :done, reasoning: "thought about it",
+                          tool_calls: [ { "name" => "bash" }, { "name" => "read" } ])
+    assert_equal "Reasoning · 2 tool calls", activity_summary(message)
+  end
+
+  test "activity_summary falls back to Activity for a bare finished turn" do
+    assert_equal "Activity", activity_summary(Message.new(streaming_status: :done))
+  end
 end

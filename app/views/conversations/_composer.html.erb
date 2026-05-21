@@ -15,17 +15,6 @@
     <% if new_chat %>
       <div class="flex gap-2 mb-2" data-controller="model-select"
            data-model-select-catalog-value="<%= Agent::Catalog.models_by_provider.to_json %>">
-        <select name="backend"
-                class="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700">
-          <% Conversation.backends.each_key do |backend| %>
-            <% supported = Agent::Adapters.supported?(backend) %>
-            <option value="<%= backend %>"
-                    <%= "selected" if backend == Agent::Adapters::SUPPORTED.first %>
-                    <%= "disabled" unless supported %>>
-              <%= backend.titleize %><%= " (soon)" unless supported %>
-            </option>
-          <% end %>
-        </select>
         <select name="provider" data-model-select-target="provider"
                 data-action="model-select#providerChanged"
                 class="rounded-md border border-gray-300 px-2 py-1.5 text-sm text-gray-700">

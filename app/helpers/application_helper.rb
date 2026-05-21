@@ -40,6 +40,16 @@ module ApplicationHelper
     format("%dm %02ds", minutes, rest)
   end
 
+  # Summary label for an assistant turn's reasoning/tools disclosure.
+  def activity_summary(message)
+    return "Working…" unless message.done?
+
+    parts = []
+    parts << "Reasoning" if message.reasoning.present?
+    parts << pluralize(message.tool_calls.size, "tool call") if message.tool_calls.any?
+    parts.join(" · ").presence || "Activity"
+  end
+
   # A compact per-message token line, or "" when none was recorded.
   def token_summary(message)
     return "" if message.input_tokens.blank? && message.output_tokens.blank?

@@ -44,6 +44,18 @@ class ChatBroadcaster
     )
   end
 
+  # Called by ChatJob once the turn is persisted: re-renders the
+  # reasoning/tools disclosure from the saved message, which collapses
+  # it (the turn is now done) — or removes it if there was neither.
+  def collapse_activity
+    Turbo::StreamsChannel.broadcast_replace_to(
+      @conversation,
+      target: "#{base_id}_activity",
+      partial: "messages/activity",
+      locals: { message: @message }
+    )
+  end
+
   private
 
   def base_id = dom_id(@message)

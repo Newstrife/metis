@@ -22,7 +22,7 @@
                   <%= time_ago_in_words(conversation.updated_at) %> ago
                 </span>
               </div>
-              <% meta = [ conversation.backend, conversation.model_label, conversation.runtime_label ].compact %>
+              <% meta = [ conversation.model_label, conversation.runtime_label ].compact %>
               <div class="mt-0.5 text-xs text-gray-400"><%= meta.join(" · ") %></div>
             <% end %>
           </li>

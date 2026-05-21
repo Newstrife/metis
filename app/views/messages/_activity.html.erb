@@ -1,0 +1,22 @@
+<%# An assistant turn's reasoning + tool calls. Open while the turn
+    streams — the broadcaster appends into the inner divs, which must
+    exist — then collapsed once the turn is done. Skipped entirely for
+    a finished turn that had neither. %>
+<% if !message.done? || message.reasoning.present? || message.tool_calls.any? %>
+  <details id="<%= dom_id(message) %>_activity" class="mb-2" <%= "open" unless message.done? %>>
+    <summary class="cursor-pointer select-none text-xs text-gray-400 hover:text-gray-600">
+      <%= activity_summary(message) %>
+    </summary>
+    <div class="mt-2">
+      <div id="<%= dom_id(message) %>_reasoning"
+           class="mb-2 text-sm italic text-gray-500 whitespace-pre-wrap break-words empty:hidden"><%= message.reasoning %></div>
+      <div id="<%= dom_id(message) %>_tools" class="space-y-2 empty:hidden">
+        <% message.tool_calls.each do |call| %>
+          <%= render "messages/tool_call",
+                tool_call_id: call["tool_call_id"], name: call["name"], args: call["args"],
+                output: call["output"], is_error: call["is_error"], status: call["status"] %>
+        <% end %>
+      </div>
+    </div>
+  </details>
+<% end %>
