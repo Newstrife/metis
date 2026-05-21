@@ -3,7 +3,7 @@ require "test_helper"
 class ChatBroadcasterTest < ActiveSupport::TestCase
   setup do
     user = User.create!(email: "bc@example.com", password: "password123")
-    conversation = user.conversations.create!(backend: :pi)
+    conversation = user.conversations.create!
     message = conversation.messages.create!(role: :assistant, content: "", streaming_status: :streaming)
     @broadcaster = ChatBroadcaster.new(conversation, message)
   end

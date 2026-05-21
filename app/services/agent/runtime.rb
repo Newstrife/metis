@@ -13,9 +13,8 @@ module Agent
   # Runtime::Local runs the agent as a local subprocess; Runtime::E2b runs
   # it inside a secure E2B microVM.
   module Runtime
-    # Resolve the runtime for a conversation. The runtime is a
-    # per-deployment choice (config.x.agent.runtime), in contrast to the
-    # backend, which the user picks per conversation.
+    # Resolve the runtime for a conversation — a per-deployment choice
+    # (config.x.agent.runtime).
     def self.for(conversation)
       build(conversation, Rails.application.config.x.agent.runtime)
     end

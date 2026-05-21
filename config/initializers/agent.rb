@@ -1,7 +1,7 @@
 # Agent runtime configuration.
 #
 # The runtime — *where* the coding agent runs — is a per-deployment
-# choice (unlike the backend, which is per-conversation). See
+# choice. See
 # Agent::Runtime.
 #
 #   :local — pi as a local subprocess. NOT isolated; single-operator /

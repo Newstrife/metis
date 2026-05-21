@@ -3,7 +3,7 @@ require "test_helper"
 class ConversationTest < ActiveSupport::TestCase
   setup do
     @user = User.create!(email: "conv@example.com", password: "password123")
-    @conversation = @user.conversations.create!(backend: :pi)
+    @conversation = @user.conversations.create!
   end
 
   test "turn_in_progress? is false with no in-flight assistant message" do
@@ -39,14 +39,13 @@ class ConversationTest < ActiveSupport::TestCase
 
   test "model_label reads from settings before a turn runs" do
     conversation = @user.conversations.create!(
-      backend: :pi, settings: { "provider" => "openai", "model" => "gpt-5.5" }
+      settings: { "provider" => "openai", "model" => "gpt-5.5" }
     )
     assert_equal "gpt-5.5", conversation.model_label
   end
 
   test "model_label prefers the model pi resolved" do
     conversation = @user.conversations.create!(
-      backend: :pi,
       settings: { "model" => "gpt-5.5" },
       agent_model: { "provider" => "openai-codex", "name" => "GPT-5.5" }
     )

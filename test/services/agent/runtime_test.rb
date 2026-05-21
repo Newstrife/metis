@@ -3,7 +3,7 @@ require "test_helper"
 class Agent::RuntimeTest < ActiveSupport::TestCase
   setup do
     @user = User.create!(email: "rtsel@example.com", password: "password123")
-    @conversation = @user.conversations.create!(backend: :pi)
+    @conversation = @user.conversations.create!
   end
 
   def with_runtime_config(name)

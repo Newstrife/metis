@@ -13,7 +13,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "lists conversations for a signed-in user" do
-    @user.conversations.create!(backend: :pi, title: "Existing")
+    @user.conversations.create!(title: "Existing")
     sign_in @user
     get conversations_path
     assert_response :success
@@ -60,21 +60,9 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
-  test "honors the chosen agent backend" do
-    sign_in @user
-    post conversations_path, params: { content: "hi", backend: "codex" }
-    assert_equal "codex", @user.conversations.last.backend
-  end
-
-  test "falls back to pi for an unknown backend" do
-    sign_in @user
-    post conversations_path, params: { content: "hi", backend: "bogus" }
-    assert_equal "pi", @user.conversations.last.backend
-  end
-
   test "shows a conversation owned by the user" do
     sign_in @user
-    conversation = @user.conversations.create!(backend: :pi, title: "Mine")
+    conversation = @user.conversations.create!(title: "Mine")
     get conversation_path(conversation)
     assert_response :success
     assert_select "h1", text: "Mine"
@@ -83,7 +71,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
   test "shows the runtime a conversation ran on in the context meter" do
     sign_in @user
     conversation = @user.conversations.create!(
-      backend: :pi, title: "Ran", runtime_state: { "runtime" => "e2b", "sandbox_id" => "sbx-7" }
+      title: "Ran", runtime_state: { "runtime" => "e2b", "sandbox_id" => "sbx-7" }
     )
     get conversation_path(conversation)
 
@@ -93,7 +81,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
 
   test "does not expose another user's conversation" do
     other = User.create!(email: "other@example.com", password: "password123")
-    conversation = other.conversations.create!(backend: :pi, title: "Secret")
+    conversation = other.conversations.create!(title: "Secret")
     sign_in @user
     get conversation_path(conversation)
     assert_response :not_found

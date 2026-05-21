@@ -10,8 +10,6 @@ class ChatJob < ApplicationJob
     broadcaster = ChatBroadcaster.new(conversation, assistant_message)
 
     run(conversation, user_message, assistant_message, broadcaster)
-  rescue Agent::UnsupportedBackendError => e
-    fail_message(assistant_message, broadcaster, e.message)
   rescue StandardError => e
     Rails.logger.error("ChatJob #{conversation_id} failed: #{e.class}: #{e.message}")
     fail_message(assistant_message, broadcaster, "The agent run failed.")

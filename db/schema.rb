@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_20_232914) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_21_010628) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -54,7 +54,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_20_232914) do
 
   create_table "conversations", force: :cascade do |t|
     t.jsonb "agent_model", default: {}, null: false
-    t.integer "backend", default: 0, null: false
     t.string "backend_session_id"
     t.jsonb "context_usage", default: {}, null: false
     t.datetime "created_at", null: false

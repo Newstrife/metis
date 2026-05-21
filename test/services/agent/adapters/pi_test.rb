@@ -63,7 +63,7 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
   end
 
   def adapter
-    Agent::Adapters::Pi.new(conversation: Conversation.new(backend: :pi))
+    Agent::Adapters::Pi.new(conversation: Conversation.new)
   end
 
   def pi_event(hash)
@@ -74,12 +74,12 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
   def streaming_adapter(stub)
     client = PiAgent::Client.new(bin: "ruby", args: [ "-e", stub ])
     session = PiAgent::Session.new(client.start)
-    Agent::Adapters::Pi.new(conversation: Conversation.new(backend: :pi), runtime: FakeRuntime.new(session))
+    Agent::Adapters::Pi.new(conversation: Conversation.new, runtime: FakeRuntime.new(session))
   end
 
   def create_conversation(**attrs)
     user = User.create!(email: "pi-#{SecureRandom.hex(4)}@example.com", password: "password123")
-    user.conversations.create!({ backend: :pi }.merge(attrs))
+    user.conversations.create!(attrs)
   end
 
   # Set config.x.agent deployment defaults for the block, then restore.

@@ -4,7 +4,7 @@ require "tmpdir"
 class Agent::Runtime::E2bTest < ActiveSupport::TestCase
   setup do
     @user = User.create!(email: "e2b@example.com", password: "password123")
-    @conversation = @user.conversations.create!(backend: :pi)
+    @conversation = @user.conversations.create!
     @runtime = Agent::Runtime::E2b.new(conversation: @conversation)
   end
 

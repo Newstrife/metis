@@ -4,7 +4,7 @@ require "tmpdir"
 class Agent::SessionArchiveTest < ActiveSupport::TestCase
   setup do
     @user = User.create!(email: "arch@example.com", password: "password123")
-    @conversation = @user.conversations.create!(backend: :pi)
+    @conversation = @user.conversations.create!
   end
 
   def with_tmp_dir

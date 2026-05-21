@@ -35,20 +35,22 @@ touches those models (including tests).
 
 ### The Agent service layer (`app/services/agent/`)
 
-This is the core of the app. It composes a coding agent along **two axes**:
+This is the core of the app. Metis runs on a single coding-agent
+foundation — pi (see `docs/single-coding-agent-foundation.md`). The Agent
+layer separates two concerns:
 
-1. **`Agent::Adapters`** — *which* agent runs. `Adapters.for(conversation)`
-   dispatches on `conversation.backend`. v1 implements only `Pi`;
-   `claude_code` and `codex` are in the enum but raise
-   `UnsupportedBackendError`. An adapter's `#stream(input)` yields events.
-2. **`Agent::Runtime`** — *where* the agent runs. `Runtime::Local` runs pi as
-   a local subprocess; `Runtime::E2B` (microVM isolation) is planned.
+1. **`Agent::Adapters`** — *the agent*. `Adapters.for(conversation)` builds
+   the `Pi` adapter, which drives pi and translates its native event
+   stream. `#stream(input)` yields events. This layer decouples the chat
+   UI from pi's wire protocol; it is not a multi-backend seam.
+2. **`Agent::Runtime`** — *where* the agent runs. `Runtime::Local` runs pi
+   as a local subprocess; `Runtime::E2b` runs it in an isolated microVM.
    **`Runtime::Local` is not a security boundary** — pi has shell access.
 
-Every backend translates its native event stream into **`Agent::UiEvent`**, a
-canonical vocabulary (`text_delta`, `tool_call_started`, `turn_finished`, …)
-so the chat UI is backend-agnostic. `UiEvent#native_ref` keeps the raw payload
-for backend-aware view helpers.
+pi's native events are translated into **`Agent::UiEvent`**, a canonical
+vocabulary (`text_delta`, `tool_call_started`, `turn_finished`, …) that
+keeps the chat UI decoupled from pi's protocol. `UiEvent#native_ref`
+keeps the raw payload for native view helpers.
 
 ### Request → response flow
 

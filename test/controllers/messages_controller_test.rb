@@ -5,7 +5,7 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
 
   setup do
     @user = User.create!(email: "msg@example.com", password: "password123")
-    @conversation = @user.conversations.create!(backend: :pi, title: "Chat")
+    @conversation = @user.conversations.create!(title: "Chat")
     sign_in @user
   end
 
@@ -87,7 +87,7 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
 
   test "does not let a user post to another user's conversation" do
     other = User.create!(email: "other-msg@example.com", password: "password123")
-    other_conversation = other.conversations.create!(backend: :pi)
+    other_conversation = other.conversations.create!
 
     post conversation_messages_path(other_conversation),
          params: { content: "sneaky" }, as: :turbo_stream

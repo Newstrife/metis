@@ -21,7 +21,7 @@ class ConversationsController < ApplicationController
     end
 
     conversation = current_user.conversations.create!(
-      backend: chat_backend, title: content.presence&.truncate(80), settings: chat_settings
+      title: content.presence&.truncate(80), settings: chat_settings
     )
     start_turn(conversation, content, uploads)
     redirect_to conversation
@@ -35,12 +35,6 @@ class ConversationsController < ApplicationController
 
   def set_conversation
     @conversation = current_user.conversations.find(params[:id])
-  end
-
-  # The agent backend picked in the new-chat composer, guarded against a
-  # value outside the enum. Defaults to pi.
-  def chat_backend
-    params[:backend].presence_in(Conversation.backends.keys) || "pi"
   end
 
   # The provider/model picked in the new-chat composer, stored on the

@@ -3,7 +3,7 @@ require "test_helper"
 class Agent::Runtime::LocalTest < ActiveSupport::TestCase
   setup do
     @user = User.create!(email: "rt@example.com", password: "password123")
-    @conversation = @user.conversations.create!(backend: :pi)
+    @conversation = @user.conversations.create!
     @runtime = Agent::Runtime::Local.new(conversation: @conversation)
     @workspace = Agent::Workspace.for(@conversation)
   end

@@ -22,7 +22,7 @@ class ChatJobTest < ActiveSupport::TestCase
 
   setup do
     @user = User.create!(email: "job@example.com", password: "password123")
-    @conversation = @user.conversations.create!(backend: :pi, title: "Job test")
+    @conversation = @user.conversations.create!(title: "Job test")
     @user_message = @conversation.messages.create!(role: :user, content: "hi", streaming_status: :done)
     @assistant_message = @conversation.messages.create!(role: :assistant, content: "", streaming_status: :pending)
   end
@@ -146,12 +146,6 @@ class ChatJobTest < ActiveSupport::TestCase
 
     assert_equal "GPT-5.5", @conversation.reload.agent_model["name"]
     assert_equal "openai-codex", @conversation.agent_model["provider"]
-  end
-
-  test "marks the message errored for an unsupported backend" do
-    @conversation.update!(backend: :claude_code)
-    ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
-    assert @assistant_message.reload.errored?
   end
 
   test "marks the message errored when the adapter raises" do
