@@ -1,7 +1,7 @@
 class ConversationsController < ApplicationController
   include Composing
 
-  before_action :set_conversation, only: :show
+  before_action :set_conversation, only: %i[show cancel]
 
   def index
     @conversations = current_user.conversations.recent
@@ -29,6 +29,13 @@ class ConversationsController < ApplicationController
 
   def show
     @messages = @conversation.messages.chronological
+  end
+
+  # Request that the in-flight turn stop. ChatJob picks this up and
+  # aborts pi; the response is empty (the UI updates via broadcast).
+  def cancel
+    @conversation.request_cancel!
+    head :no_content
   end
 
   private

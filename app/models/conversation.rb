@@ -29,4 +29,10 @@ class Conversation < ApplicationRecord
   def turn_in_progress?
     messages.where(role: :assistant, streaming_status: %i[pending streaming]).exists?
   end
+
+  # Stamp a cancellation request for the in-flight turn. ChatJob polls
+  # this mid-stream (compared against the turn's start) and aborts pi.
+  def request_cancel!
+    update_column(:cancel_requested_at, Time.current)
+  end
 end

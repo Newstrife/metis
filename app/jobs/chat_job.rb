@@ -3,6 +3,9 @@
 class ChatJob < ApplicationJob
   queue_as :default
 
+  # How often (in streamed events) to poll for a cancellation request.
+  CANCEL_POLL_INTERVAL = 15
+
   def perform(conversation_id, user_message_id, assistant_message_id)
     conversation = Conversation.find(conversation_id)
     user_message = Message.find(user_message_id)
@@ -24,6 +27,8 @@ class ChatJob < ApplicationJob
     reasoning = +""
     tools = {}
     errored = false
+    canceled = false
+    events = 0
 
     adapter.stream(user_message.content,
                    images: user_message.images, files: user_message.files) do |event|
@@ -35,13 +40,19 @@ class ChatJob < ApplicationJob
       when :error           then errored = true
       end
       broadcaster.handle(event)
+
+      events += 1
+      if !canceled && (events % CANCEL_POLL_INTERVAL).zero? && cancel_requested?(conversation, assistant_message)
+        adapter.abort
+        canceled = true
+      end
     end
 
     assistant_message.update!(
       content: text,
       reasoning: reasoning.presence,
       tool_calls: tools.values,
-      streaming_status: errored ? :errored : :done,
+      streaming_status: final_status(canceled: canceled, errored: errored),
       finished_at: Time.current,
       **turn_token_columns(conversation, adapter)
     )
@@ -52,6 +63,25 @@ class ChatJob < ApplicationJob
     conversation.touch
     broadcaster.refresh_usage
     broadcaster.collapse_activity
+    broadcaster.refresh_composer
+  end
+
+  # Has the user asked to stop *this* turn? The flag is conversation-wide,
+  # so it is scoped by time — a stamp from before the turn began (a stale
+  # request, or a prior turn's) does not count.
+  def cancel_requested?(conversation, assistant_message)
+    started_at = assistant_message.started_at
+    return false unless started_at
+
+    cancel_time = Conversation.where(id: conversation.id).pick(:cancel_requested_at)
+    cancel_time.present? && cancel_time > started_at
+  end
+
+  def final_status(canceled:, errored:)
+    return :canceled if canceled
+    return :errored if errored
+
+    :done
   end
 
   # Accumulate one tool call across its started/progress/finished events,
@@ -122,5 +152,6 @@ class ChatJob < ApplicationJob
 
     assistant_message.update!(streaming_status: :errored, finished_at: Time.current)
     broadcaster&.fail(message)
+    broadcaster&.refresh_composer
   end
 end

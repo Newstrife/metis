@@ -44,6 +44,16 @@ class ChatBroadcaster
     )
   end
 
+  # Swap the composer's Stop button back to Send once the turn ends.
+  def refresh_composer
+    Turbo::StreamsChannel.broadcast_replace_to(
+      @conversation,
+      target: "composer_actions",
+      partial: "conversations/composer_actions",
+      locals: { conversation: @conversation }
+    )
+  end
+
   # Called by ChatJob once the turn is persisted: re-renders the
   # reasoning/tools disclosure from the saved message, which collapses
   # it (the turn is now done) — or removes it if there was neither.

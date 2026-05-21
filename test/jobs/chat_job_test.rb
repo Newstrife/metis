@@ -16,8 +16,10 @@ class ChatJobTest < ActiveSupport::TestCase
     end
 
     def stream(_input, images: [], files: [])
-      @events.each { |event| yield event }
+      @events.each { |event| break if @aborted; yield event }
     end
+
+    def abort = (@aborted = true)
   end
 
   setup do
@@ -165,6 +167,27 @@ class ChatJobTest < ActiveSupport::TestCase
              runtime_info: { "runtime" => "e2b", "sandbox_id" => "sbx-1" })
 
     assert_equal({ "runtime" => "e2b", "sandbox_id" => "sbx-1" }, @conversation.reload.runtime_state)
+  end
+
+  test "aborts the turn and marks it canceled when cancellation is requested" do
+    @assistant_message.update!(started_at: 1.minute.ago)
+    @conversation.request_cancel!
+    events = Array.new(40) { Agent::UiEvent.new(:text_delta, data: { delta: "x" }) }
+    events << Agent::UiEvent.new(:turn_finished)
+
+    run_with(events)
+
+    assert @assistant_message.reload.canceled?
+  end
+
+  test "a turn with no cancellation request finishes normally" do
+    @assistant_message.update!(started_at: 1.minute.ago)
+    events = Array.new(40) { Agent::UiEvent.new(:text_delta, data: { delta: "x" }) }
+    events << Agent::UiEvent.new(:turn_finished)
+
+    run_with(events)
+
+    assert @assistant_message.reload.done?
   end
 
   test "stamps finished_at so a completed turn has a duration" do

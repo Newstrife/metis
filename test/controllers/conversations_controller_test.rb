@@ -86,4 +86,22 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     get conversation_path(conversation)
     assert_response :not_found
   end
+
+  test "cancel stamps the conversation so the in-flight turn stops" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Running")
+    post cancel_conversation_path(conversation)
+
+    assert_response :no_content
+    assert_not_nil conversation.reload.cancel_requested_at
+  end
+
+  test "cannot cancel another user's conversation" do
+    other = User.create!(email: "cancel-other@example.com", password: "password123")
+    conversation = other.conversations.create!(title: "Theirs")
+    sign_in @user
+    post cancel_conversation_path(conversation)
+
+    assert_response :not_found
+  end
 end

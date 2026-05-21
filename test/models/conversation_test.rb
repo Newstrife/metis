@@ -61,4 +61,10 @@ class ConversationTest < ActiveSupport::TestCase
     @conversation.update!(runtime_state: { "runtime" => "e2b", "sandbox_id" => "sbx-7" })
     assert_equal "e2b", @conversation.runtime_label
   end
+
+  test "request_cancel! stamps cancel_requested_at" do
+    assert_nil @conversation.cancel_requested_at
+    @conversation.request_cancel!
+    assert_not_nil @conversation.reload.cancel_requested_at
+  end
 end

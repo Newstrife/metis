@@ -21,9 +21,13 @@
     <div id="<%= dom_id(message) %>_body"
          class="chat-content break-words"><%= markdown(message.content) %></div>
 
-    <% unless message.done? %>
+    <% if message.streaming? || message.pending? %>
       <span id="<%= dom_id(message) %>_indicator"
             class="inline-block animate-pulse text-gray-400">●</span>
+    <% end %>
+
+    <% if message.canceled? %>
+      <div class="mt-1 text-xs text-gray-400">Stopped</div>
     <% end %>
 
     <div id="<%= dom_id(message) %>_meta"
