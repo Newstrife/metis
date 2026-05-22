@@ -69,6 +69,25 @@ module ApplicationHelper
     format("%gk", (count / 100.0).round / 10.0)
   end
 
+  # Group conversations (already ordered newest-first) into recency
+  # buckets for the sidebar list. Empty buckets are dropped.
+  def conversation_groups(conversations)
+    now = Time.current
+    buckets = { "This week" => [], "This month" => [], "Earlier" => [] }
+    conversations.each do |conversation|
+      bucket =
+        if conversation.updated_at >= now.beginning_of_week
+          "This week"
+        elsif conversation.updated_at >= now.beginning_of_month
+          "This month"
+        else
+          "Earlier"
+        end
+      buckets[bucket] << conversation
+    end
+    buckets.reject { |_, list| list.empty? }
+  end
+
   private
 
   def add_link_target_blank(html)

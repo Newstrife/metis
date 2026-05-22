@@ -1,23 +1,23 @@
 <% content_for :title, @conversation.display_title %>
 
-<%= turbo_stream_from @conversation %>
+<main class="chat" data-controller="chat">
+  <%= turbo_stream_from @conversation %>
 
-<div data-controller="chat">
-  <header class="mb-6">
-    <%= link_to "← Conversations", conversations_path,
-          class: "text-sm text-gray-500 hover:text-gray-800" %>
-    <div class="mt-1 flex items-baseline justify-between gap-3">
-      <h1 class="text-xl font-semibold"><%= @conversation.display_title %></h1>
-      <span class="shrink-0 text-xs text-gray-400">
-        <%= time_ago_in_words(@conversation.created_at) %> ago
-      </span>
+  <header class="chat-head">
+    <div style="flex:1; min-width:0">
+      <h1 class="chat-title"><%= @conversation.display_title %></h1>
+      <div class="chat-sub">
+        <span>Started <%= time_ago_in_words(@conversation.created_at) %> ago</span>
+        <%= render "context_meter", conversation: @conversation %>
+      </div>
     </div>
-    <div class="mt-2"><%= render "context_meter", conversation: @conversation %></div>
   </header>
 
-  <div id="messages" data-chat-target="messages" class="space-y-4 pb-32">
-    <%= render @messages %>
+  <div class="stream" data-chat-target="scroll">
+    <div id="messages" class="thread" data-chat-target="messages">
+      <%= render @messages %>
+    </div>
   </div>
 
   <%= render "composer", conversation: @conversation %>
-</div>
+</main>

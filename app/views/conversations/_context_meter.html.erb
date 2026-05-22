@@ -4,26 +4,18 @@
 <% runtime = conversation.runtime_state %>
 <% usage = conversation.context_usage %>
 <% window = usage["contextWindow"].to_i %>
-<% if model["name"].present? || runtime["runtime"].present? || window.positive? %>
-  <div id="<%= dom_id(conversation, :context) %>" class="flex items-center gap-2 text-xs text-gray-400">
-    <% if model["name"].present? %>
-      <span class="font-medium text-gray-500" title="<%= model["provider"] %>"><%= model["name"] %></span>
-    <% end %>
-    <% if runtime["runtime"].present? %>
-      <span class="rounded bg-gray-100 px-1.5 py-0.5 font-medium uppercase tracking-wide text-gray-500"
-            title="<%= runtime["sandbox_id"] %>"><%= runtime["runtime"] %></span>
-    <% end %>
-    <% if window.positive? %>
-      <% percent = usage["percent"].to_f.clamp(0, 100) %>
-      <span class="tabular-nums" title="Context window used">
-        <%= format_tokens(usage["tokens"]) %> / <%= format_tokens(window) %>
-      </span>
-      <span class="block h-1.5 w-28 overflow-hidden rounded-full bg-gray-100">
-        <span class="block h-full rounded-full bg-gray-400" style="width: <%= percent %>%"></span>
-      </span>
-      <span class="tabular-nums"><%= percent.round %>%</span>
-    <% end %>
-  </div>
-<% else %>
-  <div id="<%= dom_id(conversation, :context) %>"></div>
-<% end %>
+<span id="<%= dom_id(conversation, :context) %>" class="ctx-group">
+  <% if model["name"].present? %>
+    <span class="tag" title="<%= model["provider"] %>"><%= model["name"] %></span>
+  <% end %>
+  <% if runtime["runtime"].present? %>
+    <span class="tag rt" title="<%= runtime["sandbox_id"] %>"><%= runtime["runtime"] %></span>
+  <% end %>
+  <% if window.positive? %>
+    <% percent = usage["percent"].to_f.clamp(0, 100) %>
+    <span class="ctx" title="<%= format_tokens(usage["tokens"]) %> / <%= format_tokens(window) %> tokens">
+      <span class="ctx-track"><span class="ctx-fill" style="width: <%= percent %>%"></span></span>
+      ctx <%= percent.round %>%
+    </span>
+  <% end %>
+</span>

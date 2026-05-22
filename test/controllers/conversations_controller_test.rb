@@ -17,7 +17,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     sign_in @user
     get conversations_path
     assert_response :success
-    assert_select "h1", text: "Conversations"
+    assert_select ".sidebar .convo .tt", text: "Existing"
   end
 
   test "starting a new chat creates a conversation with the first message" do

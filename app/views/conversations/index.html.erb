@@ -1,37 +1,15 @@
-<% content_for :title, "Conversations" %>
+<% content_for :title, "New chat" %>
 
-<div class="w-full max-w-2xl mx-auto">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-semibold">Conversations</h1>
-    <div class="flex items-center gap-3 text-sm">
-      <span class="text-gray-500"><%= current_user.email %></span>
-      <%= button_to "Sign out", destroy_user_session_path, method: :delete,
-            class: "text-gray-500 hover:text-gray-800" %>
+<main class="chat">
+  <div class="welcome">
+    <div class="welcome-mark" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+        <path d="M8 1.5v13M2.5 5l5.5-2 5.5 2M2.5 5v6M13.5 5v6M2.5 11l5.5 2 5.5-2" stroke-linejoin="round"/>
+      </svg>
     </div>
-  </div>
-
-  <div class="pb-32">
-    <% if @conversations.any? %>
-      <ul class="divide-y divide-gray-200 border border-gray-200 rounded-md">
-        <% @conversations.each do |conversation| %>
-          <li>
-            <%= link_to conversation, class: "block px-4 py-3 hover:bg-gray-50" do %>
-              <div class="flex items-baseline justify-between gap-3">
-                <span class="font-medium truncate"><%= conversation.display_title %></span>
-                <span class="shrink-0 text-xs text-gray-400">
-                  <%= time_ago_in_words(conversation.updated_at) %> ago
-                </span>
-              </div>
-              <% meta = [ conversation.model_label, conversation.runtime_label ].compact %>
-              <div class="mt-0.5 text-xs text-gray-400"><%= meta.join(" · ") %></div>
-            <% end %>
-          </li>
-        <% end %>
-      </ul>
-    <% else %>
-      <p class="text-gray-500">No conversations yet — start one below.</p>
-    <% end %>
+    <h1>Start a new conversation</h1>
+    <p>Ask anything. Metis runs the pi agent in a sandboxed runtime and streams the answer back live.</p>
   </div>
 
   <%= render "composer", conversation: nil %>
-</div>
+</main>

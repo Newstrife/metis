@@ -1,10 +1,12 @@
 class ConversationsController < ApplicationController
   include Composing
 
+  layout "chat"
+
   before_action :set_conversation, only: %i[show cancel]
+  before_action :set_sidebar, only: %i[index show]
 
   def index
-    @conversations = current_user.conversations.recent
   end
 
   # A new conversation starts from its first message: the index composer
@@ -42,6 +44,11 @@ class ConversationsController < ApplicationController
 
   def set_conversation
     @conversation = current_user.conversations.find(params[:id])
+  end
+
+  # The conversation list shown in the shell sidebar on every page.
+  def set_sidebar
+    @conversations = current_user.conversations.recent
   end
 
   # The provider/model picked in the new-chat composer, stored on the

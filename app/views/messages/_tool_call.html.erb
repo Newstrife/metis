@@ -1,15 +1,14 @@
-<div id="tool_<%= tool_call_id %>"
-     class="rounded border px-3 py-2 text-sm <%= is_error ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50" %>">
-  <div class="flex items-center gap-2">
-    <span class="font-mono font-medium"><%= name %></span>
-    <span class="text-xs text-gray-400"><%= status %></span>
+<div id="tool_<%= tool_call_id %>" class="toolcall<%= " err" if is_error %>">
+  <div class="toolcall-head">
+    <span class="toolcall-fn"><%= name %></span>
+    <span class="toolcall-status"><%= status %></span>
   </div>
 
   <% if args.present? %>
-    <pre class="mt-1 text-xs text-gray-600 overflow-x-auto"><%= args.to_json %></pre>
+    <pre><%= args.to_json %></pre>
   <% end %>
 
   <% if output.present? %>
-    <pre class="mt-1 text-xs whitespace-pre-wrap break-words"><%= output %></pre>
+    <pre><%= output %></pre>
   <% end %>
 </div>

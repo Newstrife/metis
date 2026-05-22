@@ -1,8 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Keeps the message list scrolled to the bottom as content streams in.
+// Keeps the message stream pinned to the bottom as content streams in.
+// The stream target is the scrollable element; the whole pane is watched
+// for mutations so streamed text deltas and appended messages both scroll.
 export default class extends Controller {
-  static targets = ["messages"]
+  static targets = ["messages", "scroll"]
 
   connect() {
     this.scrollToBottom()
@@ -19,6 +21,7 @@ export default class extends Controller {
   }
 
   scrollToBottom() {
-    window.scrollTo({ top: document.body.scrollHeight })
+    const el = this.hasScrollTarget ? this.scrollTarget : this.element
+    el.scrollTop = el.scrollHeight
   }
 }

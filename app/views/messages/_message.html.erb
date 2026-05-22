@@ -1,36 +1,47 @@
 <% if message.user? %>
-  <%# User: a contained bubble, aligned to the right. %>
-  <div id="<%= dom_id(message) %>" class="flex justify-end">
-    <div class="max-w-[85%] rounded-2xl bg-gray-100 px-4 py-2.5">
+  <%# User: a contained bubble on the accent fill, aligned right. %>
+  <div id="<%= dom_id(message) %>" class="msg-user">
+    <div class="bubble">
       <% if message.attachments? %>
         <%= render "messages/attachments", message: message %>
       <% end %>
       <div id="<%= dom_id(message) %>_body"
-           class="chat-content break-words"><%= markdown(message.content) %></div>
+           class="chat-content"><%= markdown(message.content) %></div>
     </div>
+    <div class="msg-stamp"><%= time_ago_in_words(message.created_at) %> ago</div>
   </div>
 <% else %>
-  <%# Assistant: full width, no bubble, so code and tables have room. %>
-  <div id="<%= dom_id(message) %>" class="pr-6">
-    <% if message.attachments? %>
-      <%= render "messages/attachments", message: message %>
-    <% end %>
+  <%# Assistant: a card beside the agent mark, room for code and tables.
+      The outer .msg-row is the stable element id — a turn error is
+      broadcast-appended into it, landing below the card. %>
+  <div id="<%= dom_id(message) %>" class="msg-row">
+    <div class="msg-ai">
+      <div class="ai-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8 1.5v13M2.5 5l5.5-2 5.5 2M2.5 5v6M13.5 5v6M2.5 11l5.5 2 5.5-2" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="ai-card">
+        <% if message.attachments? %>
+          <%= render "messages/attachments", message: message %>
+        <% end %>
 
-    <%= render "messages/activity", message: message %>
+        <%= render "messages/activity", message: message %>
 
-    <div id="<%= dom_id(message) %>_body"
-         class="chat-content break-words"><%= markdown(message.content) %></div>
+        <div id="<%= dom_id(message) %>_body"
+             class="chat-content"><%= markdown(message.content) %></div>
 
-    <% if message.streaming? || message.pending? %>
-      <span id="<%= dom_id(message) %>_indicator"
-            class="inline-block animate-pulse text-gray-400">●</span>
-    <% end %>
+        <% if message.streaming? || message.pending? %>
+          <span id="<%= dom_id(message) %>_indicator" class="msg-indicator">●</span>
+        <% end %>
 
-    <% if message.canceled? %>
-      <div class="mt-1 text-xs text-gray-400">Stopped</div>
-    <% end %>
+        <% if message.canceled? %>
+          <div class="msg-flag">Stopped</div>
+        <% end %>
 
-    <div id="<%= dom_id(message) %>_meta"
-         class="mt-2 text-xs text-gray-400 tabular-nums empty:hidden"><%= message_meta(message) %></div>
+        <div id="<%= dom_id(message) %>_meta"
+             class="msg-meta"><%= message_meta(message) %></div>
+      </div>
+    </div>
   </div>
 <% end %>

@@ -1,0 +1,68 @@
+<%# The persistent shell sidebar: brand, conversation search + list, user.
+    Rendered by the "chat" layout on every conversations page. %>
+<aside class="sidebar" data-controller="conversation-filter">
+  <div class="ws">
+    <div class="ws-mark">M</div>
+    <div class="ws-name">Metis</div>
+    <div style="flex:1"></div>
+    <button type="button" class="ico-btn theme-toggle" data-controller="theme"
+            data-action="theme#toggle" title="Switch color scheme" aria-label="Switch color scheme">
+      <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M13 9.5A5.5 5.5 0 016.5 3a5.5 5.5 0 106.5 6.5z" stroke-linejoin="round"/>
+      </svg>
+      <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="8" cy="8" r="3.2"/>
+        <path d="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5L3.4 3.4" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <%= link_to conversations_path, class: "ico-btn", title: "New chat" do %>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <path d="M8 3v10M3 8h10" stroke-linecap="round"/>
+      </svg>
+    <% end %>
+  </div>
+
+  <div class="search">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14" stroke-linecap="round"/>
+    </svg>
+    <input type="search" placeholder="Search conversations" aria-label="Search conversations"
+           data-conversation-filter-target="query"
+           data-action="input->conversation-filter#filter">
+  </div>
+
+  <nav class="convos" aria-label="Conversations">
+    <% groups = conversation_groups(@conversations) %>
+    <% if groups.any? %>
+      <% groups.each do |label, conversations| %>
+        <div class="convo-group">
+          <div class="grp-label"><%= label %></div>
+          <% conversations.each do |conversation| %>
+            <%= link_to conversation,
+                  class: "convo#{' on' if conversation == @conversation}",
+                  data: { conversation_filter_target: "item",
+                          title: conversation.display_title } do %>
+              <span class="ds" aria-hidden="true"></span>
+              <span class="tt"><%= conversation.display_title %></span>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+      <div class="convos-empty" data-conversation-filter-target="empty" hidden>No matches.</div>
+    <% else %>
+      <div class="convos-empty">No conversations yet — start one on the right.</div>
+    <% end %>
+  </nav>
+
+  <div class="user">
+    <div class="avatar" aria-hidden="true"><%= current_user.email.first.upcase %></div>
+    <div class="who"><div class="nm"><%= current_user.email %></div></div>
+    <%= button_to destroy_user_session_path, method: :delete,
+          class: "signout", title: "Sign out", form: { data: { turbo: false } } do %>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M6 14H3.5A1.5 1.5 0 012 12.5v-9A1.5 1.5 0 013.5 2H6M10.5 11l3-3-3-3M13.5 8H6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    <% end %>
+  </div>
+</aside>

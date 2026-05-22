@@ -1,27 +1,24 @@
 <% if message.images.attached? %>
-  <div class="flex flex-wrap gap-2 mb-2">
+  <div class="att-images">
     <% message.images.each do |image| %>
-      <a href="<%= rails_blob_path(image) %>" target="_blank" rel="noopener" class="block">
-        <%= image_tag rails_blob_path(image),
-              class: "max-h-44 rounded-md border border-gray-200" %>
+      <a href="<%= rails_blob_path(image) %>" target="_blank" rel="noopener">
+        <%= image_tag rails_blob_path(image), class: "att-image", alt: image.filename %>
       </a>
     <% end %>
   </div>
 <% end %>
 
 <% if message.files.attached? %>
-  <div class="flex flex-wrap gap-2 mb-2">
+  <div class="att-files">
     <% message.files.each do |file| %>
-      <%= link_to rails_blob_path(file, disposition: "attachment"),
-            class: "flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm hover:border-gray-400" do %>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-             class="shrink-0 text-gray-400">
+      <%= link_to rails_blob_path(file, disposition: "attachment"), class: "att-file" do %>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
         </svg>
-        <span class="font-medium text-gray-700"><%= file.filename %></span>
-        <span class="text-xs text-gray-400"><%= number_to_human_size(file.byte_size) %></span>
+        <span class="att-name"><%= file.filename %></span>
+        <span class="att-size"><%= number_to_human_size(file.byte_size) %></span>
       <% end %>
     <% end %>
   </div>
