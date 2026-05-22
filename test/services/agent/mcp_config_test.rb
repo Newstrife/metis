@@ -77,4 +77,28 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
 
     assert_equal [ "on" ], rendered["mcpServers"].keys
   end
+
+  test "an oauth credential projects its live access token as a bearer header" do
+    connector = add_connector(name: "github", transport: :http,
+                              definition: { "url" => "https://mcp.example/" },
+                              catalog_key: "github")
+    cred = connector.connector_credentials.create!(user: member)
+    cred.assign_oauth_token!({
+      "access_token" => "live", "refresh_token" => "rt", "expires_in" => 3600
+    })
+
+    assert_equal({ "Authorization" => "Bearer live" }, rendered["mcpServers"]["github"]["headers"])
+  end
+
+  test "an oauth connector is omitted when its refresh fails" do
+    connector = add_connector(name: "github", transport: :http,
+                              definition: { "url" => "https://mcp.example/" },
+                              catalog_key: "github")
+    cred = connector.connector_credentials.create!(user: member)
+    cred.assign_oauth_token!({ "access_token" => "expired", "expires_in" => -10 })
+
+    with_stub(GithubApp::OauthClient, :refresh, ->(_) { raise GithubApp::TokenService::Error, "boom" }) do
+      assert_equal [], rendered["mcpServers"].keys
+    end
+  end
 end

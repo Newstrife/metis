@@ -107,6 +107,29 @@ still the OAuth broker — it runs the authorization flow, stores per-user
 and per-team tokens encrypted, and hands them to the bridge. The win is
 *one* uniform implementation of the right shape, not zero work.
 
+## GitHub — the OAuth shape, concretely
+
+The GitHub connector is the first one with `auth: oauth` in the catalog,
+and it sets the pattern. Each member authorizes the metis GitHub App
+once; metis stores a per-member access + refresh token (encrypted, on
+`ConnectorCredential`); the MCP server receives the live access token
+as `Authorization: Bearer …`. The agent acts **as that member** — not
+as a bot — so commits, reviews, and issue traffic carry the right
+identity, and what the agent can see is exactly what the member can.
+
+A single GitHub App registration drives this. The deployment configures
+its OAuth credentials in the environment — `GITHUB_APP_CLIENT_ID` and
+`GITHUB_APP_CLIENT_SECRET` (see `.env.example`). The app **must** have
+"Expire user authorization tokens" enabled; without it GitHub issues no
+refresh token and the 8-hour access token cannot be renewed without
+sending the member back through the flow.
+
+`GithubApp::TokenService` mints/refreshes the access token on demand
+when staging `.mcp.json`; if a refresh fails, the connector is dropped
+silently from the rendered file, mirroring the existing "no credential
+the member can use → omit" policy. Members who have not connected
+simply have no GitHub entry in their `.mcp.json`.
+
 ## Accepted tradeoff
 
 A service that ships only a CLI, with no MCP server, is not connectable

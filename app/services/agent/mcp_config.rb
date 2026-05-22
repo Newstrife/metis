@@ -42,13 +42,30 @@ module Agent
       credential = connector.credential_for(@conversation.user)
       return nil if credential.nil? && connector.connector_credentials.exists?
 
+      secrets = secrets_for(connector, credential)
+      return nil if secrets.nil?
+
       entry = connector.definition.deep_dup
-      secrets = credential&.credential_map || {}
       return entry if secrets.empty?
 
       slot = connector.stdio? ? "env" : "headers"
       entry[slot] = (entry[slot] || {}).merge(secrets)
       entry
+    end
+
+    # The header/env values a credential contributes to its connector's
+    # entry. `nil` means: omit the connector entirely (an OAuth refresh
+    # failed). `{}` means: contribute nothing (a no-auth server).
+    def secrets_for(connector, credential)
+      return {} if credential.nil?
+      return credential.credential_map unless credential.oauth_token
+
+      token = GithubApp::TokenService.access_token_for(credential)
+      connector.catalog_app&.credential_map_for(token) || {}
+    rescue GithubApp::TokenService::Error => error
+      Rails.logger.error("McpConfig: OAuth refresh failed for connector " \
+                          "#{connector.id}: #{error.message}")
+      nil
     end
   end
 end

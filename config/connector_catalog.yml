@@ -6,8 +6,8 @@
 # docs/connectors.md.
 #
 # auth:
-#   token — the user supplies a key/token (v1)
-#   oauth — Metis brokers an OAuth flow (a fast-follow; not yet connectable)
+#   token — the user supplies a key/token
+#   oauth — Metis brokers an OAuth flow; per-member access tokens
 
 github:
   name: GitHub

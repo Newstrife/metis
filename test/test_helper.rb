@@ -12,6 +12,15 @@ module ActiveSupport
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all
 
-    # Add more helper methods to be used by all tests here...
+    # Replace a singleton method on `target` (typically a class) with `replacement`
+    # for the duration of the block, then restore. Minitest 6 dropped Object#stub,
+    # so tests that fake out an external boundary use this instead.
+    def with_stub(target, method_name, replacement)
+      original = target.method(method_name)
+      target.singleton_class.send(:define_method, method_name, replacement)
+      yield
+    ensure
+      target.singleton_class.send(:define_method, method_name, original)
+    end
   end
 end

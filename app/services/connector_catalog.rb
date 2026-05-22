@@ -8,7 +8,8 @@ class ConnectorCatalog
 
   # One catalog entry — a connectable app.
   App = Data.define(:key, :name, :category, :description,
-                    :transport, :definition, :auth, :credential, :inputs) do
+                    :transport, :definition, :auth, :oauth_provider,
+                    :credential, :inputs) do
     def token_auth? = auth == "token"
     def oauth? = auth == "oauth"
 
@@ -61,6 +62,7 @@ class ConnectorCatalog
           transport: attrs["transport"],
           definition: attrs["definition"] || {},
           auth: attrs["auth"],
+          oauth_provider: attrs["oauth_provider"],
           credential: attrs["credential"],
           inputs: attrs["inputs"] || []
         )
