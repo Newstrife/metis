@@ -25,10 +25,12 @@ the Docker image, the E2B template. pi auto-discovers it; metis neither
 vendors it nor loads it explicitly.
 
 The adapter reads its server list from an on-disk `.mcp.json`, so metis
-**stages a `.mcp.json` per run** into the pi workspace — connector
-definitions from the `Connector` model, credentials injected as env vars
-or bearer tokens. A fresh sandbox carries no other MCP config on disk, so
-the staged file is the only source.
+**stages a `.mcp.json` per run** into the pi workspace — non-secret
+server definitions and inline credentials, both rendered from the
+`Connector` model. That file is a per-turn projected input, excluded
+from the session archive, so the secrets never become durable. A fresh
+sandbox carries no other MCP config on disk, so the staged file is the
+only source.
 
 ## Why not skill + CLI
 
@@ -60,9 +62,30 @@ agent has to scrape.
 metis is multi-user. Business-data connectors need team-level governance:
 whose credentials a connection uses, who may use it, an audit trail. MCP's
 model — the host holds credentials and passes them per connection — maps
-directly onto metis owning a `Connector` resource scoped to a user or a
-team. A CLI has no such concept; pi, single-user by nature, could never
-provide it. **pi executes; metis governs.**
+directly onto metis owning a `Connector` resource. A CLI has no such
+concept; pi, single-user by nature, could never provide it. **pi executes;
+metis governs.**
+
+A connector is owned through metis's single tenancy unit, the `Team` — a
+personal account being a team of one (see `tenancy.md`). The resource
+splits in two:
+
+- **`Connector`** — the definition: which MCP server and its non-secret
+  config. Visible to every member of the owning team.
+- **`ConnectorCredential`** — `belongs_to :connector`, `belongs_to :user`
+  (nullable), encrypted secret.
+
+That nullable `user_id` carries both credential shapes in one table. A row
+with `user_id: nil` is a **shared** credential — a service account the
+whole team uses, typical for a data source like Metabase. A row with a
+`user_id` is that member's **own** credential — typical for an
+identity-bearing service like GitHub or Slack, where the agent should act
+as that member.
+
+Staging `.mcp.json` for member X resolves each connector to X's own
+credential if present, else the shared credential, else omits the
+connector from X's `.mcp.json`. That resolution point is also the audit
+anchor: which member used which connector under which credential.
 
 ## Why pi recommends CLIs — and why metis differs
 

@@ -22,7 +22,8 @@ tools and share them** — across their own devices, and with their teams.
 1. **Single foundation.** One agent harness — pi. An opinionated product,
    not a generic shell over swappable backends.
 2. **Multi-user by default.** Personal *and* team usage are both
-   first-class. Every resource is owned by a user or a team.
+   first-class. Every resource is owned by a `Team`; a personal account
+   is a team of one (`docs/tenancy.md`).
 3. **Sandboxed by default.** Hosted deployments run pi in an isolated
    runtime. `Local` (host shell access) is development-only.
 4. **Not provider-locked.** LLM provider and model are chosen per
@@ -51,8 +52,9 @@ Themes, roughly in dependency order:
 | Theme | Goal |
 |---|---|
 | **Auth & tenancy** | OAuth, onboarding, then teams/orgs. Team-aware ownership from the start. |
-| **Skills** | Project-bundled skills first, then user/team-managed skills with a UI. |
+| **Skills** | Bundled skills first, then user/team-managed skills with a UI. |
 | **MCP & connectors** | One MCP-bridge extension + a team-scoped `Connector` model — the whole MCP ecosystem through a single bridge. |
+| **Projects** | User-managed R&D contexts — bind a GitHub repo + a Linear project, composed into a conversation (`docs/tenancy.md`). |
 | **Collaboration** | Shared conversations, shared tools, team spaces. |
 | **Web UI** | A design system in the Hotwire stack — a consistent component set + design tokens. |
 | **Docs** | Continuous. |
@@ -93,14 +95,16 @@ Team ─▶ Connector configs  (Metis: encrypted, team-scoped)
 
 Pieces:
 
-- **`Connector` model** — team-scoped (user-scoped for personal): which MCP
-  server, its config, its credentials. Encrypted, like `ApiKey`.
+- **`Connector` + `ConnectorCredential`** — the connector definition (which
+  MCP server, its config) is owned through a `Team`; credentials are a
+  separate encrypted record, either shared (a team service account) or
+  per-member. See `docs/tenancy.md`.
 - **`pi-mcp-adapter`** — the adopted bridge, installed as a pi package
   (`pi install`) into each pi environment at setup/build time; pi
   auto-discovers it. Reads its MCP server list from an on-disk `.mcp.json`.
 - **`.mcp.json` staged per run** — the runtime writes a `.mcp.json` into
   the pi workspace from the conversation's `Connector` records, with
-  credentials injected as env vars / bearer tokens.
+  credentials inlined; the file is excluded from the session archive.
 - **MCP servers run inside the sandbox** — third-party MCP server code is
   contained by the Docker/E2b runtime. Principle 3 earns its keep here.
 - **Marketplace** — a catalog of MCP servers a team can enable and
@@ -123,7 +127,7 @@ Concrete deliverables:
 - [x] **Docker runtime** — `Agent::Runtime::Docker`, alongside `Local` and
   `E2b`, on the same `Base` contract (`session_dir`, `extension_paths`,
   `run`). Unblocks safe multi-user hosting.
-- [ ] **Project-bundled skills** — wire `pi --skill` the way `--extension`
+- [ ] **Bundled skills** — wire `pi --skill` the way `--extension`
   is wired (`Agent::Runtime.skill_sources` + `skill_paths`). Ship one or
   two bundled skills.
 - [ ] **OAuth & onboarding** — omniauth (Google / GitHub) on Devise, and a
@@ -137,9 +141,9 @@ Concrete deliverables:
 - [ ] **Docs** — keep `README.md` and `CLAUDE.md` current as the above
   lands.
 
-Design the ownership model **team-aware now** — a conversation or skill is
-owned by a user *or* a team — even though teams themselves are week 2+, so
-teams slot in without a migration.
+Design the ownership model **team-aware now**: every resource is owned by a
+`Team` and a personal account is a team of one, so shared teams slot in
+later without a migration. See `docs/tenancy.md`.
 
 ## Deferred to week 2+
 
@@ -148,8 +152,9 @@ marketplace · the teams/orgs model · Web-UI design-system rollout.
 
 ## Open questions
 
-1. **Team model.** How are teams created, joined, and (if hosted) billed?
-   Where exactly is the personal-vs-team ownership boundary?
+1. **Team model.** The ownership boundary is settled — one `Team` unit,
+   personal = team of one (`docs/tenancy.md`). Still open: how shared teams
+   are created, joined, and (if hosted) billed.
 2. **MCP runtime cost.** Metis runs pi per-turn in a fresh runtime; a
    naive bridge re-spawns and re-auths every MCP server each turn.
    Connection reuse, a warm runtime pool, or remote (HTTP/SSE) MCP servers
@@ -159,5 +164,6 @@ marketplace · the teams/orgs model · Web-UI design-system rollout.
    extensions, and connectors alike.
 4. **Hosting model.** Self-host only, or a Metis-hosted SaaS too? This
    affects billing and how hard tenant isolation must be.
-5. **Connector trust.** Who vets marketplace connectors, and how are their
-   secrets scoped per user/team?
+5. **Connector trust.** Secret scoping is settled — shared vs per-member
+   `ConnectorCredential` (`docs/connectors.md`). Still open: who vets
+   marketplace connectors.
