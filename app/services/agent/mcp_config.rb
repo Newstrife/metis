@@ -1,9 +1,11 @@
 module Agent
-  # Renders the `.mcp.json` that pi-mcp-adapter reads, from a
-  # conversation's enabled Connectors. Each connector's non-secret
-  # definition and its encrypted credentials are merged into one inline
-  # server entry. The rendered file is a per-turn projected input — the
-  # Connector records are the durable source of truth. See
+  # Renders the `.mcp.json` that pi-mcp-adapter reads, from the
+  # conversation team's enabled Connectors. Each connector resolves to
+  # the conversation member's credential — their own, else the team's
+  # shared one. A connector the member has no credential for is omitted;
+  # a connector with no credentials at all is kept (a no-auth server).
+  # The rendered file is a per-turn projected input — the Connector and
+  # ConnectorCredential records are the durable source. See
   # docs/connectors.md.
   class McpConfig
     # pi-mcp-adapter reads this from pi's working directory.
@@ -15,7 +17,11 @@ module Agent
 
     # The `.mcp.json` document.
     def to_h
-      { "mcpServers" => connectors.to_h { |connector| [ connector.name, server_entry(connector) ] } }
+      entries = connectors.filter_map do |connector|
+        entry = server_entry(connector)
+        [ connector.name, entry ] if entry
+      end
+      { "mcpServers" => entries.to_h }
     end
 
     # The document as a string, ready to write to FILENAME.
@@ -26,15 +32,18 @@ module Agent
     private
 
     def connectors
-      @conversation.user.connectors.enabled
+      @conversation.team.connectors.enabled
     end
 
-    # One connector's server entry: its non-secret definition, with the
-    # encrypted credentials merged inline into env (stdio) or headers
-    # (http).
+    # A connector's server entry for this conversation's member, or nil
+    # to omit it: omitted when the connector has credentials but none the
+    # member can use; kept (definition only) when it has none at all.
     def server_entry(connector)
+      credential = connector.credential_for(@conversation.user)
+      return nil if credential.nil? && connector.connector_credentials.exists?
+
       entry = connector.definition.deep_dup
-      secrets = connector.credential_map
+      secrets = credential&.credential_map || {}
       return entry if secrets.empty?
 
       slot = connector.stdio? ? "env" : "headers"

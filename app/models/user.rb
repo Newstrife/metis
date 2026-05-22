@@ -8,7 +8,7 @@ class User < ApplicationRecord
   has_many :teams, through: :memberships
   has_many :conversations, dependent: :destroy
   has_many :api_keys, dependent: :destroy
-  has_many :connectors, as: :owner, dependent: :destroy
+  has_many :connector_credentials, dependent: :destroy
 
   after_create :create_personal_team
 

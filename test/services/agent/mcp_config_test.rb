@@ -8,8 +8,12 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     end
   end
 
+  def team = conversation.team
+
+  def member = conversation.user
+
   def add_connector(**attrs)
-    conversation.user.connectors.create!({
+    team.connectors.create!({
       name: "filesystem", transport: :stdio, definition: { "command" => "npx" }
     }.merge(attrs))
   end
@@ -18,34 +22,53 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     JSON.parse(Agent::McpConfig.new(conversation).content)
   end
 
-  test "renders an empty mcpServers map when there are no connectors" do
+  test "renders an empty mcpServers map when the team has no connectors" do
     assert_equal({ "mcpServers" => {} }, rendered)
   end
 
-  test "renders a stdio connector as its definition entry" do
+  test "renders a no-credential connector as its definition unchanged" do
     add_connector(name: "fs", definition: { "command" => "npx", "args" => [ "-y", "x" ] })
 
     assert_equal({ "command" => "npx", "args" => [ "-y", "x" ] }, rendered["mcpServers"]["fs"])
   end
 
-  test "merges credentials into env for a stdio connector" do
-    add_connector(name: "fs",
-                  definition: { "command" => "npx", "env" => { "NODE_ENV" => "production" } },
-                  credential_map: { "API_KEY" => "secret" })
+  test "merges the member's own credential into a stdio connector's env" do
+    connector = add_connector(name: "fs", definition: { "command" => "npx" })
+    connector.connector_credentials.create!(user: member, credential_map: { "API_KEY" => "mine" })
 
-    assert_equal({ "NODE_ENV" => "production", "API_KEY" => "secret" },
-                 rendered["mcpServers"]["fs"]["env"])
+    assert_equal({ "API_KEY" => "mine" }, rendered["mcpServers"]["fs"]["env"])
   end
 
-  test "merges credentials into headers for an http connector" do
-    conversation.user.connectors.create!(
-      name: "github", transport: :http,
-      definition: { "url" => "https://mcp.example/" },
-      credential_map: { "Authorization" => "Bearer t" }
-    )
+  test "merges a credential into an http connector's headers" do
+    connector = add_connector(name: "gh", transport: :http,
+                              definition: { "url" => "https://mcp.example/" })
+    connector.connector_credentials.create!(user: nil, credential_map: { "Authorization" => "Bearer t" })
 
-    assert_equal({ "url" => "https://mcp.example/", "headers" => { "Authorization" => "Bearer t" } },
-                 rendered["mcpServers"]["github"])
+    assert_equal({ "Authorization" => "Bearer t" }, rendered["mcpServers"]["gh"]["headers"])
+  end
+
+  test "falls back to the team's shared credential" do
+    connector = add_connector(name: "fs", definition: { "command" => "npx" })
+    connector.connector_credentials.create!(user: nil, credential_map: { "API_KEY" => "shared" })
+
+    assert_equal({ "API_KEY" => "shared" }, rendered["mcpServers"]["fs"]["env"])
+  end
+
+  test "the member's own credential wins over the shared one" do
+    connector = add_connector(name: "fs", definition: { "command" => "npx" })
+    connector.connector_credentials.create!(user: nil, credential_map: { "API_KEY" => "shared" })
+    connector.connector_credentials.create!(user: member, credential_map: { "API_KEY" => "mine" })
+
+    assert_equal({ "API_KEY" => "mine" }, rendered["mcpServers"]["fs"]["env"])
+  end
+
+  test "omits a connector the member has no credential for" do
+    connector = add_connector(name: "github", transport: :http,
+                              definition: { "url" => "https://mcp.example/" })
+    other = User.create!(email: "other-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    connector.connector_credentials.create!(user: other, credential_map: { "T" => "x" })
+
+    assert_equal [], rendered["mcpServers"].keys
   end
 
   test "omits disabled connectors" do
