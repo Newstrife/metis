@@ -31,19 +31,32 @@ module Agent
       }
     ].freeze
 
-    # [[label, id], ...] for a provider <select>.
-    def self.provider_options
-      PROVIDERS.map { |provider| [ provider[:label], provider[:id] ] }
+    # Models grouped by provider for a single <select>, in the shape
+    # grouped_options_for_select wants:
+    #   [["Anthropic", [["Claude Opus 4.7", "claude-opus-4-7"], ...]], ...]
+    def self.grouped_model_options
+      PROVIDERS.map do |provider|
+        models = provider[:models].map { |model| [ model[:label], model[:id] ] }
+        [ provider[:label], models ]
+      end
     end
 
-    # { "<provider id>" => [{ "value" =>, "label" => }, ...] } — the
-    # model-select Stimulus controller reads this to repopulate the
-    # model dropdown when the provider changes.
-    def self.models_by_provider
-      PROVIDERS.to_h do |provider|
-        models = provider[:models].map { |m| { "value" => m[:id], "label" => m[:label] } }
-        [ provider[:id], models ]
+    # The provider that offers a given model id, or nil if unknown.
+    def self.provider_for(model_id)
+      match = PROVIDERS.find do |provider|
+        provider[:models].any? { |model| model[:id] == model_id }
       end
+      match&.fetch(:id)
+    end
+
+    # Model pre-selected in the composer: the deployment default when it
+    # is in the catalog, otherwise the default provider's first model.
+    def self.default_model
+      configured = Rails.application.config.x.agent.model.presence
+      return configured if configured && provider_for(configured)
+
+      default = PROVIDERS.find { |provider| provider[:id] == default_provider }
+      default[:models].first[:id]
     end
 
     # Provider pre-selected in the composer: the deployment default when

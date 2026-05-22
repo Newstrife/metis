@@ -11,21 +11,6 @@
     <% end %>
 
     <%= form_with url: post_url, method: :post, multipart: true do |form| %>
-      <% if new_chat %>
-        <div class="model-row" data-controller="model-select"
-             data-model-select-catalog-value="<%= Agent::Catalog.models_by_provider.to_json %>">
-          <select name="provider" class="select" data-model-select-target="provider"
-                  data-action="model-select#providerChanged">
-            <%= options_for_select(Agent::Catalog.provider_options, Agent::Catalog.default_provider) %>
-          </select>
-          <select name="model" class="select" data-model-select-target="model">
-            <% Agent::Catalog.models_by_provider[Agent::Catalog.default_provider].each do |model| %>
-              <option value="<%= model["value"] %>"><%= model["label"] %></option>
-            <% end %>
-          </select>
-        </div>
-      <% end %>
-
       <div data-file-upload-target="previews" class="previews"></div>
 
       <div class="composer">
@@ -34,7 +19,7 @@
                   data-action="keydown->composer#submitOnEnter"
                   placeholder="<%= new_chat ? "Ask anything to start a new chat…" : "Message the agent…" %>"></textarea>
         <div class="composer-bar">
-          <label class="attach" title="Attach photos or files">
+          <label class="attach" title="Attach photos or files" aria-label="Attach photos or files">
             <input type="file" name="attachments[]" multiple
                    accept="<%= Message::ALLOWED_CONTENT_TYPES.join(",") %>"
                    class="hidden"
@@ -44,8 +29,21 @@
                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
             </svg>
-            Attach
           </label>
+
+          <% if new_chat %>
+            <span class="model-pick">
+              <select name="model" aria-label="Model">
+                <%= grouped_options_for_select(Agent::Catalog.grouped_model_options,
+                                               Agent::Catalog.default_model) %>
+              </select>
+              <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                   stroke-width="1.7" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+          <% end %>
+
           <div class="composer-spacer"></div>
           <%= render "conversations/composer_actions", conversation: conversation %>
         </div>

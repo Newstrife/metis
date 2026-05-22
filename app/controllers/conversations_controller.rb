@@ -51,9 +51,10 @@ class ConversationsController < ApplicationController
     @conversations = current_user.conversations.recent
   end
 
-  # The provider/model picked in the new-chat composer, stored on the
-  # conversation for Agent::Adapters::Pi#credential_args.
+  # The model picked in the new-chat composer, with its provider derived
+  # from the catalog — stored on the conversation for the Pi adapter.
   def chat_settings
-    { "provider" => params[:provider].presence, "model" => params[:model].presence }.compact
+    model = params[:model].presence
+    { "provider" => model && Agent::Catalog.provider_for(model), "model" => model }.compact
   end
 end

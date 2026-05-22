@@ -70,24 +70,26 @@ module ApplicationHelper
   end
 
   # Group conversations (already ordered newest-first) by last activity
-  # into rolling recency buckets for the sidebar. Empty buckets dropped.
+  # into calendar recency buckets for the sidebar — today, yesterday,
+  # then the current week and month. Empty buckets are dropped. Matches
+  # Themis's inbox_time_bucket.
   def conversation_groups(conversations)
-    today = Time.current.beginning_of_day
+    now = Time.current
     buckets = {
       "Today" => [], "Yesterday" => [],
-      "Last week" => [], "Last month" => [], "Older" => []
+      "This week" => [], "This month" => [], "Older" => []
     }
     conversations.each do |conversation|
       at = conversation.updated_at
       bucket =
-        if at >= today
+        if at.to_date == now.to_date
           "Today"
-        elsif at >= today - 1.day
+        elsif at.to_date == now.yesterday.to_date
           "Yesterday"
-        elsif at >= today - 7.days
-          "Last week"
-        elsif at >= today - 30.days
-          "Last month"
+        elsif at >= now.beginning_of_week
+          "This week"
+        elsif at >= now.beginning_of_month
+          "This month"
         else
           "Older"
         end

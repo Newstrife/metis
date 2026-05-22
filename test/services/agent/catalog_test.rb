@@ -1,19 +1,22 @@
 require "test_helper"
 
 class Agent::CatalogTest < ActiveSupport::TestCase
-  test "provider_options pairs each provider's label with its id" do
-    assert_includes Agent::Catalog.provider_options, [ "Anthropic", "anthropic" ]
+  test "grouped_model_options groups label/id model pairs under each provider" do
+    groups = Agent::Catalog.grouped_model_options
+
+    assert_includes groups.map(&:first), "Anthropic"
+    anthropic = groups.find { |label, _| label == "Anthropic" }.last
+    assert_includes anthropic, [ "Claude Opus 4.7", "claude-opus-4-7" ]
   end
 
-  test "models_by_provider lists value/label models for every provider" do
-    catalog = Agent::Catalog.models_by_provider
-    expected = Agent::Catalog::PROVIDERS.map { |provider| provider[:id] }
+  test "provider_for resolves the provider that offers a model" do
+    assert_equal "openai", Agent::Catalog.provider_for("gpt-5.5")
+    assert_nil Agent::Catalog.provider_for("no-such-model")
+  end
 
-    assert_equal expected.sort, catalog.keys.sort
-    catalog.each_value do |models|
-      assert models.any?
-      assert(models.all? { |model| model["value"].present? && model["label"].present? })
-    end
+  test "default_model is a model the catalog offers" do
+    models = Agent::Catalog::PROVIDERS.flat_map { |provider| provider[:models].pluck(:id) }
+    assert_includes models, Agent::Catalog.default_model
   end
 
   test "default_provider is one of the catalog providers" do
