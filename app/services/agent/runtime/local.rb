@@ -24,6 +24,7 @@ module Agent
       def run(pi_args:)
         workspace.ensure!
         workspace.stage_uploads(conversation.uploaded_files)
+        workspace.stage_mcp_config(mcp_config)
         session = PiAgent.session(args: pi_args, cwd: workspace.workspace_dir.to_s)
         begin
           yield session

@@ -10,6 +10,8 @@ module Agent
   #   workspace/uploads/  staged user uploads — projected each turn from
   #                       the durable Message attachments, never archived
   #                       (see docs/session-persistence.md)
+  #   workspace/.mcp.json MCP connector config — rendered each turn from
+  #                       the conversation's Connectors, never archived
   #
   # Two roots, because persistence is a per-runtime concern:
   #   Workspace.scratch    — under tmp/, for a runtime that re-hydrates
@@ -66,6 +68,13 @@ module Agent
 
         attachment.open { |io| IO.copy_stream(io, uploads_dir.join(name)) }
       end
+    end
+
+    # Write the rendered .mcp.json into the workspace root — a per-turn
+    # projected input like uploads/, overwritten each turn and never
+    # archived (see docs/connectors.md).
+    def stage_mcp_config(content)
+      File.write(workspace_dir.join(McpConfig::FILENAME), content)
     end
   end
 end

@@ -72,4 +72,13 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
     assert_equal "data", File.read(workspace.uploads_dir.join("escape.txt"))
     refute File.exist?(workspace.scope_dir.join("escape.txt")), "the crafted name did not escape"
   end
+
+  test "stage_mcp_config writes .mcp.json into the workspace root" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    workspace.stage_mcp_config(%({"mcpServers":{}}))
+
+    assert_equal %({"mcpServers":{}}), File.read(workspace.workspace_dir.join(".mcp.json"))
+  end
 end

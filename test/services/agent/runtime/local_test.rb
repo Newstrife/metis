@@ -102,4 +102,15 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
 
     assert session.closed?
   end
+
+  test "run stages the conversation's connectors into .mcp.json" do
+    @user.connectors.create!(name: "fs", transport: :stdio, definition: { "command" => "npx" })
+
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        config = JSON.parse(File.read(@workspace.workspace_dir.join(".mcp.json")))
+        assert_equal [ "fs" ], config["mcpServers"].keys
+      end
+    end
+  end
 end

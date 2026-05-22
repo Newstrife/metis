@@ -23,6 +23,13 @@ module Agent
         []
       end
 
+      # The rendered `.mcp.json` (Agent::McpConfig) for this
+      # conversation's connectors, for a runtime to stage into pi's
+      # workspace each turn.
+      def mcp_config
+        Agent::McpConfig.new(conversation).content
+      end
+
       # Provision the runtime, open a PiAgent::Session running pi with
       # `pi_args`, yield it to the caller, then finalize (persist state,
       # tear down). The session is closed by the runtime, not the caller.

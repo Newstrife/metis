@@ -60,6 +60,7 @@ module Agent
         stage_extensions(sandbox)
         hydrate(sandbox)
         stage_uploads(sandbox)
+        stage_mcp_config(sandbox)
         session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args))
         begin
           yield session
@@ -90,9 +91,11 @@ module Agent
       # storage. Logged, never raised — it must not crash the turn the
       # user already saw stream.
       def persist(sandbox)
-        # Exclude staged uploads — projected inputs, not archived state.
+        # Exclude per-turn projected inputs (staged uploads, the
+        # rendered .mcp.json) — not archived state.
         sandbox.commands.run(
-          "tar -czf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR} --exclude=./workspace/uploads ."
+          "tar -czf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR} " \
+          "--exclude=./workspace/uploads --exclude=./workspace/.mcp.json ."
         )
         data = sandbox.files.read(REMOTE_ARCHIVE, format: "bytes")
         Tempfile.create([ "pi-session", ".tar.gz" ]) do |tmp|
@@ -136,6 +139,12 @@ module Agent
 
           sandbox.files.write("#{WORKSPACE_DIR}/uploads/#{name}", attachment.download)
         end
+      end
+
+      # Write the rendered .mcp.json into the sandbox workspace — a
+      # per-turn projected input, excluded from the archive (see #persist).
+      def stage_mcp_config(sandbox)
+        sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::McpConfig::FILENAME}", mcp_config)
       end
 
       def transport_factory(sandbox, pi_args)
