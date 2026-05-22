@@ -1,0 +1,38 @@
+<% content_for :title, "Connectors" %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title">Connectors</h1>
+    <div style="flex:1"></div>
+    <% if @connectors.any? %>
+      <%= link_to "New connector", new_connector_path, class: "btn btn-primary" %>
+    <% end %>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <% if @connectors.any? %>
+        <div class="conn-list">
+          <% @connectors.each do |connector| %>
+            <%= link_to edit_connector_path(connector), class: "conn-row" do %>
+              <div class="conn-main">
+                <div class="conn-name"><%= connector.name %></div>
+                <div class="conn-sub">
+                  <%= connector.definition["command"].presence || connector.definition["url"] %>
+                </div>
+              </div>
+              <span class="tag rt"><%= connector.transport %></span>
+              <% unless connector.enabled? %><span class="tag">off</span><% end %>
+            <% end %>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="pane-empty">
+          <p>No connectors yet. A connector points the agent at an MCP server —
+             Metabase, GitHub, and the rest of the ecosystem.</p>
+          <%= link_to "New connector", new_connector_path, class: "btn btn-primary" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</main>

@@ -46,11 +46,6 @@ class ConversationsController < ApplicationController
     @conversation = current_user.conversations.find(params[:id])
   end
 
-  # The conversation list shown in the shell sidebar on every page.
-  def set_sidebar
-    @conversations = current_user.conversations.recent
-  end
-
   # The model picked in the new-chat composer, with its provider derived
   # from the catalog — stored on the conversation for the Pi adapter.
   def chat_settings

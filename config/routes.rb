@@ -15,6 +15,8 @@ Rails.application.routes.draw do
     resources :messages, only: :create
   end
 
+  resources :connectors, except: :show
+
   # Defines the root path route ("/")
   root "conversations#index"
 end
