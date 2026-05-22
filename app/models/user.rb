@@ -7,14 +7,9 @@ class User < ApplicationRecord
   has_many :memberships, dependent: :destroy
   has_many :teams, through: :memberships
   has_many :conversations, dependent: :destroy
-  has_many :api_keys, dependent: :destroy
   has_many :connector_credentials, dependent: :destroy
 
   after_create :create_personal_team
-
-  def api_key_for(provider)
-    api_keys.find_by(provider: provider.to_s)&.key
-  end
 
   # The team-of-one created at signup — owner of this user's personal
   # resources (docs/tenancy.md).

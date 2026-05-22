@@ -46,9 +46,9 @@ bin/setup        # install dependencies and prepare the database
 your local pi. The `docker` image and `e2b` template bake the same
 bridge in at build time, so every runtime has it.
 
-Metis encrypts `Message#content`, `Message#reasoning`, and `ApiKey#key`
-with Active Record Encryption — the encryption keys must be present in
-Rails credentials for every environment, test included.
+Metis encrypts `Message#content` and `Message#reasoning` with Active
+Record Encryption — the encryption keys must be present in Rails
+credentials for every environment, test included.
 
 ## Running
 

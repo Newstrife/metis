@@ -276,16 +276,17 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_includes args, "--continue"
   end
 
-  test "pi_args carries credential flags from settings and the stored key" do
+  test "pi_args carries credential flags from the conversation settings" do
     conversation = create_conversation(
       settings: { "model" => "anthropic/claude-sonnet-4-5", "provider" => "anthropic" }
     )
-    conversation.user.api_keys.create!(provider: "anthropic", key: "sk-test")
-    args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
+    with_agent_config(api_keys: { "anthropic" => "sk-test" }) do
+      args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
 
-    assert_equal "anthropic/claude-sonnet-4-5", args[args.index("--model") + 1]
-    assert_equal "anthropic", args[args.index("--provider") + 1]
-    assert_equal "sk-test", args[args.index("--api-key") + 1]
+      assert_equal "anthropic/claude-sonnet-4-5", args[args.index("--model") + 1]
+      assert_equal "anthropic", args[args.index("--provider") + 1]
+      assert_equal "sk-test", args[args.index("--api-key") + 1]
+    end
   end
 
   test "pi_args omits --api-key when no key is configured for the provider" do
@@ -326,16 +327,6 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
       args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
 
       assert_equal "sk-oai", args[args.index("--api-key") + 1]
-    end
-  end
-
-  test "a stored ApiKey overrides the deployment api key" do
-    conversation = create_conversation(settings: { "provider" => "anthropic" })
-    conversation.user.api_keys.create!(provider: "anthropic", key: "sk-user")
-    with_agent_config(api_keys: { "anthropic" => "sk-deploy" }) do
-      args = Agent::Adapters::Pi.new(conversation: conversation).pi_args
-
-      assert_equal "sk-user", args[args.index("--api-key") + 1]
     end
   end
 

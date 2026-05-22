@@ -27,9 +27,9 @@ Run `bin/rubocop` and the relevant tests before committing.
 (sibling of this repo). It must be checked out there or `bundle` fails. This
 gem drives `pi --mode rpc` and is the only way the app talks to the pi agent.
 
-Active Record encryption is used for `Message#content` and `ApiKey#key`, so
-encryption keys must be present in Rails credentials for any environment that
-touches those models (including tests).
+Active Record encryption is used for `Message#content` and `Message#reasoning`,
+so encryption keys must be present in Rails credentials for any environment
+that touches that model (including tests).
 
 ## Architecture
 
@@ -87,11 +87,12 @@ the user already saw stream.
 
 pi's `--provider` / `--model` come from the conversation's `settings` (jsonb,
 set by the new-chat composer) or fall back to `config.x.agent` deployment
-defaults (`METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL`). The `--api-key` is
-chosen by provider: the owner's `ApiKey` (`User#api_key_for`) if set, else the
+defaults (`METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL`). The `--api-key` is the
 per-provider deployment key in `config.x.agent.api_keys` (`ANTHROPIC_API_KEY` /
 `OPENAI_API_KEY` / `GOOGLE_API_KEY`, read from the environment — `.env` in
-development, loaded by foreman). All unset → pi uses its own config.
+development, loaded by foreman) matched to the chosen provider. Provider API
+keys are a shared, deployment-level resource — there are no per-user keys. All
+unset → pi uses its own config.
 
 ## Conventions
 

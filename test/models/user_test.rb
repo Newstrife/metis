@@ -19,13 +19,6 @@ class UserTest < ActiveSupport::TestCase
     assert_equal [ user ], user.personal_team.members
   end
 
-  test "api_key_for returns the stored key for a provider" do
-    user = create_user
-    user.api_keys.create!(provider: "anthropic", key: "sk-test")
-
-    assert_equal "sk-test", user.api_key_for("anthropic")
-  end
-
   test "destroying a user destroys its memberships" do
     user = create_user
 
