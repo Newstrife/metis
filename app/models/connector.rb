@@ -24,6 +24,12 @@ class Connector < ApplicationRecord
     connector_credentials.find_by(user: user) || connector_credentials.find_by(user: nil)
   end
 
+  # The marketplace app this connector was created from, or nil for a
+  # custom connector. See ConnectorCatalog, docs/connectors.md.
+  def catalog_app
+    ConnectorCatalog.find(catalog_key)
+  end
+
   private
 
   # A stdio server entry needs a command; an http one needs a url.

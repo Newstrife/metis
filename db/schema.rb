@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_22_101000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_22_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -64,6 +64,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_101000) do
   end
 
   create_table "connectors", force: :cascade do |t|
+    t.string "catalog_key"
     t.datetime "created_at", null: false
     t.jsonb "definition", default: {}, null: false
     t.boolean "enabled", default: true, null: false
@@ -71,6 +72,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_101000) do
     t.bigint "team_id", null: false
     t.integer "transport", null: false
     t.datetime "updated_at", null: false
+    t.index ["team_id", "catalog_key"], name: "index_connectors_on_team_id_and_catalog_key", unique: true
     t.index ["team_id", "name"], name: "index_connectors_on_team_id_and_name", unique: true
     t.index ["team_id"], name: "index_connectors_on_team_id"
   end

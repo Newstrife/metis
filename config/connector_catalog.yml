@@ -1,0 +1,24 @@
+# The connector marketplace catalog — curated MCP-server "apps".
+#
+# Each entry is a template: connecting one resolves it (with any user
+# `inputs`) into a team's Connector, and the `credential` schema shapes
+# the secret the user supplies into a ConnectorCredential. See
+# docs/connectors.md.
+#
+# auth:
+#   token — the user supplies a key/token (v1)
+#   oauth — Metis brokers an OAuth flow (a fast-follow; not yet connectable)
+
+github:
+  name: GitHub
+  category: Development
+  description: Repositories, issues, pull requests, and code search.
+  transport: http
+  definition:
+    url: https://api.githubcopilot.com/mcp/
+  auth: token
+  credential:
+    label: Personal access token
+    hint: Create one at github.com/settings/tokens with the scopes you want the agent to use.
+    header: Authorization
+    format: "Bearer %{token}"

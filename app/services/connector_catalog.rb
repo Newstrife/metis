@@ -1,0 +1,52 @@
+require "yaml"
+
+# The connector marketplace catalog: curated MCP-server "apps", loaded
+# from config/connector_catalog.yml. Each App is a template — connecting
+# one resolves it into a team's Connector. See docs/connectors.md.
+class ConnectorCatalog
+  PATH = Rails.root.join("config/connector_catalog.yml")
+
+  # One catalog entry — a connectable app.
+  App = Data.define(:key, :name, :category, :description,
+                    :transport, :definition, :auth, :credential, :inputs) do
+    def token_auth? = auth == "token"
+    def oauth? = auth == "oauth"
+  end
+
+  class << self
+    # Every app, in catalog order.
+    def all
+      @all ||= load_apps
+    end
+
+    # The app for a key, or nil.
+    def find(key)
+      return if key.blank?
+
+      all.find { |app| app.key == key.to_s }
+    end
+
+    # Apps grouped by category, for the marketplace gallery.
+    def by_category
+      all.group_by(&:category)
+    end
+
+    private
+
+    def load_apps
+      YAML.safe_load_file(PATH).map do |key, attrs|
+        App.new(
+          key: key,
+          name: attrs["name"],
+          category: attrs["category"],
+          description: attrs["description"],
+          transport: attrs["transport"],
+          definition: attrs["definition"] || {},
+          auth: attrs["auth"],
+          credential: attrs["credential"],
+          inputs: attrs["inputs"] || []
+        )
+      end
+    end
+  end
+end
