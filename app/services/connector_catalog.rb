@@ -11,6 +11,24 @@ class ConnectorCatalog
                     :transport, :definition, :auth, :credential, :inputs) do
     def token_auth? = auth == "token"
     def oauth? = auth == "oauth"
+
+    # The MCP server definition with any %{input} placeholders filled
+    # from the user-supplied values.
+    def resolved_definition(inputs)
+      definition.transform_values do |value|
+        next value unless value.is_a?(String)
+
+        value.gsub(/%\{(\w+)\}/) { inputs[Regexp.last_match(1)].to_s }
+      end
+    end
+
+    # The user's secret, shaped into the credential map (header => value)
+    # a ConnectorCredential holds. Empty when the app needs no credential.
+    def credential_map_for(secret)
+      return {} unless credential
+
+      { credential["header"] => format(credential["format"], token: secret) }
+    end
   end
 
   class << self

@@ -1,4 +1,4 @@
-<% content_for :title, @connector.name %>
+<% content_for :title, @app&.name || @connector.name %>
 
 <main class="pane">
   <header class="pane-head">
@@ -7,15 +7,38 @@
         <path d="M10 3L5 8l5 5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     <% end %>
-    <h1 class="pane-title"><%= @connector.name %></h1>
+    <h1 class="pane-title"><%= @app&.name || @connector.name %></h1>
     <div style="flex:1"></div>
-    <%= button_to "Remove", connector_path(@connector), method: :delete, class: "btn btn-danger",
-          form: { data: { turbo_confirm: "Remove this connector?" } } %>
+    <%= button_to "Disconnect", connector_path(@connector), method: :delete, class: "btn btn-danger",
+          form: { data: { turbo_confirm: "Disconnect #{@connector.name}?" } } %>
   </header>
 
   <div class="pane-body">
     <div class="pane-inner">
-      <%= render "form", connector: @connector %>
+      <% if @app %>
+        <p class="pane-lead"><%= @app.description %></p>
+        <%= form_with model: @connector, class: "conn-form" do |f| %>
+          <% if @app.credential %>
+            <div class="field">
+              <%= label_tag :credential, @app.credential["label"] %>
+              <%= password_field_tag :credential, nil, autocomplete: "off",
+                    placeholder: @credential ? "Set — leave blank to keep the current one" : nil %>
+              <% if @app.credential["hint"] %>
+                <p class="field-hint"><%= @app.credential["hint"] %></p>
+              <% end %>
+            </div>
+          <% end %>
+          <label class="field-check">
+            <%= f.check_box :enabled %>
+            <span>Enabled — staged into the agent's <code>.mcp.json</code>.</span>
+          </label>
+          <div class="form-actions">
+            <%= f.submit "Save", class: "btn btn-primary" %>
+          </div>
+        <% end %>
+      <% else %>
+        <%= render "form", connector: @connector %>
+      <% end %>
     </div>
   </div>
 </main>

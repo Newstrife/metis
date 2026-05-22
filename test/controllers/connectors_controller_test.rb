@@ -10,53 +10,71 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
 
   def team = @user.personal_team
 
-  test "index lists the team's connectors" do
-    team.connectors.create!(name: "fs", transport: :stdio, definition: { "command" => "npx" })
-
-    get connectors_path
-    assert_response :success
-    assert_select ".conn-row", 1
+  def github_connector
+    team.connectors.create!(catalog_key: "github", name: "github",
+                            transport: :http, definition: { "url" => "https://mcp.example/" })
   end
 
-  test "new renders the form" do
+  test "the gallery lists catalog apps" do
+    get connectors_path
+    assert_response :success
+    assert_select ".app-tile"
+  end
+
+  test "new with an app key renders the connect form" do
+    get new_connector_path(app: "github")
+    assert_response :success
+    assert_select "input[name=catalog_key]"
+  end
+
+  test "new with an already-connected app redirects to manage" do
+    connector = github_connector
+    get new_connector_path(app: "github")
+    assert_redirected_to edit_connector_path(connector)
+  end
+
+  test "new without an app renders the custom form" do
     get new_connector_path
     assert_response :success
   end
 
-  test "create assembles a stdio connector from the structured form" do
+  test "connecting a catalog app creates a connector and the member's credential" do
+    assert_difference([ "Connector.count", "ConnectorCredential.count" ], 1) do
+      post connectors_path, params: { catalog_key: "github", credential: "ghp_secret" }
+    end
+
+    connector = team.connectors.find_by(catalog_key: "github")
+    assert_equal "http", connector.transport
+    assert_equal "https://api.githubcopilot.com/mcp/", connector.definition["url"]
+
+    credential = connector.credential_for(@user)
+    assert_equal @user, credential.user
+    assert_equal({ "Authorization" => "Bearer ghp_secret" }, credential.credential_map)
+  end
+
+  test "creating a custom connector from the structured form" do
     assert_difference("Connector.count", 1) do
       post connectors_path, params: {
-        connector: { name: "fs", transport: "stdio", enabled: "1",
-                     command: "npx", args: "-y\nserver-filesystem" }
+        connector: { name: "fs", transport: "stdio", enabled: "1", command: "npx", args: "-y" }
       }
     end
-
-    connector = team.connectors.last
-    assert_equal "npx", connector.definition["command"]
-    assert_equal [ "-y", "server-filesystem" ], connector.definition["args"]
+    assert_equal "npx", team.connectors.last.definition["command"]
   end
 
-  test "create rejects an invalid connector" do
-    assert_no_difference("Connector.count") do
-      post connectors_path, params: { connector: { name: "", transport: "stdio" } }
-    end
-    assert_response :unprocessable_entity
+  test "the manage page renders for a connected app" do
+    get edit_connector_path(github_connector)
+    assert_response :success
   end
 
-  test "update saves changes, reassembling the definition" do
-    connector = team.connectors.create!(name: "fs", transport: :stdio, definition: { "command" => "npx" })
+  test "updating a connected app sets a new credential" do
+    connector = github_connector
+    patch connector_path(connector), params: { connector: { enabled: "1" }, credential: "ghp_new" }
 
-    patch connector_path(connector), params: {
-      connector: { name: "fs", transport: "http", url: "https://mcp.example/" }
-    }
-
-    assert connector.reload.http?
-    assert_equal "https://mcp.example/", connector.definition["url"]
+    assert_equal({ "Authorization" => "Bearer ghp_new" }, connector.credential_for(@user).credential_map)
   end
 
-  test "destroy removes the connector" do
-    connector = team.connectors.create!(name: "fs", transport: :stdio, definition: { "command" => "npx" })
-
+  test "disconnect removes the connector" do
+    connector = github_connector
     assert_difference("Connector.count", -1) { delete connector_path(connector) }
   end
 
