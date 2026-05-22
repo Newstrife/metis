@@ -6,6 +6,10 @@ class ConversationTest < ActiveSupport::TestCase
     @conversation = @user.conversations.create!
   end
 
+  test "a conversation defaults its team to the creator's personal team" do
+    assert_equal @user.personal_team, @conversation.team
+  end
+
   test "turn_in_progress? is false with no in-flight assistant message" do
     refute @conversation.turn_in_progress?
   end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_21_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_21_182000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -74,10 +74,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_21_170000) do
     t.datetime "created_at", null: false
     t.jsonb "runtime_state", default: {}, null: false
     t.jsonb "settings", default: {}, null: false
+    t.bigint "team_id", null: false
     t.string "title"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["team_id"], name: "index_conversations_on_team_id"
     t.index ["user_id"], name: "index_conversations_on_user_id"
+  end
+
+  create_table "memberships", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "role", null: false
+    t.bigint "team_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["team_id"], name: "index_memberships_on_team_id"
+    t.index ["user_id", "team_id"], name: "index_memberships_on_user_id_and_team_id", unique: true
+    t.index ["user_id"], name: "index_memberships_on_user_id"
   end
 
   create_table "messages", force: :cascade do |t|
@@ -100,6 +113,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_21_170000) do
     t.index ["conversation_id"], name: "index_messages_on_one_in_progress_turn", unique: true, where: "((role = 1) AND (streaming_status = ANY (ARRAY[0, 1])))"
   end
 
+  create_table "teams", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.boolean "personal", default: false, null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", default: "", null: false
@@ -115,6 +135,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_21_170000) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "api_keys", "users"
+  add_foreign_key "conversations", "teams"
   add_foreign_key "conversations", "users"
+  add_foreign_key "memberships", "teams"
+  add_foreign_key "memberships", "users"
   add_foreign_key "messages", "conversations"
 end

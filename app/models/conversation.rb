@@ -1,10 +1,15 @@
 class Conversation < ApplicationRecord
   belongs_to :user
+  belongs_to :team
   has_many :messages, dependent: :destroy
 
   # The pi session directory, archived. Durable, worker-independent
   # storage for the agent's conversation memory (see Agent::SessionArchive).
   has_one_attached :pi_session_archive
+
+  # A conversation is owned by a team; default it to the creator's
+  # personal team unless one was given (docs/tenancy.md).
+  before_validation :default_team, on: :create
 
   scope :recent, -> { order(updated_at: :desc) }
 
@@ -42,5 +47,11 @@ class Conversation < ApplicationRecord
   # docs/session-persistence.md).
   def uploaded_files
     messages.with_attached_files.flat_map { |message| message.files.attachments }
+  end
+
+  private
+
+  def default_team
+    self.team ||= user&.personal_team
   end
 end
