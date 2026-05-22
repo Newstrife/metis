@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_21_163351) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_21_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -50,6 +50,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_21_163351) do
     t.bigint "user_id", null: false
     t.index ["user_id", "provider"], name: "index_api_keys_on_user_id_and_provider", unique: true
     t.index ["user_id"], name: "index_api_keys_on_user_id"
+  end
+
+  create_table "connectors", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "credentials"
+    t.jsonb "definition", default: {}, null: false
+    t.boolean "enabled", default: true, null: false
+    t.string "name", null: false
+    t.bigint "owner_id", null: false
+    t.string "owner_type", null: false
+    t.integer "transport", null: false
+    t.datetime "updated_at", null: false
+    t.index ["owner_type", "owner_id", "name"], name: "index_connectors_on_owner_type_and_owner_id_and_name", unique: true
+    t.index ["owner_type", "owner_id"], name: "index_connectors_on_owner"
   end
 
   create_table "conversations", force: :cascade do |t|

@@ -6,6 +6,7 @@ class User < ApplicationRecord
 
   has_many :conversations, dependent: :destroy
   has_many :api_keys, dependent: :destroy
+  has_many :connectors, as: :owner, dependent: :destroy
 
   def api_key_for(provider)
     api_keys.find_by(provider: provider.to_s)&.key
