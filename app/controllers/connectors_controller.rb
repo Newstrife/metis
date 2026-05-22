@@ -69,6 +69,8 @@ class ConnectorsController < ApplicationController
   # --- catalog connect --------------------------------------------------
 
   def connect_app(app)
+    return redirect_to(connector_github_start_path) if app.oauth?
+
     connector = team.connectors.find_or_initialize_by(catalog_key: app.key)
     connector.update!(
       name: app.key, transport: app.transport,
@@ -142,9 +144,11 @@ class ConnectorsController < ApplicationController
   end
 
   # Re-set the member's credential when the manage page supplies one.
+  # OAuth-shaped apps own their credential lifecycle through the connect
+  # flow — never accept a typed-in secret for them.
   def save_credential
     app = @connector.catalog_app
-    return unless app && params[:credential].present?
+    return unless app && app.token_auth? && params[:credential].present?
 
     credential = @connector.connector_credentials.find_or_initialize_by(user: current_user)
     credential.update!(credential_map: app.credential_map_for(params[:credential]))

@@ -16,9 +16,8 @@ github:
   transport: http
   definition:
     url: https://api.githubcopilot.com/mcp/
-  auth: token
+  auth: oauth
+  oauth_provider: github
   credential:
-    label: Personal access token
-    hint: Create one at github.com/settings/tokens with the scopes you want the agent to use.
     header: Authorization
     format: "Bearer %{token}"

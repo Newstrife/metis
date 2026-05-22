@@ -41,9 +41,19 @@
             <%= link_to "Cancel", connectors_path, class: "btn btn-ghost" %>
           </div>
         <% end %>
+      <% elsif @app.oauth_provider == "github" %>
+        <p class="pane-hint">
+          Authorize Metis to act as you on GitHub. The connection covers
+          only your account — each member of your team connects their own.
+        </p>
+        <div class="form-actions">
+          <%= link_to "Authorize on GitHub", connector_github_start_path,
+                      class: "btn btn-primary" %>
+          <%= link_to "Cancel", connectors_path, class: "btn btn-ghost" %>
+        </div>
       <% else %>
         <div class="pane-empty">
-          <p>OAuth connections are coming soon — <%= @app.name %> will connect in one click.</p>
+          <p><%= @app.name %> is not connectable yet.</p>
         </div>
       <% end %>
     </div>

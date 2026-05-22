@@ -12,7 +12,8 @@ class ConnectorCatalogTest < ActiveSupport::TestCase
     assert_equal "GitHub", github.name
     assert_equal "http", github.transport
     assert_equal "https://api.githubcopilot.com/mcp/", github.definition["url"]
-    assert github.token_auth?
+    assert github.oauth?
+    assert_equal "github", github.oauth_provider
   end
 
   test "find is nil for an unknown or blank key" do

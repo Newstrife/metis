@@ -15,6 +15,8 @@ Rails.application.routes.draw do
     resources :messages, only: :create
   end
 
+  get "connectors/github/start",    to: "connectors/github#start",    as: :connector_github_start
+  get "connectors/github/callback", to: "connectors/github#callback", as: :connector_github_callback
   resources :connectors, except: :show
 
   # Defines the root path route ("/")

@@ -21,10 +21,11 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".app-tile"
   end
 
-  test "new with an app key renders the connect form" do
+  test "new with an oauth app renders the authorize button" do
     get new_connector_path(app: "github")
+
     assert_response :success
-    assert_select "input[name=catalog_key]"
+    assert_select "a[href=?]", connector_github_start_path
   end
 
   test "new with an already-connected app redirects to manage" do
@@ -38,18 +39,12 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "connecting a catalog app creates a connector and the member's credential" do
-    assert_difference([ "Connector.count", "ConnectorCredential.count" ], 1) do
+  test "POSTing to connect an oauth app redirects through its OAuth start" do
+    assert_no_difference([ "Connector.count", "ConnectorCredential.count" ]) do
       post connectors_path, params: { catalog_key: "github", credential: "ghp_secret" }
     end
 
-    connector = team.connectors.find_by(catalog_key: "github")
-    assert_equal "http", connector.transport
-    assert_equal "https://api.githubcopilot.com/mcp/", connector.definition["url"]
-
-    credential = connector.credential_for(@user)
-    assert_equal @user, credential.user
-    assert_equal({ "Authorization" => "Bearer ghp_secret" }, credential.credential_map)
+    assert_redirected_to connector_github_start_path
   end
 
   test "creating a custom connector from the structured form" do
@@ -66,11 +61,11 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "updating a connected app sets a new credential" do
+  test "updating an oauth app ignores any typed-in credential" do
     connector = github_connector
     patch connector_path(connector), params: { connector: { enabled: "1" }, credential: "ghp_new" }
 
-    assert_equal({ "Authorization" => "Bearer ghp_new" }, connector.credential_for(@user).credential_map)
+    assert_nil connector.credential_for(@user)
   end
 
   test "disconnect removes the connector" do

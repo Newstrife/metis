@@ -18,7 +18,7 @@
       <% if @app %>
         <p class="pane-lead"><%= @app.description %></p>
         <%= form_with model: @connector, class: "conn-form" do |f| %>
-          <% if @app.credential %>
+          <% if @app.token_auth? && @app.credential %>
             <div class="field">
               <%= label_tag :credential, @app.credential["label"] %>
               <%= password_field_tag :credential, nil, autocomplete: "off",
@@ -34,6 +34,19 @@
           </label>
           <div class="form-actions">
             <%= f.submit "Save", class: "btn btn-primary" %>
+          </div>
+        <% end %>
+        <% if @app.oauth? %>
+          <p class="pane-hint">
+            <% if @credential&.oauth_token %>
+              Connected as you on GitHub. Re-authorize to refresh your access.
+            <% else %>
+              Not yet authorized as you on GitHub — each member connects their own account.
+            <% end %>
+          </p>
+          <div class="form-actions">
+            <%= link_to(@credential&.oauth_token ? "Re-authorize on GitHub" : "Authorize on GitHub",
+                        connector_github_start_path, class: "btn btn-secondary") %>
           </div>
         <% end %>
       <% else %>
