@@ -19,6 +19,11 @@ exposes their tools to the agent. metis adopts it rather than building a
 bridge of its own; forking is the fallback if its programmatic-config gap
 stalls upstream. CLIs are not used as the connector mechanism.
 
+pi-mcp-adapter is a pi *package*, installed with `pi install` into each
+pi environment at setup or image-build time — `bin/setup` for local dev,
+the Docker image, the E2B template. pi auto-discovers it; metis neither
+vendors it nor loads it explicitly.
+
 The adapter reads its server list from an on-disk `.mcp.json`, so metis
 **stages a `.mcp.json` per run** into the pi workspace — connector
 definitions from the `Connector` model, credentials injected as env vars

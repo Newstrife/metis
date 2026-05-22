@@ -38,8 +38,8 @@ tools and share them** — across their own devices, and with their teams.
 
 - **Chat** — live streaming chat over `pi --mode rpc`, Turbo-broadcast and
   persisted. Working.
-- **Runtimes** — `Local` (subprocess) and `E2b` (microVM) built; the
-  runtime is a clean second axis (`Agent::Runtime`).
+- **Runtimes** — `Local` (subprocess), `Docker` (container), and `E2b`
+  (microVM) built; the runtime is a clean second axis (`Agent::Runtime`).
 - **Extensions** — `pi --extension` wiring shipped; `web-tools` (keyless
   web search / fetch) is the first bundled extension.
 - **Auth** — Devise email/password. No teams yet.
@@ -50,7 +50,6 @@ Themes, roughly in dependency order:
 
 | Theme | Goal |
 |---|---|
-| **Runtimes** | Add `Docker`. A sandboxed runtime is mandatory for any shared deployment. |
 | **Auth & tenancy** | OAuth, onboarding, then teams/orgs. Team-aware ownership from the start. |
 | **Skills** | Project-bundled skills first, then user/team-managed skills with a UI. |
 | **MCP & connectors** | One MCP-bridge extension + a team-scoped `Connector` model — the whole MCP ecosystem through a single bridge. |
@@ -96,9 +95,9 @@ Pieces:
 
 - **`Connector` model** — team-scoped (user-scoped for personal): which MCP
   server, its config, its credentials. Encrypted, like `ApiKey`.
-- **`pi-mcp-adapter`** — the adopted bridge extension, vendored into
-  `.pi/extensions/` and loaded through the existing `pi --extension`
-  wiring. Reads its MCP server list from an on-disk `.mcp.json`.
+- **`pi-mcp-adapter`** — the adopted bridge, installed as a pi package
+  (`pi install`) into each pi environment at setup/build time; pi
+  auto-discovers it. Reads its MCP server list from an on-disk `.mcp.json`.
 - **`.mcp.json` staged per run** — the runtime writes a `.mcp.json` into
   the pi workspace from the conversation's `Connector` records, with
   credentials injected as env vars / bearer tokens.
@@ -121,7 +120,7 @@ runs pi per turn, so the bridge reconnects every MCP server on every turn.
 
 Concrete deliverables:
 
-- [ ] **Docker runtime** — `Agent::Runtime::Docker`, alongside `Local` and
+- [x] **Docker runtime** — `Agent::Runtime::Docker`, alongside `Local` and
   `E2b`, on the same `Base` contract (`session_dir`, `extension_paths`,
   `run`). Unblocks safe multi-user hosting.
 - [ ] **Project-bundled skills** — wire `pi --skill` the way `--extension`

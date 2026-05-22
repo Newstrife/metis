@@ -15,6 +15,15 @@ FileUtils.chdir APP_ROOT do
   puts "== Installing dependencies =="
   system("bundle check") || system!("bundle install")
 
+  puts "\n== Installing pi packages =="
+  # The MCP connector bridge. Keep the version in sync with
+  # docker/pi-runtime/Dockerfile and lib/tasks/e2b.rake.
+  if system("pi list 2>/dev/null | grep -q 'pi-mcp-adapter@2.6.1'")
+    puts "pi-mcp-adapter already installed."
+  else
+    system! "pi", "install", "npm:pi-mcp-adapter@2.6.1"
+  end
+
   # puts "\n== Copying sample files =="
   # unless File.exist?("config/database.yml")
   #   FileUtils.cp "config/database.yml.sample", "config/database.yml"

@@ -30,6 +30,8 @@ See [`PLAN.md`](PLAN.md) for direction and roadmap.
 - PostgreSQL
 - **`pi-agent-rb`** checked out as a sibling directory at `../pi-agent-rb`.
   The `Gemfile` references it as a local path gem, so `bundle` fails without it.
+- **pi** on your `PATH` for the `local` runtime —
+  `npm install -g @earendil-works/pi-coding-agent`.
 - Docker — only for the `docker` runtime.
 - An [E2B](https://e2b.dev) account — only for the `e2b` runtime.
 
@@ -38,6 +40,11 @@ See [`PLAN.md`](PLAN.md) for direction and roadmap.
 ```sh
 bin/setup        # install dependencies and prepare the database
 ```
+
+`bin/setup` also installs the **MCP connector bridge**
+([`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter)) into
+your local pi. The `docker` image and `e2b` template bake the same
+bridge in at build time, so every runtime has it.
 
 Metis encrypts `Message#content`, `Message#reasoning`, and `ApiKey#key`
 with Active Record Encryption — the encryption keys must be present in

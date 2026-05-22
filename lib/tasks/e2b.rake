@@ -6,9 +6,12 @@ namespace :e2b do
 
     puts "Building E2B template '#{name}' with #{pi_package}..."
 
+    # The MCP connector bridge (pi-mcp-adapter) is baked in alongside pi.
+    # Keep the version in sync with bin/setup and docker/pi-runtime/Dockerfile.
     template = E2B::Template.new
                             .from_node_image
                             .npm_install(pi_package, g: true)
+                            .run_cmd("pi install npm:pi-mcp-adapter@2.6.1")
 
     # tags must be a non-null array — the E2B v3 build API rejects null.
     info = E2B::Template.build(template, name: name, tags: [], on_build_logs: ->(line) { puts line })

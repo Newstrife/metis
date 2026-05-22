@@ -15,3 +15,7 @@ RUN apt-get update \
 # passes PI_VERSION from PiAgent::SUPPORTED_PI_VERSION.
 ARG PI_VERSION
 RUN npm install --global "@earendil-works/pi-coding-agent@${PI_VERSION}"
+
+# The MCP connector bridge (pi-mcp-adapter). Keep the version in sync
+# with bin/setup and lib/tasks/e2b.rake.
+RUN pi install npm:pi-mcp-adapter@2.6.1
