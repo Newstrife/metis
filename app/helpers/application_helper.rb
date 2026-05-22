@@ -69,19 +69,27 @@ module ApplicationHelper
     format("%gk", (count / 100.0).round / 10.0)
   end
 
-  # Group conversations (already ordered newest-first) into recency
-  # buckets for the sidebar list. Empty buckets are dropped.
+  # Group conversations (already ordered newest-first) by last activity
+  # into rolling recency buckets for the sidebar. Empty buckets dropped.
   def conversation_groups(conversations)
-    now = Time.current
-    buckets = { "This week" => [], "This month" => [], "Earlier" => [] }
+    today = Time.current.beginning_of_day
+    buckets = {
+      "Today" => [], "Yesterday" => [],
+      "Last week" => [], "Last month" => [], "Older" => []
+    }
     conversations.each do |conversation|
+      at = conversation.updated_at
       bucket =
-        if conversation.updated_at >= now.beginning_of_week
-          "This week"
-        elsif conversation.updated_at >= now.beginning_of_month
-          "This month"
+        if at >= today
+          "Today"
+        elsif at >= today - 1.day
+          "Yesterday"
+        elsif at >= today - 7.days
+          "Last week"
+        elsif at >= today - 30.days
+          "Last month"
         else
-          "Earlier"
+          "Older"
         end
       buckets[bucket] << conversation
     end

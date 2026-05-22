@@ -30,6 +30,8 @@
 
       <div class="composer">
         <textarea name="content" rows="2"
+                  data-controller="composer"
+                  data-action="keydown->composer#submitOnEnter"
                   placeholder="<%= new_chat ? "Ask anything to start a new chat…" : "Message the agent…" %>"></textarea>
         <div class="composer-bar">
           <label class="attach" title="Attach photos or files">
@@ -54,7 +56,5 @@
       <%# Hidden form the composer's Stop button submits (via form="cancel_turn"). %>
       <%= form_with url: cancel_conversation_path(conversation), method: :post, id: "cancel_turn" do %><% end %>
     <% end %>
-
-    <div class="composer-hint">Metis runs the pi agent in a sandboxed runtime.</div>
   </div>
 </div>

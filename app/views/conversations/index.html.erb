@@ -3,12 +3,13 @@
 <main class="chat">
   <div class="welcome">
     <div class="welcome-mark" aria-hidden="true">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
-        <path d="M8 1.5v13M2.5 5l5.5-2 5.5 2M2.5 5v6M13.5 5v6M2.5 11l5.5 2 5.5-2" stroke-linejoin="round"/>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 18.5V7l7 6.5 7-6.5v11.5"/>
       </svg>
     </div>
-    <h1>Start a new conversation</h1>
-    <p>Ask anything. Metis runs the pi agent in a sandboxed runtime and streams the answer back live.</p>
+    <h1>What's on your mind?</h1>
+    <p>Metis is an open-source, self-hostable agent platform for individuals and teams.</p>
   </div>
 
   <%= render "composer", conversation: nil %>

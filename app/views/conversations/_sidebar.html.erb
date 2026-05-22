@@ -2,7 +2,6 @@
     Rendered by the "chat" layout on every conversations page. %>
 <aside class="sidebar" data-controller="conversation-filter">
   <div class="ws">
-    <div class="ws-mark">M</div>
     <div class="ws-name">Metis</div>
     <div style="flex:1"></div>
     <button type="button" class="ico-btn theme-toggle" data-controller="theme"
@@ -42,7 +41,6 @@
                   class: "convo#{' on' if conversation == @conversation}",
                   data: { conversation_filter_target: "item",
                           title: conversation.display_title } do %>
-              <span class="ds" aria-hidden="true"></span>
               <span class="tt"><%= conversation.display_title %></span>
             <% end %>
           <% end %>
