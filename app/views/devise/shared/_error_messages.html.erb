@@ -1,0 +1,10 @@
+<% if resource.errors.any? %>
+  <div class="auth-error">
+    <strong><%= pluralize(resource.errors.count, "problem") %> stopped this from saving:</strong>
+    <ul>
+      <% resource.errors.full_messages.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
