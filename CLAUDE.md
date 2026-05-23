@@ -88,9 +88,11 @@ turns is a **per-runtime concern** — see `docs/session-persistence.md`:
   turn and restored before the next.
 
 Uploaded files are projected into `workspace/uploads/` each turn from their
-durable `Message` attachments, and excluded from the archive. Archive
-failures are logged, never raised — a storage failure must not crash a turn
-the user already saw stream.
+durable `Message` attachments, and excluded from the archive. The same
+shape carries the rendered `workspace/.mcp.json` and the rendered
+`workspace/AGENTS.md` (the agent's per-turn boot identity — see
+`docs/agent-identity.md`). Archive failures are logged, never raised —
+a storage failure must not crash a turn the user already saw stream.
 
 ### Credentials
 

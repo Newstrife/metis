@@ -37,18 +37,24 @@ mechanism — not a universal layer.
       workspace/          pi cwd : files the agent itself creates
         uploads/          staged user uploads — see below
 
-## Uploads are inputs, not session state
+## Projected inputs are not session state
 
-User uploads are already stored durably as `Message` file attachments
-(Active Storage). They are immutable *input*, not agent-produced state.
+Some workspace contents are *projections* of durable Rails state, not
+agent-produced output: user uploads, the rendered MCP connector config,
+the agent's per-turn boot identity. Each is read straight from its
+durable source at the start of every turn, and **excluded from the
+session archive**.
 
-So uploads are **projected** into `workspace/uploads/` at the start of
-every turn, read straight from the conversation's `Message` attachments,
-and **excluded from the session archive**. The archive then carries only
-the transcript and the agent's own working files.
+| Projected input | Source |
+|---|---|
+| `workspace/uploads/*` | `Message` attachments (Active Storage) |
+| `workspace/.mcp.json` | `Connector` + `ConnectorCredential` (see [`connectors.md`](connectors.md)) |
+| `workspace/AGENTS.md` | `Conversation` + `Team` + runtime (see [`agent-identity.md`](agent-identity.md)) |
 
-Archive size becomes independent of upload size: a large PDF costs once
-(its Message attachment), not once per turn.
+The archive then carries only the transcript and the agent's own
+working files. Archive size becomes independent of upload, connector,
+and identity-doc size — each costs once at its durable source, not
+once per turn.
 
 ## Phasing
 
