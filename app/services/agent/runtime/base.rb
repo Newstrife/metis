@@ -30,6 +30,19 @@ module Agent
         Agent::McpConfig.new(conversation).content
       end
 
+      # The rendered AGENTS.md (Agent::Identity) — the agent boot file
+      # pi auto-loads from its working directory each turn. Per-turn
+      # projected input, like mcp_config.
+      def identity_content
+        Agent::Identity.new(conversation, kind).content
+      end
+
+      # The runtime's short name (`local`, `docker`, `e2b`) — used in
+      # the agent identity file and the runtime_info trace.
+      def kind
+        self.class.name.demodulize.underscore
+      end
+
       # Provision the runtime, open a PiAgent::Session running pi with
       # `pi_args`, yield it to the caller, then finalize (persist state,
       # tear down). The session is closed by the runtime, not the caller.
@@ -44,7 +57,7 @@ module Agent
       # A record of where the turn ran, persisted on the Conversation:
       # the runtime name, plus whatever per-run detail a subclass adds.
       def runtime_info
-        { "runtime" => self.class.name.demodulize.underscore }
+        { "runtime" => kind }
       end
     end
   end

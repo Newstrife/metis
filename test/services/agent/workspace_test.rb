@@ -81,4 +81,13 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
 
     assert_equal %({"mcpServers":{}}), File.read(workspace.workspace_dir.join(".mcp.json"))
   end
+
+  test "stage_identity writes AGENTS.md into the workspace root" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    workspace.stage_identity("# Hello, pi")
+
+    assert_equal "# Hello, pi", File.read(workspace.workspace_dir.join("AGENTS.md"))
+  end
 end

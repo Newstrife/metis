@@ -12,6 +12,8 @@ module Agent
   #                       (see docs/session-persistence.md)
   #   workspace/.mcp.json MCP connector config — rendered each turn from
   #                       the conversation's Connectors, never archived
+  #   workspace/AGENTS.md Agent boot identity — rendered each turn (see
+  #                       Agent::Identity), never archived, pi auto-loads
   #
   # Two roots, because persistence is a per-runtime concern:
   #   Workspace.scratch    — under tmp/, for a runtime that re-hydrates
@@ -75,6 +77,14 @@ module Agent
     # archived (see docs/connectors.md).
     def stage_mcp_config(content)
       File.write(workspace_dir.join(McpConfig::FILENAME), content)
+    end
+
+    # Write the rendered AGENTS.md into the workspace root. pi auto-loads
+    # it from `cwd` as ambient instructions — the agent boots reading
+    # this every turn. Per-turn projected input like .mcp.json: rendered
+    # fresh each turn, never archived. See Agent::Identity.
+    def stage_identity(content)
+      File.write(workspace_dir.join(Identity::FILENAME), content)
     end
   end
 end

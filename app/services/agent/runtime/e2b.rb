@@ -61,6 +61,7 @@ module Agent
         hydrate(sandbox)
         stage_uploads(sandbox)
         stage_mcp_config(sandbox)
+        stage_identity(sandbox)
         session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args))
         begin
           yield session
@@ -145,6 +146,13 @@ module Agent
       # per-turn projected input, excluded from the archive (see #persist).
       def stage_mcp_config(sandbox)
         sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::McpConfig::FILENAME}", mcp_config)
+      end
+
+      # Write the rendered AGENTS.md into the sandbox workspace. Per-turn
+      # projected input, excluded from the archive. pi auto-loads it from
+      # `cwd` as ambient instructions.
+      def stage_identity(sandbox)
+        sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::Identity::FILENAME}", identity_content)
       end
 
       def transport_factory(sandbox, pi_args)

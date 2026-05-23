@@ -63,10 +63,12 @@ module Agent
 
       def compress(dir, archive_path)
         # Exclude per-turn projected inputs (staged uploads, the rendered
-        # .mcp.json) — re-projected each turn from durable sources, not
-        # archived state. See docs/session-persistence.md.
+        # .mcp.json, the rendered AGENTS.md) — re-projected each turn
+        # from durable sources, not archived state. See
+        # docs/session-persistence.md.
         ok = system("tar", "-czf", archive_path.to_s, "-C", dir.to_s,
                     "--exclude=./workspace/uploads", "--exclude=./workspace/.mcp.json",
+                    "--exclude=./workspace/AGENTS.md",
                     ".", %i[out err] => File::NULL)
         raise ArchiveError, "failed to archive pi session dir #{dir}" unless ok
       end

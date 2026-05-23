@@ -49,6 +49,7 @@ module Agent
         Agent::SessionArchive.restore(conversation, into: workspace.scope_dir)
         workspace.stage_uploads(conversation.uploaded_files)
         workspace.stage_mcp_config(mcp_config)
+        workspace.stage_identity(identity_content)
         session = PiAgent.session(bin: "docker", args: docker_args(pi_args))
         begin
           yield session
