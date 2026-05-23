@@ -10,9 +10,12 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
       uid: uid.to_s,
       info: { email: email, nickname: login },
       credentials: {
-        token: "live", refresh_token: "rt", expires_at: Time.current.to_i + 3600,
-        scope: scope
-      }
+        token: "live", refresh_token: "rt", expires_at: Time.current.to_i + 3600
+      },
+      # omniauth-github exposes the granted scopes on extra.scope, not
+      # credentials.scope. Keep the mock shaped like the real strategy so
+      # connector grants do not silently lose repo/read:user coverage.
+      extra: { scope: scope }
     )
     Rails.application.env_config["omniauth.auth"] = OmniAuth.config.mock_auth[:github]
     set_omniauth_params(connect: connect)

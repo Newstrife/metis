@@ -71,7 +71,7 @@ class OauthBrokerTest < ActiveSupport::TestCase
     assert_equal "fresh", g.reload.access_token
   end
 
-  test "revoke calls the provider client's revoke method" do
+  test "revoke sends Google's refresh token when present" do
     g = grant(provider: "google")
     called_with = nil
 
@@ -81,6 +81,18 @@ class OauthBrokerTest < ActiveSupport::TestCase
 
     assert_equal g.refresh_token, called_with,
                  "revoke should hit the refresh_token (the long-lived one) when available"
+  end
+
+  test "revoke sends GitHub's access token" do
+    g = grant(provider: "github", access_token: "access-token", refresh_token: "refresh-token")
+    called_with = nil
+
+    with_stub(OauthBroker::Clients::Github, :revoke, ->(token) { called_with = token }) do
+      OauthBroker.revoke(g)
+    end
+
+    assert_equal "access-token", called_with,
+                 "GitHub's app authorization DELETE endpoint expects access_token, not refresh_token"
   end
 
   test "revoke swallows provider errors so the local delete can proceed" do

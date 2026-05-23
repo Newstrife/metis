@@ -57,7 +57,8 @@ module OauthBroker
     # blocking the caller (the local delete still happens).
     def revoke(grant)
       client = client_for(grant.provider)
-      client.revoke(grant.refresh_token || grant.access_token) if client.respond_to?(:revoke)
+      token = revoke_token_for(grant)
+      client.revoke(token) if token.present? && client.respond_to?(:revoke)
     rescue StandardError => error
       Rails.logger.warn(
         "OauthBroker.revoke failed for user=#{grant.user_id} provider=#{grant.provider}: " \
@@ -79,6 +80,15 @@ module OauthBroker
 
     def client_for(provider)
       CLIENTS[provider] or raise Error, "unknown oauth provider #{provider.inspect}"
+    end
+
+    def revoke_token_for(grant)
+      case grant.provider
+      when "github"
+        grant.access_token
+      else
+        grant.refresh_token || grant.access_token
+      end
     end
   end
 end

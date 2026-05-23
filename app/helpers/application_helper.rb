@@ -104,6 +104,7 @@ module ApplicationHelper
   def omniauth_authorize_path_for(app)
     strategy = OauthBroker.omniauth_strategy(app.oauth_provider)
     return nil unless strategy
+    return nil unless oauth_provider_configured?(app.oauth_provider)
 
     send("user_#{strategy}_omniauth_authorize_path")
   end
@@ -118,6 +119,7 @@ module ApplicationHelper
   def connector_authorize_path_for(app)
     strategy = OauthBroker.omniauth_strategy(app.oauth_provider)
     return nil unless strategy
+    return nil unless oauth_provider_configured?(app.oauth_provider)
 
     scopes = (OauthBroker::SIGN_IN_SCOPES.fetch(app.oauth_provider, []) + app.oauth_scopes).uniq.join(",")
     send("user_#{strategy}_omniauth_authorize_path",
@@ -125,6 +127,17 @@ module ApplicationHelper
          scope: scopes,
          prompt: "consent",
          include_granted_scopes: true)
+  end
+
+  def oauth_provider_configured?(provider)
+    case OauthBroker.normalize_provider(provider) || provider.to_s
+    when "github"
+      GithubApp::Config.configured?
+    when "google"
+      GoogleApp::Config.configured?
+    else
+      false
+    end
   end
 
   private

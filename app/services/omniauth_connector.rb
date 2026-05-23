@@ -26,7 +26,7 @@ class OmniauthConnector
     # strategy name (`google_oauth2`).
     def record_grant(user, auth, provider:)
       grant = user.oauth_grants.find_or_initialize_by(provider: provider)
-      grant.absorb!(token_bundle(auth.credentials))
+      grant.absorb!(token_bundle(auth))
       grant
     end
 
@@ -51,14 +51,22 @@ class OmniauthConnector
 
     # Shape OmniAuth credentials into the OauthGrant absorb! response
     # shape (matches the direct OAuth code-exchange response).
-    def token_bundle(credentials)
+    def token_bundle(auth)
+      credentials = auth.credentials
       expires_in = credentials.expires_at ? credentials.expires_at - Time.current.to_i : nil
       {
         "access_token" => credentials.token,
         "refresh_token" => credentials.refresh_token,
         "expires_in" => expires_in,
-        "scope" => credentials.respond_to?(:scope) ? credentials.scope : nil
+        "scope" => oauth_scope(auth)
       }.compact
+    end
+
+    def oauth_scope(auth)
+      credentials = auth.credentials
+      return credentials.scope if credentials.respond_to?(:scope) && credentials.scope.present?
+
+      auth.extra&.[](:scope).presence || auth.extra&.[]("scope").presence
     end
   end
 end
