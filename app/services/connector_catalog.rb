@@ -1,4 +1,5 @@
 require "yaml"
+require "erb"
 
 # The connector marketplace catalog: curated MCP-server "apps", loaded
 # from config/connector_catalog.yml. Each App is a template — connecting
@@ -9,7 +10,7 @@ class ConnectorCatalog
   # One catalog entry — a connectable app.
   App = Data.define(:key, :name, :category, :description,
                     :transport, :definition, :auth, :oauth_provider,
-                    :credential, :inputs) do
+                    :oauth_scopes, :credential, :inputs) do
     def token_auth? = auth == "token"
     def oauth? = auth == "oauth"
 
@@ -53,7 +54,12 @@ class ConnectorCatalog
     private
 
     def load_apps
-      YAML.safe_load_file(PATH).map do |key, attrs|
+      # Process ERB before YAML so entries can interpolate deployment
+      # config (notably self-hosted MCP server URLs) from the
+      # environment, e.g.:
+      #   url: <%= ENV.fetch("GMAIL_MCP_URL", "http://localhost:8000/mcp/") %>
+      raw = ERB.new(File.read(PATH), trim_mode: "-").result
+      YAML.safe_load(raw).map do |key, attrs|
         App.new(
           key: key,
           name: attrs["name"],
@@ -63,6 +69,7 @@ class ConnectorCatalog
           definition: attrs["definition"] || {},
           auth: attrs["auth"],
           oauth_provider: attrs["oauth_provider"],
+          oauth_scopes: Array(attrs["oauth_scopes"]),
           credential: attrs["credential"],
           inputs: attrs["inputs"] || []
         )

@@ -1,2 +1,6 @@
 web: bin/rails server
 css: bin/rails tailwindcss:watch
+# Self-hosted Gmail MCP server (https://github.com/chagel/google_workspace_mcp).
+# Default uses uvx to fetch from git — no local checkout needed.
+# See bin/workspace-mcp for source-override env vars.
+workspace_mcp: bin/workspace-mcp

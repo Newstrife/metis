@@ -18,6 +18,9 @@ github:
     url: https://api.githubcopilot.com/mcp/
   auth: oauth
   oauth_provider: github
+  oauth_scopes:
+    - repo
+    - read:user
   credential:
     header: Authorization
     format: "Bearer %{token}"
@@ -28,9 +31,26 @@ gmail:
   description: Search, read, draft, and label Gmail messages as the operator.
   transport: http
   definition:
-    url: https://gmailmcp.googleapis.com/mcp/v1
+    # Self-hosted google_workspace_mcp (chagel/google_workspace_mcp) in
+    # external OAuth mode (MCP_ENABLE_OAUTH21=true). The bearer is
+    # metis's per-user OauthGrant for Google; the server validates it
+    # against Google's userinfo API on every request and dispatches
+    # tools based on the token's scopes. Override GMAIL_MCP_URL in the
+    # environment when running the server somewhere other than the
+    # default port-8000 dev shell.
+    url: <%= ENV.fetch("GMAIL_MCP_URL", "http://localhost:10299/mcp/") %>
   auth: oauth
   oauth_provider: google
+  # The full scope set workspace-mcp's `gmail:drafts` permission tier
+  # cumulatively expects: readonly (search/get) + labels + modify
+  # (label_thread/message) + compose (draft creation). Asking for them
+  # all up front means one consent screen covers every Gmail tool the
+  # server exposes.
+  oauth_scopes:
+    - https://www.googleapis.com/auth/gmail.readonly
+    - https://www.googleapis.com/auth/gmail.labels
+    - https://www.googleapis.com/auth/gmail.modify
+    - https://www.googleapis.com/auth/gmail.compose
   credential:
     header: Authorization
     format: "Bearer %{token}"
