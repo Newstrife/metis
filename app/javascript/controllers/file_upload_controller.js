@@ -41,6 +41,26 @@ export default class extends Controller {
     this.sync();
   }
 
+  // Capture images pasted into the textarea (e.g. macOS screenshots) and
+  // attach them like any other upload. Non-image pastes are left to the
+  // browser's default behavior so text still lands in the textarea.
+  paste(event) {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+    let added = false;
+    for (const item of items) {
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (!file || !file.type.startsWith("image/")) continue;
+      this.transfer.items.add(file);
+      added = true;
+    }
+    if (added) {
+      event.preventDefault();
+      this.sync();
+    }
+  }
+
   remove(event) {
     const index = Number(event.params.index);
     const kept = new DataTransfer();

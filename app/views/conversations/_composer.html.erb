@@ -4,7 +4,7 @@
 <% post_url = new_chat ? conversations_path : conversation_messages_path(conversation) %>
 <div id="composer" class="composer-wrap"
      data-controller="file-upload"
-     data-action="dragover->file-upload#dragOver dragleave->file-upload#dragLeave drop->file-upload#drop">
+     data-action="dragover->file-upload#dragOver dragleave->file-upload#dragLeave drop->file-upload#drop paste->file-upload#paste">
   <div class="composer-inner">
     <% if local_assigns[:error].present? %>
       <div class="composer-error"><%= error %></div>
