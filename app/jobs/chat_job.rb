@@ -49,9 +49,9 @@ class ChatJob < ApplicationJob
     end
 
     assistant_message.update!(
-      content: text,
-      reasoning: reasoning.presence,
-      tool_calls: tools.values,
+      content: scrub_null_bytes(text),
+      reasoning: scrub_null_bytes(reasoning.presence),
+      tool_calls: scrub_null_bytes(tools.values),
       streaming_status: final_status(canceled: canceled, errored: errored),
       finished_at: Time.current,
       **turn_token_columns(conversation, adapter)
@@ -147,11 +147,32 @@ class ChatJob < ApplicationJob
     conversation.update_column(:runtime_state, info)
   end
 
+  # Mark the turn errored after a crash. Reloads first to drop any
+  # in-memory dirty attributes from a failed persist — otherwise the
+  # recovery update flushes the same poisoned payload (e.g. a tool_calls
+  # bag with a U+0000 byte) and rolls back too, leaving the message
+  # frozen mid-turn.
   def fail_message(assistant_message, broadcaster, message)
     return unless assistant_message
 
-    assistant_message.update!(streaming_status: :errored, finished_at: Time.current)
+    assistant_message.reload.update!(streaming_status: :errored, finished_at: Time.current)
     broadcaster&.fail(message)
     broadcaster&.refresh_composer
+  rescue ActiveRecord::RecordNotFound
+    # Message vanished while we were running — nothing to recover.
+  end
+
+  # PostgreSQL refuses to store U+0000 in text/jsonb columns. pi
+  # occasionally emits one inside a tool call's payload (a binary leak
+  # from a subprocess, a malformed file read). Strip them at the persist
+  # boundary so a single stray byte doesn't sink a whole turn's output.
+  def scrub_null_bytes(value)
+    case value
+    when nil    then nil
+    when String then value.delete("\x00")
+    when Array  then value.map { |v| scrub_null_bytes(v) }
+    when Hash   then value.each_with_object({}) { |(k, v), h| h[scrub_null_bytes(k)] = scrub_null_bytes(v) }
+    else value
+    end
   end
 end

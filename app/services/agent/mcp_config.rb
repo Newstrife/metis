@@ -61,8 +61,18 @@ module Agent
       return credential.credential_map unless credential.oauth_token
 
       app = connector.catalog_app
-      token = OauthBroker.access_token_for(credential, provider: app&.oauth_provider.to_s)
-      app&.credential_map_for(token) || {}
+      provider = app&.oauth_provider
+      if provider.blank?
+        Rails.logger.error(
+          "McpConfig: connector #{connector.id} (#{connector.name}) carries an " \
+          "OAuth credential but its catalog entry is missing or has no " \
+          "oauth_provider — dropping from .mcp.json"
+        )
+        return nil
+      end
+
+      token = OauthBroker.access_token_for(credential, provider: provider)
+      app.credential_map_for(token) || {}
     rescue OauthBroker::Error => error
       Rails.logger.error("McpConfig: OAuth refresh failed for connector " \
                           "#{connector.id}: #{error.message}")

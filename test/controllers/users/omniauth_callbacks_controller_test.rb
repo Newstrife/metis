@@ -147,6 +147,45 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     assert_equal "888+mgc@github.users.noreply.metis", synth.reload.email
   end
 
+  test "linking a GitHub identity already owned by another user is rejected with a clear alert" do
+    other = User.create!(email: "other-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    other.identities.create!(provider: "github", uid: "claimed-42")
+
+    me = User.create!(email: "me-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    sign_in me
+    mock_github(uid: "claimed-42", login: "mgc", email: "me@example.com")
+
+    assert_no_difference("Identity.count") do
+      get user_github_omniauth_callback_path
+    end
+
+    assert_redirected_to root_path
+    assert_match(/already linked/i, flash[:alert])
+  end
+
+  test "a connector upsert failure does not block sign-in" do
+    OmniauthConnector.singleton_class.send(:alias_method, :__orig_upsert, :upsert)
+    OmniauthConnector.define_singleton_method(:upsert) { |*_| raise "boom from connector" }
+
+    begin
+      mock_github(uid: "conn-fail-1", login: "mgc", email: "ok@example.com")
+
+      assert_difference("User.count", 1) do
+        get user_github_omniauth_callback_path
+      end
+
+      user = Identity.find_by(provider: "github", uid: "conn-fail-1").user
+      assert_equal "ok@example.com", user.email
+      # The connector wasn't created (the upsert raised), but the user
+      # got signed in — they can re-trigger the connector flow from the
+      # marketplace later.
+      assert_nil user.personal_team.connectors.find_by(catalog_key: "github")
+      assert_redirected_to root_path
+    ensure
+      OmniauthConnector.singleton_class.send(:alias_method, :upsert, :__orig_upsert)
+    end
+  end
+
   test "a signed-in password user attaches the GitHub identity to their account" do
     user = User.create!(email: "attach-#{SecureRandom.hex(4)}@example.com", password: "password123")
     sign_in user
@@ -176,6 +215,11 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     credential = gmail.credential_for(user)
     assert_equal "g-live", credential.oauth_token["access_token"]
     assert_equal "g-rt", credential.oauth_token["refresh_token"]
+    # Google omniauth has no nickname; external_login must NOT fall
+    # back to the user's email — that would leak PII into the connector
+    # UI where a handle was expected.
+    assert_nil credential.external_login,
+               "external_login must not be populated from email for Google"
   end
 
   test "Google sign-in upserts every catalog connector backed by Google" do

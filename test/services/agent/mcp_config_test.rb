@@ -94,4 +94,22 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
       assert_equal [], rendered["mcpServers"].keys
     end
   end
+
+  test "an oauth credential whose catalog entry has gone missing is dropped, not silently bearer-less" do
+    # A connector whose catalog_key references a removed/renamed catalog
+    # entry: catalog_app is nil. Without the fix McpConfig would pass
+    # provider="" to OauthBroker (raise) when expired, or render an
+    # entry with no Authorization header when fresh. With the fix it's
+    # omitted cleanly + logged.
+    connector = add_connector(name: "ghost", transport: :http,
+                              definition: { "url" => "https://mcp.example/" },
+                              catalog_key: "nope-removed")
+    cred = connector.connector_credentials.create!(user: member)
+    cred.assign_oauth_token!({
+      "access_token" => "live", "refresh_token" => "rt", "expires_in" => 3600
+    })
+
+    assert_equal [], rendered["mcpServers"].keys,
+                 "connector with no catalog entry must be dropped, not rendered without auth"
+  end
 end

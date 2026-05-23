@@ -23,8 +23,12 @@ class OmniauthConnector
       connector.update!(name: app.key, transport: app.transport, definition: app.definition)
       credential = connector.connector_credentials.find_or_initialize_by(user: user)
       credential.assign_oauth_token!(bundle)
-      login = auth.info.nickname.presence || auth.info.email.presence
-      credential.update!(external_login: login) if login.present?
+      # Only persist a handle when the provider gives us a real one
+      # (GitHub's nickname). Don't fall back to email — external_login
+      # is rendered in connector UIs as a public-ish identity. The view
+      # has a "Your <app> account is connected" fallback when this is
+      # blank, which is the right shape for Google (no nickname).
+      credential.update!(external_login: auth.info.nickname) if auth.info.nickname.present?
     end
 
     # Shape OmniAuth credentials into the ConnectorCredential response

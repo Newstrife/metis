@@ -19,6 +19,17 @@ class User < ApplicationRecord
 
   NOREPLY_EMAIL_SUFFIX = ".users.noreply.metis".freeze
 
+  # Addresses we'd never have set if the user had given us a real one.
+  # Anchored, not substring — `alex@users.noreply.corp.com` (a real GHE
+  # noreply domain) is a real email and must not be rewritten.
+  #
+  # - metis's own synth (User.noreply_email): `<uid>+<handle>@<provider>.users.noreply.metis`
+  # - GitHub's private-email pseudo-address: `<id>+<login>@users.noreply.github.com`
+  PLACEHOLDER_EMAIL_PATTERNS = [
+    /\.users\.noreply\.metis\z/,
+    /\A\d+\+[^@]+@users\.noreply\.github\.com\z/
+  ].freeze
+
   # Find or create a user from an OmniAuth callback. Always returns a
   # persisted User. Lookup is identity-first (`provider`+`uid`), then
   # falls back to email — so a password user gets the identity attached
@@ -34,8 +45,7 @@ class User < ApplicationRecord
     user = find_or_initialize_by(email: email)
     user.password = Devise.friendly_token[0, 32] if user.new_record?
     user.save!
-    user.identities.create!(provider: auth.provider, uid: auth.uid.to_s)
-    user
+    create_identity_for(user, auth)
   end
 
   # A stable synthetic address used when a provider's callback doesn't
@@ -47,19 +57,18 @@ class User < ApplicationRecord
     "#{auth.uid}+#{handle.parameterize}@#{auth.provider}#{NOREPLY_EMAIL_SUFFIX}"
   end
 
-  # An address we'd never have set if the user had given us a real
-  # one — covers metis's own synth suffix and the noreply pseudo-emails
-  # GitHub (and others) issue when the user keeps their address private.
   def self.placeholder_email?(email)
-    email.to_s.include?("users.noreply.")
+    s = email.to_s
+    PLACEHOLDER_EMAIL_PATTERNS.any? { |re| s.match?(re) }
   end
 
   # Promote a placeholder noreply email to the real one when the
   # provider starts returning it (e.g. after a GitHub App gains the
   # "Email addresses" permission). Never the reverse — a sign-in
   # without auth.info.email, or with another placeholder, must not
-  # overwrite a real email. Skipped if the real email is already taken
-  # by another row; merging the two accounts is a separate concern.
+  # overwrite a real email. Best-effort: a failed backfill (TOCTOU
+  # collision, provider returned a Devise-invalid address) logs and
+  # returns rather than crashing the sign-in.
   def self.backfill_real_email(user, auth)
     return unless auth.info.email.present?
     return if placeholder_email?(auth.info.email)
@@ -67,6 +76,28 @@ class User < ApplicationRecord
     return if where.not(id: user.id).exists?(email: auth.info.email)
 
     user.update!(email: auth.info.email)
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => error
+    Rails.logger.warn(
+      "User#backfill_real_email skipped for user #{user.id}: #{error.class}: #{error.message}"
+    )
+  end
+
+  # Attach the identity to the just-saved user, with a one-shot retry
+  # for the concurrent-first-sign-in race: two callbacks for the same
+  # (provider, uid) both miss Identity.find_by, both reach create!, the
+  # loser hits the unique index. Both Rails-validation (RecordInvalid)
+  # and DB-level (RecordNotUnique) paths are covered — the validation
+  # fires when the winner committed before our validate-uniqueness
+  # SELECT; the DB index fires when it committed in the gap between
+  # validation and insert.
+  def self.create_identity_for(user, auth)
+    user.identities.create!(provider: auth.provider, uid: auth.uid.to_s)
+    user
+  rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+    existing = Identity.find_by(provider: auth.provider, uid: auth.uid.to_s)
+    raise unless existing
+
+    existing.user
   end
 
   private
