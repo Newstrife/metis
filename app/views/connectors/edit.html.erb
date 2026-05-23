@@ -19,7 +19,7 @@
         <p class="pane-lead"><%= @app.description %></p>
 
         <% if @app.oauth? %>
-          <% oauth_path = omniauth_authorize_path_for(@app) %>
+          <% oauth_path = connector_authorize_path_for(@app) %>
           <% if oauth_path.nil? %>
             <section class="conn-status">
               <div class="conn-status-main">
@@ -30,7 +30,7 @@
                 </div>
               </div>
             </section>
-          <% elsif @credential&.oauth_token %>
+          <% elsif @credential&.oauth_ready? %>
             <section class="conn-status ok">
               <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                    stroke-width="2" aria-hidden="true">

@@ -101,15 +101,35 @@ module ApplicationHelper
   # The Devise omniauth strategy key for a catalog `oauth_provider`.
   # Most match; Google's gem registers as `google_oauth2`.
   OMNIAUTH_STRATEGY = { "github" => "github", "google" => "google_oauth2" }.freeze
+  private_constant :OMNIAUTH_STRATEGY
 
-  # The Devise omniauth authorize path for a catalog app, or nil if
-  # the app's provider has no strategy wired up. Same path drives
-  # "Sign in with X" and "Connect X" — see docs/connectors.md.
+  # The plain "Sign in with X" / "Connect X account" authorize path
+  # for a catalog app — the *sign-in* shape, with no extra scopes.
+  # Returns nil if the app's provider strategy isn't wired up.
   def omniauth_authorize_path_for(app)
     strategy = OMNIAUTH_STRATEGY[app.oauth_provider]
     return nil unless strategy
 
     send("user_#{strategy}_omniauth_authorize_path")
+  end
+
+  # The *connect this connector* authorize path — same omniauth
+  # strategy, but with the connector's required oauth_scopes added
+  # on top of the base sign-in scopes, prompt=consent so the user
+  # sees the new scope on the consent screen, and
+  # include_granted_scopes so the new grant unions with whatever the
+  # user has already authorized. The callback dispatches on the
+  # `connect=<key>` param to upsert the connector marker.
+  def connector_authorize_path_for(app)
+    strategy = OMNIAUTH_STRATEGY[app.oauth_provider]
+    return nil unless strategy
+
+    scopes = (OauthBroker::SIGN_IN_SCOPES.fetch(app.oauth_provider, []) + app.oauth_scopes).uniq.join(",")
+    send("user_#{strategy}_omniauth_authorize_path",
+         connect: app.key,
+         scope: scopes,
+         prompt: "consent",
+         include_granted_scopes: true)
   end
 
   private

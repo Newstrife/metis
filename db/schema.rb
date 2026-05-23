@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_22_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_23_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -126,6 +126,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_220000) do
     t.index ["conversation_id"], name: "index_messages_on_one_in_progress_turn", unique: true, where: "((role = 1) AND (streaming_status = ANY (ARRAY[0, 1])))"
   end
 
+  create_table "oauth_grants", force: :cascade do |t|
+    t.text "access_token"
+    t.datetime "created_at", null: false
+    t.datetime "expires_at"
+    t.string "provider", null: false
+    t.text "refresh_token"
+    t.text "scopes"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "provider"], name: "index_oauth_grants_on_user_id_and_provider", unique: true
+    t.index ["user_id"], name: "index_oauth_grants_on_user_id"
+  end
+
   create_table "teams", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -156,4 +169,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_220000) do
   add_foreign_key "memberships", "teams"
   add_foreign_key "memberships", "users"
   add_foreign_key "messages", "conversations"
+  add_foreign_key "oauth_grants", "users"
 end

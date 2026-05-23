@@ -101,9 +101,9 @@ module Agent
     def connector_auth_description(connector, app)
       credential = connector.credential_for(user)
       return "no credential — you'll see the server, but it may reject calls" if credential.nil?
-      return "as you (OAuth)" if credential.oauth_token
+      return "as you (OAuth)" if app&.oauth?
 
-      app&.oauth? ? "as you (OAuth)" : (credential.user_id ? "as you" : "team-shared credential")
+      credential.user_id ? "as you" : "team-shared credential"
     end
 
     def enabled_connectors

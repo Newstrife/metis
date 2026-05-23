@@ -1,8 +1,17 @@
-# Receives OAuth callbacks for sign-in and connector authorization in
-# one flow — the same OAuth tokens that authenticate the user also
-# wire up every catalog connector backed by that provider (GitHub: the
-# GitHub MCP server; Google: Gmail, Drive, Calendar, …). See
-# docs/connectors.md.
+# Receives OAuth callbacks for two flows on the same omniauth URL:
+#
+# * **Sign in** (`POST /users/auth/<provider>`) — base scopes only,
+#   creates/updates the user, records the OauthGrant. No connector
+#   side-effects.
+# * **Connect a connector** (`POST /users/auth/<provider>?connect=<key>
+#   &scope=<base+connector>&prompt=consent&include_granted_scopes=true`)
+#   — sent by the marketplace "Connect" button. Records the grant
+#   (now carrying the connector's scopes) AND creates a per-member
+#   ConnectorCredential marker on the team's Connector.
+#
+# The dispatch on `omniauth.params["connect"]` is what splits the two
+# paths — sign-in carries no `connect`, connect-flow carries the
+# catalog key. See docs/connectors.md.
 class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
   # Raised when a signed-in user tries to link an identity already
   # claimed by another Metis user. The controller turns this into a
@@ -30,9 +39,12 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     was_signed_in = user_signed_in?
     return_path   = was_signed_in ? root_path : new_user_session_path
 
-    auth = request.env["omniauth.auth"]
+    auth   = request.env["omniauth.auth"]
+    params = request.env["omniauth.params"] || {}
+
     target = was_signed_in ? attach_identity(current_user, auth) : User.from_omniauth(auth)
-    upsert_connectors(target, auth, provider)
+    record_grant(target, auth, provider)
+    activate_connector_if_requested(target, params, auth)
     finish_sign_in(target, provider)
   rescue IdentityAlreadyLinked
     redirect_to return_path,
@@ -45,14 +57,31 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     redirect_to new_user_session_path, alert: "Sign-in failed."
   end
 
-  # Connector wiring is best-effort: a transient failure here must not
-  # block a sign-in whose auth half succeeded — the user can re-trigger
-  # the connector flow from the marketplace. We log and continue.
-  def upsert_connectors(target, auth, provider)
-    OmniauthConnector.upsert(target, auth, provider: provider)
+  def record_grant(target, auth, provider)
+    OmniauthConnector.record_grant(target, auth, provider: provider)
   rescue StandardError => error
+    # Grant write failure shouldn't block a sign-in whose auth half
+    # worked — the user can re-trigger Connect later. McpConfig will
+    # drop the affected connector until the grant is recorded.
     Rails.logger.error(
-      "Omniauth(#{provider}) connector upsert failed for user #{target&.id}: " \
+      "Omniauth(#{provider}) grant write failed for user #{target&.id}: " \
+      "#{error.class}: #{error.message}"
+    )
+  end
+
+  def activate_connector_if_requested(target, params, auth)
+    catalog_key = params["connect"].presence
+    return if catalog_key.blank?
+
+    app = ConnectorCatalog.find(catalog_key)
+    return unless app
+
+    OmniauthConnector.activate_connector(target, app, auth)
+  rescue StandardError => error
+    # Connector activation failure is non-fatal for the same reason as
+    # grant write failure — the sign-in half succeeded.
+    Rails.logger.error(
+      "Omniauth connector activation failed for user #{target&.id} app=#{params['connect']}: " \
       "#{error.class}: #{error.message}"
     )
   end

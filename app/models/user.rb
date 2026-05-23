@@ -8,6 +8,7 @@ class User < ApplicationRecord
   has_many :conversations, dependent: :destroy
   has_many :connector_credentials, dependent: :destroy
   has_many :identities, dependent: :destroy
+  has_many :oauth_grants, dependent: :destroy
 
   after_create :create_personal_team
 

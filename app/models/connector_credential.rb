@@ -1,16 +1,15 @@
-# An encrypted secret for a Connector. A row with no user is the team's
-# shared credential (a service account the whole team uses); a row with
-# a user is that member's own. The runtime resolves one per member when
-# staging `.mcp.json`. See docs/connectors.md.
+# A per-member presence marker on a team's Connector. For OAuth-shaped
+# connectors, the bearer the MCP server will see is *not* stored here —
+# it lives in the user's OauthGrant for the connector's provider, and
+# this row's existence just records "this member wired this connector
+# up". For token-shaped connectors, the secret IS stored here (in the
+# `headers` envelope on the encrypted `credentials` column), because
+# there's no per-provider grant to share.
 #
-# The encrypted `credentials` column is a JSON envelope with two
-# optional shapes, depending on the catalog auth mode:
-#
-#   {"headers": {"Authorization": "Bearer …"}}   # token auth
-#   {"oauth":   {"access_token": …,              # oauth auth
-#                "refresh_token": …,
-#                "expires_at": "…iso8601…",
-#                "scope": "…"}}
+# A row with no user is the team's shared credential (a service account
+# the whole team uses, only meaningful for token-auth connectors); a
+# row with a user is that member's own. The runtime resolves one per
+# member when staging `.mcp.json`. See docs/connectors.md.
 class ConnectorCredential < ApplicationRecord
   belongs_to :connector
   belongs_to :user, optional: true
@@ -20,9 +19,10 @@ class ConnectorCredential < ApplicationRecord
   validates :user_id, uniqueness: { scope: :connector_id }
 
   # The header bag (`Authorization` → "Bearer xyz") to merge into the
-  # connector's `.mcp.json` entry. For token-auth credentials this is
-  # the secret itself; for oauth credentials it's empty — the runtime
-  # projects the live access token through the catalog's format.
+  # connector's `.mcp.json` entry. Token-auth connectors store these
+  # directly; OAuth-shaped connectors return an empty hash here — the
+  # runtime projects the live access token (from OauthGrant) through
+  # the catalog's credential format.
   def credential_map
     envelope["headers"] || {}
   end
@@ -31,29 +31,25 @@ class ConnectorCredential < ApplicationRecord
     write_envelope("headers", values || {})
   end
 
-  # The OAuth bundle — present iff this credential was obtained through
-  # an OAuth flow. Keys: access_token, refresh_token, expires_at, scope.
-  def oauth_token
-    envelope["oauth"]
+  # The per-user OauthGrant this connector's bearer comes from, or nil
+  # if no grant exists or this isn't an OAuth-shaped connector. Looked
+  # up by (user, catalog_app.oauth_provider); a single grant covers
+  # every connector wired to the same provider.
+  def oauth_grant
+    return nil if user.nil?
+
+    provider = connector&.catalog_app&.oauth_provider
+    return nil if provider.blank?
+
+    user.oauth_grants.find_by(provider: provider)
   end
 
-  # Persist a token-exchange response from the OAuth provider. Accepts
-  # the common response shape across providers: access_token,
-  # refresh_token (sometimes), expires_in, scope. Keys absent from a
-  # *refresh* response (Google omits `refresh_token` entirely; some
-  # providers omit `scope` on refresh) carry over from the prior
-  # stored bundle so the credential stays renewable. `at` is the moment
-  # the response was received, used to compute the absolute expiry.
-  def assign_oauth_token!(response, at: Time.current)
-    existing = oauth_token || {}
-    bundle = {
-      "access_token" => response["access_token"],
-      "refresh_token" => response["refresh_token"] || existing["refresh_token"],
-      "expires_at" => expires_at_from(response, at),
-      "scope" => response["scope"] || existing["scope"]
-    }.compact
-    write_envelope("oauth", bundle)
-    save!
+  # True when this is an OAuth-shaped connector AND the user has a
+  # grant that covers the connector's required scopes — i.e. the
+  # runtime can hand the agent a usable bearer.
+  def oauth_ready?
+    grant = oauth_grant
+    grant.present? && grant.access_token.present? && grant.covers?(connector.catalog_app.oauth_scopes)
   end
 
   private
@@ -64,11 +60,5 @@ class ConnectorCredential < ApplicationRecord
 
   def write_envelope(key, value)
     self.credentials = envelope.merge(key => value).to_json
-  end
-
-  def expires_at_from(response, at)
-    return nil if response["expires_in"].blank?
-
-    (at + response["expires_in"].to_i.seconds).iso8601
   end
 end

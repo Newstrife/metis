@@ -288,34 +288,31 @@ Devise.setup do |config|
                     scope: "user:email"
   end
 
-  # Google sign-in. The scopes requested cover sign-in *and* every
-  # Google Workspace connector this deployment exposes — one consent
-  # screen handles both jobs.
+  # Google sign-in. This is the **sign-in** strategy — it asks for
+  # the smallest scope set that lets us identify the user (`email,
+  # profile`) and nothing else. Connector scopes (Gmail, Drive, …) are
+  # added incrementally through `connector_authorize_path_for(app)` in
+  # `application_helper.rb`, which builds its own authorize URL with
+  # `prompt: consent` + `include_granted_scopes: true` per connector.
   #
-  # - `access_type: offline` is required to receive a refresh_token
-  #   (without it Google returns only a 1-hour access token and
-  #   renewals fail).
-  # - `prompt: consent` forces Google to show the consent screen on
-  #   EVERY authorization. Two reasons to keep it:
-  #   (a) after a user disconnects a Google connector we want fresh
-  #       consent (and a fresh refresh_token — Google only re-issues
-  #       one when prompt=consent is sent);
-  #   (b) when this deployment later adds scopes (Drive, Calendar, …)
-  #       on top of an existing grant, Google silently no-ops them
-  #       unless the user sees the consent screen and re-grants. Drop
-  #       this flag and new scopes ship dead.
+  # - `access_type: offline` keeps a refresh_token across all flows.
+  # - `prompt: select_account` shows the account picker on returning
+  #   sign-ins (the user can switch Google accounts) without forcing
+  #   a re-consent on every sign-in.
+  # - `include_granted_scopes: true` lets later per-connector grants
+  #   union with this base set, so the user holds one Google grant
+  #   that covers everything they've ever connected.
   # `test/controllers/users/omniauth_callbacks_controller_test.rb`
-  # locks both options in place so a refactor can't strip them
+  # locks these options in place so a refactor can't strip them
   # without the test failing.
   if ENV["GOOGLE_OAUTH_CLIENT_ID"].present? && ENV["GOOGLE_OAUTH_CLIENT_SECRET"].present?
     config.omniauth :google_oauth2,
                     ENV.fetch("GOOGLE_OAUTH_CLIENT_ID"),
                     ENV.fetch("GOOGLE_OAUTH_CLIENT_SECRET"),
-                    scope: "userinfo.email userinfo.profile " \
-                           "https://www.googleapis.com/auth/gmail.readonly " \
-                           "https://www.googleapis.com/auth/gmail.compose",
+                    scope: "email,profile",
                     access_type: "offline",
-                    prompt: "consent"
+                    prompt: "select_account",
+                    include_granted_scopes: true
   end
 
   # ==> Warden configuration

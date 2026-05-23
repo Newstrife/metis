@@ -3,44 +3,63 @@ require "test_helper"
 class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
-  def mock_github(uid: "1", login: "mgc", email: "omni-#{SecureRandom.hex(4)}@example.com")
+  def mock_github(uid: "1", login: "mgc", email: "omni-#{SecureRandom.hex(4)}@example.com",
+                  scope: "user:email", connect: nil)
     OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(
       provider: "github",
       uid: uid.to_s,
       info: { email: email, nickname: login },
       credentials: {
-        token: "live", refresh_token: "rt", expires_at: Time.current.to_i + 3600
+        token: "live", refresh_token: "rt", expires_at: Time.current.to_i + 3600,
+        scope: scope
       }
     )
     Rails.application.env_config["omniauth.auth"] = OmniAuth.config.mock_auth[:github]
+    set_omniauth_params(connect: connect)
     email
   end
 
-  def mock_google(uid: "g-1", email: "g-#{SecureRandom.hex(4)}@example.com", name: "User")
+  def mock_google(uid: "g-1", email: "g-#{SecureRandom.hex(4)}@example.com", name: "User",
+                  scope: "email profile", connect: nil)
     OmniAuth.config.mock_auth[:google_oauth2] = OmniAuth::AuthHash.new(
       provider: "google_oauth2",
       uid: uid.to_s,
       info: { email: email, name: name },
       credentials: {
-        token: "g-live", refresh_token: "g-rt", expires_at: Time.current.to_i + 3600
+        token: "g-live", refresh_token: "g-rt", expires_at: Time.current.to_i + 3600,
+        scope: scope
       }
     )
     Rails.application.env_config["omniauth.auth"] = OmniAuth.config.mock_auth[:google_oauth2]
+    set_omniauth_params(connect: connect)
     email
+  end
+
+  # The omniauth middleware copies the authorize URL's query params
+  # into env["omniauth.params"]; in test_mode we bypass that so we
+  # have to set them by hand for the connect flow.
+  def set_omniauth_params(connect:)
+    Rails.application.env_config["omniauth.params"] = connect ? { "connect" => connect } : nil
   end
 
   teardown do
     OmniAuth.config.mock_auth[:github] = nil
     OmniAuth.config.mock_auth[:google_oauth2] = nil
     Rails.application.env_config["omniauth.auth"] = nil
+    Rails.application.env_config["omniauth.params"] = nil
   end
 
-  test "first GitHub sign-in creates a user, records the identity, and connects GitHub" do
+  test "first GitHub sign-in creates a user, records the identity, and records an OauthGrant — no connector yet" do
     email = mock_github(uid: "42", login: "mgc")
 
     assert_difference("User.count", 1) do
       assert_difference("Identity.count", 1) do
-        get user_github_omniauth_callback_path
+        assert_difference("OauthGrant.count", 1) do
+          assert_no_difference("ConnectorCredential.count",
+                               "sign-in must not auto-wire connectors — that's the Connect button's job") do
+            get user_github_omniauth_callback_path
+          end
+        end
       end
     end
 
@@ -48,26 +67,45 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     user = identity.user
     assert_equal email, user.email
 
-    connector = user.personal_team.connectors.find_by(catalog_key: "github")
-    assert connector
-    credential = connector.credential_for(user)
-    assert_equal "live", credential.oauth_token["access_token"]
-    assert_equal "mgc", credential.external_login
+    grant = user.oauth_grants.find_by(provider: "github")
+    assert_equal "live", grant.access_token
+    assert_equal "rt", grant.refresh_token
+    assert_includes grant.scope_set, "user:email"
   end
 
-  test "subsequent GitHub sign-in finds the user through the identity" do
-    user = User.create!(email: "existing-#{SecureRandom.hex(4)}@example.com", password: "password123")
-    user.identities.create!(provider: "github", uid: "7")
-    mock_github(uid: "7", login: "mgc", email: "different-#{SecureRandom.hex(4)}@example.com")
+  test "connecting GitHub through the Connect button additionally creates a per-member ConnectorCredential marker" do
+    mock_github(uid: "42", login: "mgc", scope: "user:email repo read:user", connect: "github")
 
-    assert_no_difference("User.count") do
-      assert_no_difference("Identity.count") do
+    assert_difference("User.count", 1) do
+      assert_difference("ConnectorCredential.count", 1) do
         get user_github_omniauth_callback_path
       end
     end
 
-    credential = user.personal_team.connectors.find_by(catalog_key: "github").credential_for(user)
-    assert_equal "live", credential.oauth_token["access_token"]
+    user = Identity.find_by(provider: "github", uid: "42").user
+    cred = user.personal_team.connectors.find_by(catalog_key: "github").credential_for(user)
+    assert_equal user, cred.user
+    assert_equal "mgc", cred.external_login
+
+    # The token lives in the grant, not the credential.
+    grant = user.oauth_grants.find_by(provider: "github")
+    assert_equal "live", grant.access_token
+    assert_includes grant.scope_set, "repo"
+  end
+
+  test "subsequent GitHub sign-in finds the user through the identity and updates the grant" do
+    user = User.create!(email: "existing-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    user.identities.create!(provider: "github", uid: "7")
+    user.oauth_grants.create!(provider: "github", access_token: "older", refresh_token: "rt0",
+                              expires_at: 30.minutes.from_now, scopes: "user:email")
+    mock_github(uid: "7", login: "mgc", email: "different-#{SecureRandom.hex(4)}@example.com")
+
+    assert_no_difference([ "User.count", "Identity.count", "OauthGrant.count" ]) do
+      get user_github_omniauth_callback_path
+    end
+
+    grant = user.oauth_grants.find_by(provider: "github").reload
+    assert_equal "live", grant.access_token, "grant should pick up the fresh token from the callback"
   end
 
   test "first sign-in with no email falls back to a synthetic noreply address" do
@@ -163,27 +201,23 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     assert_match(/already linked/i, flash[:alert])
   end
 
-  test "a connector upsert failure does not block sign-in" do
-    OmniauthConnector.singleton_class.send(:alias_method, :__orig_upsert, :upsert)
-    OmniauthConnector.define_singleton_method(:upsert) { |*_| raise "boom from connector" }
+  test "a connector activation failure during connect-flow does not block sign-in" do
+    mock_github(uid: "conn-fail-1", login: "mgc", email: "ok@example.com",
+                scope: "user:email repo read:user", connect: "github")
 
-    begin
-      mock_github(uid: "conn-fail-1", login: "mgc", email: "ok@example.com")
-
+    with_stub(OmniauthConnector, :activate_connector, ->(*_) { raise "boom" }) do
       assert_difference("User.count", 1) do
         get user_github_omniauth_callback_path
       end
-
-      user = Identity.find_by(provider: "github", uid: "conn-fail-1").user
-      assert_equal "ok@example.com", user.email
-      # The connector wasn't created (the upsert raised), but the user
-      # got signed in — they can re-trigger the connector flow from the
-      # marketplace later.
-      assert_nil user.personal_team.connectors.find_by(catalog_key: "github")
-      assert_redirected_to root_path
-    ensure
-      OmniauthConnector.singleton_class.send(:alias_method, :upsert, :__orig_upsert)
     end
+
+    user = Identity.find_by(provider: "github", uid: "conn-fail-1").user
+    assert_equal "ok@example.com", user.email
+    # The grant still got recorded; sign-in completed.
+    assert user.oauth_grants.exists?(provider: "github")
+    # But the connector marker wasn't created — they can retry from the marketplace.
+    refute user.personal_team.connectors.exists?(catalog_key: "github")
+    assert_redirected_to root_path
   end
 
   test "a signed-in password user attaches the GitHub identity to their account" do
@@ -200,43 +234,52 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     assert user.reload.identities.exists?(provider: "github", uid: "13")
   end
 
-  test "first Google sign-in creates the user and connects Gmail" do
+  test "first Google sign-in creates the user and records an OauthGrant — no Gmail connector yet" do
     email = mock_google(uid: "g-42")
 
     assert_difference("User.count", 1) do
-      get user_google_oauth2_omniauth_callback_path
+      assert_difference("OauthGrant.count", 1) do
+        assert_no_difference("ConnectorCredential.count",
+                             "sign-in must not auto-wire Gmail — Connect button does that") do
+          get user_google_oauth2_omniauth_callback_path
+        end
+      end
     end
 
     user = Identity.find_by(provider: "google_oauth2", uid: "g-42").user
     assert_equal email, user.email
 
+    grant = user.oauth_grants.find_by(provider: "google")
+    assert_equal "g-live", grant.access_token
+    assert_equal "g-rt", grant.refresh_token
+    assert_includes grant.scope_set, "email"
+  end
+
+  test "connecting Gmail through the Connect button creates the Gmail ConnectorCredential" do
+    # Connect-flow scope mock: base sign-in scopes + every scope the
+    # gmail catalog entry declares. Keep this in sync with
+    # ConnectorCatalog.find("gmail").oauth_scopes so the grant covers
+    # the catalog's requirements (otherwise McpConfig drops the connector).
+    gmail_scopes = ConnectorCatalog.find("gmail").oauth_scopes.join(" ")
+    mock_google(uid: "g-42", scope: "email profile #{gmail_scopes}", connect: "gmail")
+
+    assert_difference("ConnectorCredential.count", 1) do
+      get user_google_oauth2_omniauth_callback_path
+    end
+
+    user = Identity.find_by(provider: "google_oauth2", uid: "g-42").user
     gmail = user.personal_team.connectors.find_by(catalog_key: "gmail")
-    assert gmail
-    credential = gmail.credential_for(user)
-    assert_equal "g-live", credential.oauth_token["access_token"]
-    assert_equal "g-rt", credential.oauth_token["refresh_token"]
-    # Google omniauth has no nickname; external_login must NOT fall
-    # back to the user's email — that would leak PII into the connector
-    # UI where a handle was expected.
-    assert_nil credential.external_login,
-               "external_login must not be populated from email for Google"
+    assert gmail, "Gmail connector should be created by the connect flow"
+    cred = gmail.credential_for(user)
+    # External_login stays blank for Google (no nickname); the view's
+    # generic "Your Gmail account is connected" fallback covers it.
+    assert_nil cred.external_login
+    # The grant covers Gmail's required scopes.
+    grant = user.oauth_grants.find_by(provider: "google")
+    assert grant.covers?(ConnectorCatalog.find("gmail").oauth_scopes)
   end
 
-  test "Google sign-in upserts every catalog connector backed by Google" do
-    # Stays true as more google_oauth_provider catalog entries are added:
-    # one sign-in covers every Google-backed connector.
-    google_apps = ConnectorCatalog.all.select { |a| a.oauth_provider == "google" }
-    assert google_apps.any?
-
-    mock_google(uid: "g-7")
-    get user_google_oauth2_omniauth_callback_path
-
-    user = Identity.find_by(provider: "google_oauth2", uid: "g-7").user
-    keys = user.personal_team.connectors.pluck(:catalog_key)
-    google_apps.each { |app| assert_includes keys, app.key }
-  end
-
-  test "an existing GitHub user can additionally connect Google" do
+  test "an existing GitHub user can sign in via Google to add the identity" do
     user = User.create!(email: "multi-#{SecureRandom.hex(4)}@example.com", password: "password123")
     user.identities.create!(provider: "github", uid: "100")
     sign_in user
@@ -248,8 +291,12 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
       end
     end
 
-    assert user.reload.identities.exists?(provider: "google_oauth2", uid: "g-100")
-    assert user.personal_team.connectors.find_by(catalog_key: "gmail")
+    user.reload
+    assert user.identities.exists?(provider: "google_oauth2", uid: "g-100")
+    assert user.oauth_grants.exists?(provider: "google"),
+           "the Google grant should be recorded even without a connect"
+    refute user.personal_team.connectors.exists?(catalog_key: "gmail"),
+           "no connector should be wired without a connect param"
   end
 
   # Strategy-option lock-ins — these guard the operator's
@@ -274,22 +321,26 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     DEVISE_INITIALIZER_SRC[/config\.omniauth :github.*?(?=\n\s*end\n)/m]
   end
 
-  test "Google omniauth strategy forces re-consent and offline access" do
+  test "Google sign-in strategy stays minimal-scope + offline + incremental" do
     block = google_omniauth_block
     assert block, "no config.omniauth :google_oauth2 block found in devise.rb"
 
-    assert_match(/prompt:\s*["']consent["']/, block,
-                 "prompt=consent must stay set. Without it (a) Google won't show the " \
-                 "consent screen after a user disconnects and re-connects, so they " \
-                 "can't fully re-grant; (b) when this deployment adds new scopes, " \
-                 "Google silently no-ops them against the existing grant and the new " \
-                 "connector features ship dead.")
+    assert_match(/scope:\s*["']email,profile["']/, block,
+                 "sign-in must ask for only the minimal identity scopes — connector scopes " \
+                 "are added by connector_authorize_path_for via the Connect button. " \
+                 "Bloating the sign-in scope here brings back the all-or-nothing consent " \
+                 "screen and the silent no-op behavior on later scope changes.")
     assert_match(/access_type:\s*["']offline["']/, block,
                  "access_type=offline is required to receive a refresh_token; without " \
                  "it Google issues only a 1-hour access token and every refresh fails.")
-    assert_match(/userinfo\.email/, block,
-                 "userinfo.email is required to populate auth.info.email; without it " \
-                 "every Google sign-in falls back to a synthesized noreply address.")
+    assert_match(/prompt:\s*["']select_account["']/, block,
+                 "prompt=select_account lets a returning user pick which Google account to " \
+                 "use without forcing a re-consent on every sign-in. The per-connector " \
+                 "authorize path overrides this with prompt=consent for the actual scope grant.")
+    assert_match(/include_granted_scopes:\s*true/, block,
+                 "include_granted_scopes lets later per-connector grants union with the " \
+                 "existing one. Without it each Connect rotates the grant and prior " \
+                 "connectors lose authorization.")
   end
 
   test "GitHub omniauth strategy requests user:email so the real address comes through" do

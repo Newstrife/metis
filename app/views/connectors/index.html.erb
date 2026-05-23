@@ -24,7 +24,7 @@
                   <span class="app-state connected">Connected</span>
                   <div style="flex:1"></div>
                   <%= link_to "Manage", edit_connector_path(connector), class: "btn btn-ghost" %>
-                <% elsif app.oauth? && (oauth_path = omniauth_authorize_path_for(app)) %>
+                <% elsif app.oauth? && (oauth_path = connector_authorize_path_for(app)) %>
                   <div style="flex:1"></div>
                   <%= button_to "Connect", oauth_path,
                         data: { turbo: false }, class: "btn btn-primary" %>

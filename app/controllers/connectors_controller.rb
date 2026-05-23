@@ -57,7 +57,9 @@ class ConnectorsController < ApplicationController
   end
 
   def destroy
+    app = @connector.catalog_app
     @connector.destroy
+    prune_or_revoke_oauth_grant(app) if app&.oauth?
     redirect_to connectors_path, notice: "#{@connector.name} disconnected."
   end
 
@@ -148,5 +150,47 @@ class ConnectorsController < ApplicationController
 
     credential = @connector.connector_credentials.find_or_initialize_by(user: current_user)
     credential.update!(credential_map: app.credential_map_for(params[:credential]))
+  end
+
+  # On disconnect of an OAuth-shaped connector: decide whether the
+  # user's OauthGrant for this provider has any reason to keep
+  # existing.
+  #
+  # If **no** OAuth-shaped connectors for this provider remain wired
+  # to the user, the grant is dead weight. Revoke it on the provider's
+  # side (`OauthBroker.revoke`) and destroy the local row. The user
+  # stays signed in to Metis (the Devise session is separate); their
+  # next "Sign in with Google" or "Connect Gmail" lands as a *fresh*
+  # OAuth — which is the only reliable way to get Google to show
+  # the consent screen again (with the grant on file, `prompt=consent`
+  # is silently downgraded to `prompt=none`).
+  #
+  # If other OAuth-shaped connectors still need the grant, prune its
+  # `scopes` down to the union those connectors require plus the
+  # base sign-in scopes.
+  def prune_or_revoke_oauth_grant(app)
+    grant = current_user.oauth_grants.find_by(provider: app.oauth_provider)
+    return unless grant
+
+    connector_scopes = active_connector_scopes_for(app.oauth_provider)
+    if connector_scopes.empty?
+      OauthBroker.revoke(grant)
+      grant.destroy
+    else
+      base = OauthBroker::SIGN_IN_SCOPES.fetch(app.oauth_provider, [])
+      grant.update!(scopes: (base + connector_scopes).uniq.join(" "))
+    end
+  end
+
+  # The union of `oauth_scopes` across every OAuth-shaped connector
+  # the current user has wired through this provider — empty when
+  # they have no active connectors left for this provider.
+  def active_connector_scopes_for(provider)
+    catalog_keys = ConnectorCatalog.all.select { |a| a.oauth_provider == provider }.map(&:key)
+    current_user.connector_credentials
+                .joins(:connector)
+                .where(connectors: { catalog_key: catalog_keys })
+                .flat_map { |c| c.connector.catalog_app.oauth_scopes }
+                .uniq
   end
 end

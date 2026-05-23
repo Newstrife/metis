@@ -1,72 +1,78 @@
 require "test_helper"
 
 class OauthBrokerTest < ActiveSupport::TestCase
-  def credential(catalog_key: "github")
-    team = Team.create!(name: "Acme")
-    connector = team.connectors.create!(
-      name: catalog_key, transport: :http, definition: { "url" => "https://mcp.example/" },
-      catalog_key: catalog_key
-    )
-    connector.connector_credentials.create!(user: nil)
+  def user
+    @user ||= User.create!(email: "ob-#{SecureRandom.hex(4)}@example.com", password: "password123")
+  end
+
+  def grant(provider: "github", **attrs)
+    user.oauth_grants.create!({
+      provider: provider, access_token: "at", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "x"
+    }.merge(attrs))
   end
 
   test "returns the stored access token when not near expiry" do
-    cred = credential
-    cred.assign_oauth_token!({
-      "access_token" => "live", "refresh_token" => "rt",
-      "expires_in" => 3600, "scope" => "repo"
-    })
+    g = grant(access_token: "live")
 
-    assert_equal "live", OauthBroker.access_token_for(cred, provider: "github")
+    assert_equal "live", OauthBroker.access_token_for(g)
   end
 
   test "refreshes through the github client when past expiry" do
-    cred = credential
-    cred.assign_oauth_token!({ "access_token" => "old", "refresh_token" => "rt0", "expires_in" => -10 })
+    g = grant(provider: "github", access_token: "old", refresh_token: "rt0", expires_at: 10.seconds.ago)
 
     token = with_stub(GithubApp::OauthClient, :refresh, lambda { |_rt|
       { "access_token" => "fresh", "refresh_token" => "rt1", "expires_in" => 3600 }
-    }) { OauthBroker.access_token_for(cred, provider: "github") }
+    }) { OauthBroker.access_token_for(g) }
 
     assert_equal "fresh", token
-    assert_equal "fresh", cred.reload.oauth_token["access_token"]
-    assert_equal "rt1", cred.oauth_token["refresh_token"]
+    g.reload
+    assert_equal "fresh", g.access_token
+    assert_equal "rt1", g.refresh_token
   end
 
   test "refreshes through the google client and preserves the prior refresh token" do
-    cred = credential(catalog_key: "gmail")
-    cred.assign_oauth_token!({ "access_token" => "old", "refresh_token" => "rt-google", "expires_in" => -10 })
+    g = grant(provider: "google", access_token: "old", refresh_token: "rt-google", expires_at: 10.seconds.ago)
 
     # Google's refresh response omits refresh_token entirely.
     token = with_stub(OauthBroker::Clients::Google, :refresh, lambda { |_rt|
       { "access_token" => "fresh", "expires_in" => 3600, "scope" => "gmail.readonly" }
-    }) { OauthBroker.access_token_for(cred, provider: "google") }
+    }) { OauthBroker.access_token_for(g) }
 
     assert_equal "fresh", token
-    assert_equal "rt-google", cred.reload.oauth_token["refresh_token"]
+    assert_equal "rt-google", g.reload.refresh_token
   end
 
   test "raises on an unknown provider" do
-    cred = credential
-    cred.assign_oauth_token!({ "access_token" => "x", "refresh_token" => "y", "expires_in" => -10 })
+    g = grant(expires_at: 10.seconds.ago)
+    g.update_column(:provider, "bogus") # bypass validation just to exercise the broker
 
-    assert_raises(OauthBroker::Error) do
-      OauthBroker.access_token_for(cred, provider: "bogus")
-    end
-  end
-
-  test "raises when the credential has no oauth bundle" do
-    assert_raises(OauthBroker::Error) do
-      OauthBroker.access_token_for(credential, provider: "github")
-    end
+    assert_raises(OauthBroker::Error) { OauthBroker.access_token_for(g) }
   end
 
   test "raises when expired and there is no refresh token to use" do
-    cred = credential
-    cred.assign_oauth_token!({ "access_token" => "expired", "expires_in" => -10 })
+    g = grant(access_token: "expired", refresh_token: nil, expires_at: 10.seconds.ago)
 
-    assert_raises(OauthBroker::Error) do
-      OauthBroker.access_token_for(cred, provider: "github")
+    assert_raises(OauthBroker::Error) { OauthBroker.access_token_for(g) }
+  end
+
+  test "revoke calls the provider client's revoke method" do
+    g = grant(provider: "google")
+    called_with = nil
+
+    with_stub(OauthBroker::Clients::Google, :revoke, ->(token) { called_with = token }) do
+      OauthBroker.revoke(g)
+    end
+
+    assert_equal g.refresh_token, called_with,
+                 "revoke should hit the refresh_token (the long-lived one) when available"
+  end
+
+  test "revoke swallows provider errors so the local delete can proceed" do
+    g = grant(provider: "google")
+
+    with_stub(OauthBroker::Clients::Google, :revoke, ->(_) { raise "network down" }) do
+      assert_nothing_raised { OauthBroker.revoke(g) }
     end
   end
 end

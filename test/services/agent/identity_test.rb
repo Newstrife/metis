@@ -36,8 +36,11 @@ class Agent::IdentityTest < ActiveSupport::TestCase
       name: "github", transport: :http,
       definition: { "url" => "https://mcp.example/" }, catalog_key: "github"
     )
-    cred = connector.connector_credentials.create!(user: conversation.user)
-    cred.assign_oauth_token!({ "access_token" => "live", "expires_in" => 3600 })
+    connector.connector_credentials.create!(user: conversation.user)
+    conversation.user.oauth_grants.create!(
+      provider: "github", access_token: "live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "user:email repo read:user"
+    )
 
     out = render
 

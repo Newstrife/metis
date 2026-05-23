@@ -10,6 +10,7 @@ module OauthBroker
     # the prior one.
     module Google
       TOKEN_URL = "https://oauth2.googleapis.com/token".freeze
+      REVOKE_URL = "https://oauth2.googleapis.com/revoke".freeze
 
       module_function
 
@@ -24,6 +25,22 @@ module OauthBroker
           grant_type: "refresh_token"
         )
         parse(https_client(uri).request(request))
+      end
+
+      # POST the token to Google's revoke endpoint. Severs the OAuth
+      # grant on Google's side so the next authorize request lands as
+      # a fresh consent. 200 on success, 400 with "invalid_token" if
+      # already gone — both are fine.
+      def revoke(token)
+        uri = URI(REVOKE_URL)
+        request = Net::HTTP::Post.new(uri)
+        request["Content-Type"] = "application/x-www-form-urlencoded"
+        request.set_form_data(token: token)
+        response = https_client(uri).request(request)
+        return if response.code == "200"
+        return if response.code == "400" && response.body.to_s.include?("invalid_token")
+
+        raise OauthBroker::Error, "google revoke status #{response.code}"
       end
 
       def parse(response)
