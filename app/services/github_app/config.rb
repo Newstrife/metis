@@ -8,9 +8,10 @@ module GithubApp
   #   GITHUB_APP_CLIENT_ID      the app's OAuth client id
   #   GITHUB_APP_CLIENT_SECRET  the app's OAuth client secret
   #
-  # The GitHub App must have **"Expire user authorization tokens"**
-  # enabled in its settings — otherwise GitHub returns no refresh token
-  # and renewals fail when the 8-hour access token lapses.
+  # The GitHub App must have **"User-to-server token expiration"** active
+  # under Settings → Optional features (new Apps default to it) — without
+  # it GitHub returns no refresh token and renewals fail when the 8-hour
+  # access token lapses.
   class Config
     class << self
       def client_id

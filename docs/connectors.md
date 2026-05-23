@@ -120,9 +120,10 @@ identity, and what the agent can see is exactly what the member can.
 A single GitHub App registration drives this. The deployment configures
 its OAuth credentials in the environment — `GITHUB_APP_CLIENT_ID` and
 `GITHUB_APP_CLIENT_SECRET` (see `.env.example`). The app **must** have
-"Expire user authorization tokens" enabled; without it GitHub issues no
-refresh token and the 8-hour access token cannot be renewed without
-sending the member back through the flow.
+"User-to-server token expiration" active under Settings → Optional
+features (new Apps default to it); without it GitHub issues no refresh
+token and the 8-hour access token cannot be renewed without sending the
+member back through the flow.
 
 `GithubApp::TokenService` mints/refreshes the access token on demand
 when staging `.mcp.json`; if a refresh fails, the connector is dropped
