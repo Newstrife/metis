@@ -86,6 +86,67 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     assert_match(/\A999\+mgc@github\.users\.noreply\.metis\z/, user.email)
   end
 
+  test "next sign-in backfills a real email onto a synthesized-email user" do
+    user = User.create!(email: "777+mgc@github.users.noreply.metis",
+                        password: "password123")
+    user.identities.create!(provider: "github", uid: "777")
+    mock_github(uid: "777", login: "mgc", email: "real@example.com")
+
+    get user_github_omniauth_callback_path
+
+    assert_equal "real@example.com", user.reload.email
+  end
+
+  test "next sign-in backfills a real email onto GitHub's noreply pseudo-email" do
+    user = User.create!(email: "111+mgc@users.noreply.github.com",
+                        password: "password123")
+    user.identities.create!(provider: "github", uid: "111")
+    mock_github(uid: "111", login: "mgc", email: "real@example.com")
+
+    get user_github_omniauth_callback_path
+
+    assert_equal "real@example.com", user.reload.email
+  end
+
+  test "backfill refuses to swap one placeholder for another" do
+    user = User.create!(email: "222+mgc@users.noreply.github.com",
+                        password: "password123")
+    user.identities.create!(provider: "github", uid: "222")
+    mock_github(uid: "222", login: "mgc", email: "222+other@users.noreply.github.com")
+
+    get user_github_omniauth_callback_path
+
+    assert_equal "222+mgc@users.noreply.github.com", user.reload.email
+  end
+
+  test "a missing auth email never downgrades a user who already has a real one" do
+    user = User.create!(email: "real-#{SecureRandom.hex(4)}@example.com",
+                        password: "password123")
+    user.identities.create!(provider: "github", uid: "555")
+    original = user.email
+    OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(
+      provider: "github", uid: "555",
+      info: { email: nil, nickname: "mgc" },
+      credentials: { token: "live", refresh_token: "rt", expires_at: Time.current.to_i + 3600 }
+    )
+    Rails.application.env_config["omniauth.auth"] = OmniAuth.config.mock_auth[:github]
+
+    get user_github_omniauth_callback_path
+
+    assert_equal original, user.reload.email
+  end
+
+  test "backfill skips when the real email already belongs to another user" do
+    User.create!(email: "taken@example.com", password: "password123")
+    synth = User.create!(email: "888+mgc@github.users.noreply.metis", password: "password123")
+    synth.identities.create!(provider: "github", uid: "888")
+    mock_github(uid: "888", login: "mgc", email: "taken@example.com")
+
+    get user_github_omniauth_callback_path
+
+    assert_equal "888+mgc@github.users.noreply.metis", synth.reload.email
+  end
+
   test "a signed-in password user attaches the GitHub identity to their account" do
     user = User.create!(email: "attach-#{SecureRandom.hex(4)}@example.com", password: "password123")
     sign_in user

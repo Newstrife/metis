@@ -277,9 +277,15 @@ Devise.setup do |config|
   # When the env vars are absent (e.g. tests, no-OAuth deployments)
   # the strategy is left unregistered.
   if ENV["GITHUB_APP_CLIENT_ID"].present? && ENV["GITHUB_APP_CLIENT_SECRET"].present?
+    # `scope: "user:email"` tells omniauth-github to call /user/emails
+    # and pick the user's primary verified address — the basic /user
+    # endpoint omits email unless it's set public on the profile. The
+    # GitHub App must also have the "Email addresses (read)" user
+    # permission set on github.com for this to return anything.
     config.omniauth :github,
                     ENV.fetch("GITHUB_APP_CLIENT_ID"),
-                    ENV.fetch("GITHUB_APP_CLIENT_SECRET")
+                    ENV.fetch("GITHUB_APP_CLIENT_SECRET"),
+                    scope: "user:email"
   end
 
   # Google sign-in. The scopes requested cover sign-in *and* every
