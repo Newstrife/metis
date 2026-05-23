@@ -290,9 +290,23 @@ Devise.setup do |config|
 
   # Google sign-in. The scopes requested cover sign-in *and* every
   # Google Workspace connector this deployment exposes — one consent
-  # screen handles both jobs. `access_type: offline` + `prompt: consent`
-  # are required to receive a refresh token (without it Google returns
-  # only a 1-hour access token and renewals fail).
+  # screen handles both jobs.
+  #
+  # - `access_type: offline` is required to receive a refresh_token
+  #   (without it Google returns only a 1-hour access token and
+  #   renewals fail).
+  # - `prompt: consent` forces Google to show the consent screen on
+  #   EVERY authorization. Two reasons to keep it:
+  #   (a) after a user disconnects a Google connector we want fresh
+  #       consent (and a fresh refresh_token — Google only re-issues
+  #       one when prompt=consent is sent);
+  #   (b) when this deployment later adds scopes (Drive, Calendar, …)
+  #       on top of an existing grant, Google silently no-ops them
+  #       unless the user sees the consent screen and re-grants. Drop
+  #       this flag and new scopes ship dead.
+  # `test/controllers/users/omniauth_callbacks_controller_test.rb`
+  # locks both options in place so a refactor can't strip them
+  # without the test failing.
   if ENV["GOOGLE_OAUTH_CLIENT_ID"].present? && ENV["GOOGLE_OAUTH_CLIENT_SECRET"].present?
     config.omniauth :google_oauth2,
                     ENV.fetch("GOOGLE_OAUTH_CLIENT_ID"),

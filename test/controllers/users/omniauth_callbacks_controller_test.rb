@@ -251,4 +251,54 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     assert user.reload.identities.exists?(provider: "google_oauth2", uid: "g-100")
     assert user.personal_team.connectors.find_by(catalog_key: "gmail")
   end
+
+  # Strategy-option lock-ins — these guard the operator's
+  # config/initializers/devise.rb against silent regressions. Each
+  # failed assertion has a concrete user-visible consequence; the
+  # message names it so a future refactor can't strip the option by
+  # accident. We parse the initializer source rather than introspect
+  # Devise.omniauth_configs because the env-gated `config.omniauth`
+  # blocks don't register without the OAuth env vars present at boot,
+  # which Spring + dotenv-not-loaded-in-test makes unreliable.
+
+  DEVISE_INITIALIZER_SRC = File.read(
+    Rails.root.join("config/initializers/devise.rb")
+  ).freeze
+  private_constant :DEVISE_INITIALIZER_SRC
+
+  def google_omniauth_block
+    DEVISE_INITIALIZER_SRC[/config\.omniauth :google_oauth2.*?(?=\n\s*end\n)/m]
+  end
+
+  def github_omniauth_block
+    DEVISE_INITIALIZER_SRC[/config\.omniauth :github.*?(?=\n\s*end\n)/m]
+  end
+
+  test "Google omniauth strategy forces re-consent and offline access" do
+    block = google_omniauth_block
+    assert block, "no config.omniauth :google_oauth2 block found in devise.rb"
+
+    assert_match(/prompt:\s*["']consent["']/, block,
+                 "prompt=consent must stay set. Without it (a) Google won't show the " \
+                 "consent screen after a user disconnects and re-connects, so they " \
+                 "can't fully re-grant; (b) when this deployment adds new scopes, " \
+                 "Google silently no-ops them against the existing grant and the new " \
+                 "connector features ship dead.")
+    assert_match(/access_type:\s*["']offline["']/, block,
+                 "access_type=offline is required to receive a refresh_token; without " \
+                 "it Google issues only a 1-hour access token and every refresh fails.")
+    assert_match(/userinfo\.email/, block,
+                 "userinfo.email is required to populate auth.info.email; without it " \
+                 "every Google sign-in falls back to a synthesized noreply address.")
+  end
+
+  test "GitHub omniauth strategy requests user:email so the real address comes through" do
+    block = github_omniauth_block
+    assert block, "no config.omniauth :github block found in devise.rb"
+
+    assert_match(/scope:\s*["']user:email["']/, block,
+                 "scope=user:email is what tells omniauth-github to call /user/emails " \
+                 "and pick the primary verified address. Drop it and every GitHub user " \
+                 "whose profile email is private silently lands as a noreply placeholder.")
+  end
 end
