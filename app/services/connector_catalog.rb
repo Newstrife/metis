@@ -57,7 +57,7 @@ class ConnectorCatalog
       # Process ERB before YAML so entries can interpolate deployment
       # config (notably self-hosted MCP server URLs) from the
       # environment, e.g.:
-      #   url: <%= ENV.fetch("GMAIL_MCP_URL", "http://localhost:8000/mcp/") %>
+      #   url: <%= ENV.fetch("WORKSPACE_MCP_URL", "http://localhost:8000/mcp/") %>
       raw = ERB.new(File.read(PATH), trim_mode: "-").result
       YAML.safe_load(raw).map do |key, attrs|
         App.new(

@@ -26,17 +26,30 @@ class ConnectorCatalogTest < ActiveSupport::TestCase
   end
 
   test "ERB in the catalog yaml interpolates from the environment" do
-    # The Gmail entry sources its MCP server URL from GMAIL_MCP_URL via
-    # ERB, so a self-hosted google_workspace_mcp can move between dev
-    # and prod without a code change. Verify the interpolation fires.
-    original = ENV["GMAIL_MCP_URL"]
-    ENV["GMAIL_MCP_URL"] = "https://workspace-mcp.example/mcp/"
+    # The Google connectors share one self-hosted google_workspace_mcp
+    # URL sourced from WORKSPACE_MCP_URL via ERB, so the deployment can
+    # move between dev and prod without a code change. Verify both
+    # entries pick up the same override.
+    original = ENV["WORKSPACE_MCP_URL"]
+    ENV["WORKSPACE_MCP_URL"] = "https://workspace-mcp.example/mcp/"
     ConnectorCatalog.instance_variable_set(:@all, nil)
 
     assert_equal "https://workspace-mcp.example/mcp/",
                  ConnectorCatalog.find("gmail").definition["url"]
+    assert_equal "https://workspace-mcp.example/mcp/",
+                 ConnectorCatalog.find("google_calendar").definition["url"]
   ensure
-    original.nil? ? ENV.delete("GMAIL_MCP_URL") : ENV["GMAIL_MCP_URL"] = original
+    original.nil? ? ENV.delete("WORKSPACE_MCP_URL") : ENV["WORKSPACE_MCP_URL"] = original
     ConnectorCatalog.instance_variable_set(:@all, nil)
+  end
+
+  test "google_calendar is an OAuth app with calendar scopes" do
+    calendar = ConnectorCatalog.find("google_calendar")
+
+    assert_equal "Google Calendar", calendar.name
+    assert calendar.oauth?
+    assert_equal "google", calendar.oauth_provider
+    assert_includes calendar.oauth_scopes, "https://www.googleapis.com/auth/calendar"
+    assert_includes calendar.oauth_scopes, "https://www.googleapis.com/auth/calendar.events"
   end
 end

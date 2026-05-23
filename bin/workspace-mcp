@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Starts the Google Workspace MCP server in external-OAuth mode for
-# the metis Gmail connector. Used by Procfile.dev. The server
-# validates the bearer metis sends against Google's userinfo API and
-# dispatches Gmail tools based on the token's scopes; metis never
-# gives it a refresh token or its own consent flow.
+# the metis Google connectors (Gmail, Calendar, …). Used by
+# Procfile.dev. The server validates the bearer metis sends against
+# Google's userinfo API and dispatches tools based on the token's
+# scopes; metis never gives it a refresh token or its own consent flow.
 #
 # Default install: `uvx` pulls the fork (chagel/google_workspace_mcp)
 # straight from GitHub on first run and caches it — no source checkout
@@ -70,7 +70,7 @@ fi
 
 DELAY=1
 while true; do
-  "${CMD[@]}" --transport streamable-http --permissions gmail:drafts
+  "${CMD[@]}" --transport streamable-http --permissions gmail:drafts calendar:full
   status=$?
   echo "[workspace-mcp] Process exited (${status}), restarting in ${DELAY}s..." >&2
   sleep "$DELAY"
