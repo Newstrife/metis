@@ -1,20 +1,18 @@
 # Metis
 
-**Metis is an open-source, self-hostable agent platform for individuals
-and teams.**
+**pi runs on your laptop. Metis runs pi for everyone you work with —
+in a sandbox, on your stack, with your provider.**
 
-It runs **pi** — a fast, open agent harness — behind a live, streaming
-web chat UI. pi ships with coding tools, but its extensions and skills
-make Metis a general-purpose personal agent: coding is one capability,
-not the boundary. The agent runs in a sandbox, so it is safe to let it
-run untrusted code, and the LLM provider is yours to choose — Metis is
-not provider-locked.
+An open, self-hostable agent platform built on **pi**, a fast, open
+agent harness. Streaming web chat, multi-user from day one, the agent
+sandboxed by default. Coding is one capability, not the boundary.
 
-Metis is web-first and multi-user by design. Personal productivity is
-the start, not the end: the goal is a platform where people build their
-own tools and share them — across their devices, and with their teams.
-
-See [`PLAN.md`](PLAN.md) for direction and roadmap.
+- **[`VISION.md`](VISION.md)** — what Metis is, the rules we hold to,
+  what we won't build.
+- **[`PLAN.md`](PLAN.md)** — current status, roadmap, and open
+  questions.
+- **[`docs/`](docs/)** — architecture (tenancy, connectors, session
+  persistence).
 
 ## Stack
 

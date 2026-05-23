@@ -3,9 +3,10 @@
 ## Context
 
 Metis is multi-user; personal and team usage are both first-class
-(Principle 2). Every durable resource — conversations, connectors,
-projects, skills — needs an owner, and the same question recurs for each:
-*may this user see, use, or manage it?*
+([`VISION.md`](../VISION.md) — *Multi-user from day one*). Every
+durable resource — conversations, connectors, projects, skills —
+needs an owner, and the same question recurs for each: *may this
+user see, use, or manage it?*
 
 This doc records how that is modelled. "Workspace" is deliberately not the
 word: `Agent::Workspace` already names pi's per-conversation scope

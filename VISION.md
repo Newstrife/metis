@@ -1,0 +1,80 @@
+# Metis Vision
+
+**pi runs on your laptop. Metis runs pi for everyone you work with —
+in a sandbox, on your stack, with your provider.**
+
+This is the soul of the project: what Metis is, what it isn't, and the
+rules that keep it that way. Status and roadmap live in
+[`PLAN.md`](PLAN.md); architecture in [`docs/`](docs/).
+
+## What this is
+
+Metis is an open, self-hostable agent platform. It puts a live,
+streaming web chat in front of **pi** — a fast, open agent harness
+that ships coding tools but isn't bounded by them. The agent runs in a
+sandbox by default. The LLM provider is yours. The connector model
+holds credentials per team and per member, so the agent acts as the
+right person against the right systems.
+
+Personal productivity is the floor, not the ceiling. The point is a
+platform where people **build their own tools and share them** —
+across their devices and with their teams.
+
+## How we got here
+
+Metis started as a chat UI for pi. pi is single-user, terminal-first,
+local. Metis is the opposite environment: server-side, multi-user,
+sandboxed, no human at the terminal to tap through an auth prompt.
+Most of Metis's decisions read as inversions of pi's — *for the same
+reasons pi made them the other way*.
+
+## Rules we hold to
+
+1. **One harness — pi.** Not a generic shell over swappable backends.
+   An opinionated product.
+2. **Multi-user from day one.** Every durable resource belongs to a
+   `Team`; a personal account is a team of one
+   ([`docs/tenancy.md`](docs/tenancy.md)).
+3. **Sandboxed by default.** `Docker` and `E2b` run pi in isolation.
+   `Local` is dev-only and is **not** a security boundary. Don't ship
+   it as one.
+4. **Your provider.** Anthropic / OpenAI / Google, picked per
+   conversation. Provider keys are the deployment's — Metis is not a
+   per-user key vault.
+5. **Server-rendered.** Hotwire + Stimulus. No SPA on top.
+6. **pi executes; Rails governs.** Skills, extensions, MCP — all pi.
+   Rails holds the credentials and decides who sees what. It does not
+   re-implement.
+7. **Built to share.** A tool you make is a tool your team can use.
+
+## What we won't build
+
+Each one of these is a temptation already present in the code or the
+backlog. Recording them keeps the project from drifting into shapes we
+have considered and rejected.
+
+- **A second agent backend.** `Agent::Adapters` is *not* a
+  pluggable-agent seam — it translates pi's wire into a canonical UI
+  vocabulary (`Agent::UiEvent`). A different agent would be a different
+  product, not a different adapter.
+- **Connectors that wrap CLIs.** A CLI assumes it is the top-level app
+  run by an interactive human. Metis has none of those. Connectors
+  speak MCP through one pi extension
+  ([`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter)) —
+  see [`docs/connectors.md`](docs/connectors.md). A service that ships
+  only a CLI is not a connector until an MCP server for it exists. We
+  are fine with that bet.
+- **A Rails-side MCP runtime.** Metis is the **host** — it holds
+  credentials and stages `.mcp.json` per turn. pi speaks the protocol.
+  Re-implementing MCP in Rails duplicates pi.
+- **Per-user provider API keys.** Provider keys live in
+  `config.x.agent.api_keys` and are paid for by the deployment. Users
+  pick provider + model; they do not bring their own keys.
+- **Polymorphic `owner` on resources.** One tenancy unit, `Team`, with
+  a personal team-of-one default. Polymorphic `owner` (User-or-Team)
+  bifurcates every scope and policy, permanently, for the gain of one
+  row at signup ([`docs/tenancy.md`](docs/tenancy.md)).
+- **A JavaScript framework.** Hotwire is the rendering model; Stimulus
+  is the ceiling. No React, no Vue, no Svelte.
+- **Defensive code over edge cases.** Follow the happy path. Sentry
+  catches what slips through.

@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Read first
+
+Before changing code, read [`VISION.md`](VISION.md) — what Metis is, the
+rules we hold to, and what we explicitly **won't build**. Most of the
+guardrails (no second agent backend, no CLI-as-connector, no Rails-side
+MCP runtime, no polymorphic owner, no SPA, no per-user provider keys)
+are inverses of temptations already present in this codebase. Honour
+them, or argue them on a PR — don't drift into them.
+
 ## Overview
 
 Metis is a Rails 8.1 web app (Ruby 4.0.5, PostgreSQL) that puts a chat UI in
