@@ -38,15 +38,19 @@ class ConnectorCredential < ApplicationRecord
   end
 
   # Persist a token-exchange response from the OAuth provider. Accepts
-  # GitHub's response shape: access_token, refresh_token, expires_in,
-  # scope. `at` is the moment the response was received, used to compute
-  # the absolute expiry.
+  # the common response shape across providers: access_token,
+  # refresh_token (sometimes), expires_in, scope. Keys absent from a
+  # *refresh* response (Google omits `refresh_token` entirely; some
+  # providers omit `scope` on refresh) carry over from the prior
+  # stored bundle so the credential stays renewable. `at` is the moment
+  # the response was received, used to compute the absolute expiry.
   def assign_oauth_token!(response, at: Time.current)
+    existing = oauth_token || {}
     bundle = {
       "access_token" => response["access_token"],
-      "refresh_token" => response["refresh_token"],
+      "refresh_token" => response["refresh_token"] || existing["refresh_token"],
       "expires_at" => expires_at_from(response, at),
-      "scope" => response["scope"]
+      "scope" => response["scope"] || existing["scope"]
     }.compact
     write_envelope("oauth", bundle)
     save!

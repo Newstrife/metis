@@ -60,9 +60,10 @@ module Agent
       return {} if credential.nil?
       return credential.credential_map unless credential.oauth_token
 
-      token = GithubApp::TokenService.access_token_for(credential)
-      connector.catalog_app&.credential_map_for(token) || {}
-    rescue GithubApp::TokenService::Error => error
+      app = connector.catalog_app
+      token = OauthBroker.access_token_for(credential, provider: app&.oauth_provider.to_s)
+      app&.credential_map_for(token) || {}
+    rescue OauthBroker::Error => error
       Rails.logger.error("McpConfig: OAuth refresh failed for connector " \
                           "#{connector.id}: #{error.message}")
       nil

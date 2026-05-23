@@ -23,6 +23,9 @@ gem "devise"
 # the connector. omniauth-rails_csrf_protection turns the authorize
 # request into a POST so it carries the CSRF token.
 gem "omniauth-github"
+# Google sign-in (Devise omniauthable) — same OAuth client drives the
+# Google Workspace connectors (Gmail, Drive, Calendar, …).
+gem "omniauth-google-oauth2"
 gem "omniauth-rails_csrf_protection"
 
 # Render Markdown message content to HTML (GFM-compliant, native tables)

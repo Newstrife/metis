@@ -2,19 +2,15 @@ require "net/http"
 require "json"
 
 module GithubApp
-  # The HTTP boundary to GitHub's OAuth endpoints. Extracted as its own
-  # module so callers (TokenService, the connect controller) can be
-  # tested by stubbing two named methods rather than faking HTTP.
+  # The HTTP boundary to GitHub's OAuth token endpoint. Extracted as
+  # its own module so OauthBroker (and the omniauth callback test
+  # suite) can stub one named method rather than fake out HTTP.
   class OauthClient
     EXCHANGE_URL = "https://github.com/login/oauth/access_token".freeze
 
     class << self
-      # Exchange an authorization code for a user access-token bundle.
-      def exchange_code(code, redirect_uri:)
-        post(code: code, redirect_uri: redirect_uri, grant_type: "authorization_code")
-      end
-
-      # Refresh an access token from a refresh token.
+      # Refresh an access token from a refresh token. Returns the
+      # parsed response hash.
       def refresh(refresh_token)
         post(refresh_token: refresh_token, grant_type: "refresh_token")
       end
@@ -31,10 +27,10 @@ module GithubApp
       end
 
       def parse(response)
-        raise TokenService::Error, "github oauth status #{response.code}" unless response.code == "200"
+        raise OauthBroker::Error, "github oauth status #{response.code}" unless response.code == "200"
 
         parsed = JSON.parse(response.body)
-        raise TokenService::Error, parsed["error_description"] || parsed["error"] if parsed["error"]
+        raise OauthBroker::Error, parsed["error_description"] || parsed["error"] if parsed["error"]
 
         parsed
       end

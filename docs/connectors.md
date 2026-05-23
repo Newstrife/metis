@@ -125,11 +125,13 @@ features (new Apps default to it); without it GitHub issues no refresh
 token and the 8-hour access token cannot be renewed without sending the
 member back through the flow.
 
-`GithubApp::TokenService` mints/refreshes the access token on demand
-when staging `.mcp.json`; if a refresh fails, the connector is dropped
+`OauthBroker` mints/refreshes the access token on demand when staging
+`.mcp.json`, dispatching to the per-provider client
+(`OauthBroker::Clients::Github`, `::Google`) based on the catalog
+app's `oauth_provider`. If a refresh fails, the connector is dropped
 silently from the rendered file, mirroring the existing "no credential
 the member can use → omit" policy. Members who have not connected
-simply have no GitHub entry in their `.mcp.json`.
+simply have no entry for that connector in their `.mcp.json`.
 
 **One flow, both jobs.** The same GitHub App OAuth handles sign-in
 *and* connector authorization, through Devise OmniAuth
@@ -145,6 +147,34 @@ logging in via GitHub *is* the connection.
 
 Configure the GitHub App's callback URL as `/users/auth/github/callback`
 (it can hold several; add this one if you used a different path before).
+
+## Google — one OAuth client, many connectors
+
+Google Workspace ships several MCP servers (Gmail, and more on the way
+from Google). Metis treats them as one OAuth provider: a single Google
+OAuth 2.0 client (`GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`)
+drives sign-in *and* authorizes every catalog app with `oauth_provider:
+google`. One consent screen, all of them. Devise OmniAuth
+(`omniauth-google-oauth2`) requests `access_type: offline` +
+`prompt: consent` so Google returns a refresh token; without it the
+1-hour access token can't be renewed.
+
+The refresh response from Google does **not** include a new refresh
+token, so `ConnectorCredential#assign_oauth_token!` preserves the
+prior `refresh_token` (and `scope`) when a partial response is
+assigned. The credential stays renewable across many refresh cycles.
+
+Authorize the Google OAuth client's redirect URI as
+`/users/auth/google_oauth2/callback`, and add the Workspace scopes
+the catalog needs (Gmail today: `gmail.readonly`, `gmail.compose`).
+
+## Identities, not a single provider per user
+
+A user has many `Identity` rows — one per provider they've signed in
+through or whose connector they've authorized. Sign-in looks up the
+user by `(provider, uid)` first and falls back to email match, so a
+GitHub user can additionally connect Google (and vice versa) without
+forking a second account.
 
 ## Accepted tradeoff
 

@@ -90,7 +90,7 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     cred = connector.connector_credentials.create!(user: member)
     cred.assign_oauth_token!({ "access_token" => "expired", "expires_in" => -10 })
 
-    with_stub(GithubApp::OauthClient, :refresh, ->(_) { raise GithubApp::TokenService::Error, "boom" }) do
+    with_stub(GithubApp::OauthClient, :refresh, ->(_) { raise OauthBroker::Error, "boom" }) do
       assert_equal [], rendered["mcpServers"].keys
     end
   end

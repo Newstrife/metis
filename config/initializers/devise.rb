@@ -282,6 +282,22 @@ Devise.setup do |config|
                     ENV.fetch("GITHUB_APP_CLIENT_SECRET")
   end
 
+  # Google sign-in. The scopes requested cover sign-in *and* every
+  # Google Workspace connector this deployment exposes — one consent
+  # screen handles both jobs. `access_type: offline` + `prompt: consent`
+  # are required to receive a refresh token (without it Google returns
+  # only a 1-hour access token and renewals fail).
+  if ENV["GOOGLE_OAUTH_CLIENT_ID"].present? && ENV["GOOGLE_OAUTH_CLIENT_SECRET"].present?
+    config.omniauth :google_oauth2,
+                    ENV.fetch("GOOGLE_OAUTH_CLIENT_ID"),
+                    ENV.fetch("GOOGLE_OAUTH_CLIENT_SECRET"),
+                    scope: "userinfo.email userinfo.profile " \
+                           "https://www.googleapis.com/auth/gmail.readonly " \
+                           "https://www.googleapis.com/auth/gmail.compose",
+                    access_type: "offline",
+                    prompt: "consent"
+  end
+
   # ==> Warden configuration
   # If you want to use other strategies, that are not supported by Devise, or
   # change the failure app, you can configure them inside the config.warden block.

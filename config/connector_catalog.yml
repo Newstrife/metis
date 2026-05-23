@@ -21,3 +21,16 @@ github:
   credential:
     header: Authorization
     format: "Bearer %{token}"
+
+gmail:
+  name: Gmail
+  category: Productivity
+  description: Search, read, draft, and label Gmail messages as the operator.
+  transport: http
+  definition:
+    url: https://gmailmcp.googleapis.com/mcp/v1
+  auth: oauth
+  oauth_provider: google
+  credential:
+    header: Authorization
+    format: "Bearer %{token}"

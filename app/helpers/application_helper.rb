@@ -98,6 +98,20 @@ module ApplicationHelper
     buckets.reject { |_, list| list.empty? }
   end
 
+  # The Devise omniauth strategy key for a catalog `oauth_provider`.
+  # Most match; Google's gem registers as `google_oauth2`.
+  OMNIAUTH_STRATEGY = { "github" => "github", "google" => "google_oauth2" }.freeze
+
+  # The Devise omniauth authorize path for a catalog app, or nil if
+  # the app's provider has no strategy wired up. Same path drives
+  # "Sign in with X" and "Connect X" — see docs/connectors.md.
+  def omniauth_authorize_path_for(app)
+    strategy = OMNIAUTH_STRATEGY[app.oauth_provider]
+    return nil unless strategy
+
+    send("user_#{strategy}_omniauth_authorize_path")
+  end
+
   private
 
   def add_link_target_blank(html)
