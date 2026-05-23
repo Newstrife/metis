@@ -18,7 +18,7 @@ class OauthGrant < ApplicationRecord
 
   validates :provider, presence: true,
                        uniqueness: { scope: :user_id },
-                       inclusion: { in: %w[github google] }
+                       inclusion: { in: OauthBroker::PROVIDERS }
 
   # Treat tokens within 60s of expiry as stale — leaves the broker
   # time to refresh before the MCP server sees a 401.
@@ -44,13 +44,13 @@ class OauthGrant < ApplicationRecord
     (Array(required).map(&:to_s) - scope_set).empty?
   end
 
-  # Absorb an OAuth response — store its tokens, extend expires_at,
-  # union its scope set into the grant. Used by both the initial
-  # callback and OauthBroker's refresh path.
+  # Absorb an OAuth response from the callback or a refresh.
   #
-  # A refresh response may omit `refresh_token` (Google does); the
-  # prior one is preserved. It may also omit `scope` when the grant
-  # was unchanged; the prior scope set is preserved.
+  # `scope` in the response is authoritative when present — replace,
+  # don't union, or covers? will keep returning true for a scope the
+  # user just revoked on the consent screen. Absent (refresh, grant
+  # unchanged) preserves the prior set. `refresh_token` may also be
+  # omitted (Google does on refresh); preserve the prior one.
   def absorb!(response, at: Time.current)
     self.access_token = response["access_token"] if response["access_token"].present?
     self.refresh_token = response["refresh_token"] if response["refresh_token"].present?
@@ -62,7 +62,7 @@ class OauthGrant < ApplicationRecord
     # false forever, so OauthBroker refreshes on every chat turn
     # (refresh-stampede + provider rate limit).
     self.expires_at = expires_at_from(response, at) || expires_at || (at + DEFAULT_EXPIRES_IN)
-    self.scopes = merge_scopes(response["scope"])
+    self.scopes = adopt_scopes(response["scope"])
     save!
   end
 
@@ -78,9 +78,10 @@ class OauthGrant < ApplicationRecord
 
   private
 
-  def merge_scopes(incoming)
-    incoming_set = incoming.to_s.split(/[\s,]+/).reject(&:blank?)
-    (scope_set + incoming_set).uniq.join(" ")
+  def adopt_scopes(incoming)
+    return scopes if incoming.blank?
+
+    incoming.to_s.split(/[\s,]+/).reject(&:blank?).uniq.join(" ")
   end
 
   def expires_at_from(response, at)

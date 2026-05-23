@@ -31,17 +31,15 @@ class User < ApplicationRecord
     /\A\d+\+[^@]+@users\.noreply\.github\.com\z/
   ].freeze
 
-  # Find or create a user from an OmniAuth callback. Always returns a
-  # persisted User. Lookup is identity-first (`provider`+`uid`), then
-  # falls back to email — so a password user gets the identity attached
-  # rather than forked into a second account.
+  # Identity-first lookup; email fallback only when the provider
+  # has verified the address (otherwise a forged email claim takes
+  # over the matching user). Untrusted emails fall through to a
+  # synthetic noreply, creating a fresh account.
   #
-  # The create-new-user path is wrapped in a transaction so the
-  # concurrent-first-sign-in race (two callbacks for the same
-  # provider+uid both passing Identity.find_by) doesn't leave an
-  # orphan User + Team + Membership for the losing callback. On
-  # collision the transaction rolls back and we retry once — the
-  # second pass finds the winner's Identity at the top of the method.
+  # The transaction + retry handles the concurrent-first-sign-in
+  # race: two callbacks for the same (provider, uid) both miss
+  # Identity.find_by; the loser hits the unique index, rolls back,
+  # retries, and the second pass finds the winner's identity.
   def self.from_omniauth(auth)
     attempts = 0
     begin
@@ -52,17 +50,46 @@ class User < ApplicationRecord
       end
 
       transaction do
-        email = auth.info.email.presence || noreply_email(auth)
+        email = trusted_email(auth) || noreply_email(auth)
         user = find_or_initialize_by(email: email)
         user.password = Devise.friendly_token[0, 32] if user.new_record?
         user.save!
         user.identities.create!(provider: auth.provider, uid: auth.uid.to_s)
         user
       end
-    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => error
       attempts += 1
-      retry if attempts == 1 && Identity.exists?(provider: auth.provider, uid: auth.uid.to_s)
+      if attempts == 1 && Identity.exists?(provider: auth.provider, uid: auth.uid.to_s)
+        Rails.logger.info(
+          "User.from_omniauth retrying after race: #{error.class}: #{error.message}"
+        )
+        retry
+      end
       raise
+    end
+  end
+
+  def self.trusted_email(auth)
+    return nil if auth.info.email.blank?
+    return nil unless email_verified_for?(auth)
+
+    auth.info.email
+  end
+
+  # GitHub's user:email scope guarantees the primary email is verified.
+  # Google exposes an explicit boolean — read both surfaces (newer
+  # omniauth-google_oauth2 puts it on info, older only on extra.raw_info)
+  # and treat anything but explicit true as unverified.
+  def self.email_verified_for?(auth)
+    case auth.provider
+    when "github"
+      true
+    when "google_oauth2"
+      verified = auth.info&.[](:email_verified)
+      verified = auth.extra&.raw_info&.[]("email_verified") if verified.nil?
+      verified == true || verified == "true"
+    else
+      false
     end
   end
 

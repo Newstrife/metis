@@ -20,15 +20,16 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
   end
 
   def mock_google(uid: "g-1", email: "g-#{SecureRandom.hex(4)}@example.com", name: "User",
-                  scope: "email profile", connect: nil)
+                  scope: "email profile", connect: nil, email_verified: true)
     OmniAuth.config.mock_auth[:google_oauth2] = OmniAuth::AuthHash.new(
       provider: "google_oauth2",
       uid: uid.to_s,
-      info: { email: email, name: name },
+      info: { email: email, name: name, email_verified: email_verified },
       credentials: {
         token: "g-live", refresh_token: "g-rt", expires_at: Time.current.to_i + 3600,
         scope: scope
-      }
+      },
+      extra: { raw_info: { "email_verified" => email_verified } }
     )
     Rails.application.env_config["omniauth.auth"] = OmniAuth.config.mock_auth[:google_oauth2]
     set_omniauth_params(connect: connect)
@@ -296,6 +297,38 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     # The grant covers Gmail's required scopes.
     grant = user.oauth_grants.find_by(provider: "google")
     assert grant.covers?(ConnectorCatalog.find("gmail").oauth_scopes)
+  end
+
+  test "an unverified Google email does NOT take over an existing user with the same address" do
+    # Without the email_verified guard, a forged email claim signs the
+    # attacker in as the victim.
+    victim = User.create!(email: "victim-#{SecureRandom.hex(4)}@example.com",
+                          password: "password123")
+    victim_email = victim.email
+    mock_google(uid: "attacker", email: victim_email, email_verified: false)
+
+    assert_difference("User.count", 1, "must create a new user, not log in as the victim") do
+      get user_google_oauth2_omniauth_callback_path
+    end
+
+    identity = Identity.find_by(provider: "google_oauth2", uid: "attacker")
+    refute_equal victim.id, identity.user_id
+    refute_equal victim_email, identity.user.email
+    assert_match(/users\.noreply\.metis\z/, identity.user.email)
+  end
+
+  test "a verified Google email DOES attach to the existing user with the same address" do
+    existing = User.create!(email: "owner-#{SecureRandom.hex(4)}@example.com",
+                            password: "password123")
+    mock_google(uid: "g-new", email: existing.email, email_verified: true)
+
+    assert_no_difference("User.count") do
+      assert_difference("Identity.count", 1) do
+        get user_google_oauth2_omniauth_callback_path
+      end
+    end
+
+    assert_equal existing, Identity.find_by(provider: "google_oauth2", uid: "g-new").user
   end
 
   test "an existing GitHub user can sign in via Google to add the identity" do

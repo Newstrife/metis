@@ -18,9 +18,16 @@
 # exit non-zero on crash and recover; `set -e` would kill the script
 # on the first crash, the opposite of what the comment promises.
 
-# OAuth credentials are loaded by foreman from .env. The Devise
-# initializer reads the same vars; both processes agree on the
-# client id/secret that the user's grant was issued against.
+# OAuth credentials loaded by foreman from .env. Devise's initializer
+# reads the same vars so both processes agree on the client the user's
+# grant was issued against. Hard-stop if unset — otherwise the server
+# boots and every request fails opaquely inside the restart loop.
+# Exit 0 so foreman doesn't take the rest of the Procfile down.
+if [ -z "${GOOGLE_OAUTH_CLIENT_ID:-}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_SECRET:-}" ]; then
+  echo "[workspace-mcp] GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET must both be set." >&2
+  echo "[workspace-mcp] Add them to .env (see .env.example) or comment out workspace_mcp in Procfile.dev." >&2
+  exit 0
+fi
 export GOOGLE_OAUTH_CLIENT_ID
 export GOOGLE_OAUTH_CLIENT_SECRET
 

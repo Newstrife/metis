@@ -90,4 +90,19 @@ class OauthBrokerTest < ActiveSupport::TestCase
       assert_nothing_raised { OauthBroker.revoke(g) }
     end
   end
+
+  test "normalize_provider maps the omniauth strategy name to the canonical OauthGrant provider name" do
+    assert_equal "github", OauthBroker.normalize_provider("github")
+    assert_equal "google", OauthBroker.normalize_provider("google_oauth2")
+    assert_nil OauthBroker.normalize_provider("twitter")
+    assert_nil OauthBroker.normalize_provider(nil)
+  end
+
+  test "omniauth_strategy is the inverse of normalize_provider" do
+    OauthBroker::PROVIDERS.each do |provider|
+      strategy = OauthBroker.omniauth_strategy(provider)
+      assert strategy, "omniauth_strategy(#{provider.inspect}) returned nil"
+      assert_equal provider, OauthBroker.normalize_provider(strategy)
+    end
+  end
 end

@@ -19,11 +19,11 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
   class IdentityAlreadyLinked < StandardError; end
 
   def github
-    handle("github")
+    handle(OauthBroker.normalize_provider("github"))
   end
 
   def google_oauth2
-    handle("google")
+    handle(OauthBroker.normalize_provider("google_oauth2"))
   end
 
   def failure

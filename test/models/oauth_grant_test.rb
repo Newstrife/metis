@@ -51,7 +51,7 @@ class OauthGrantTest < ActiveSupport::TestCase
     assert g.covers?([])
   end
 
-  test "absorb! unions scopes and refreshes tokens + expiry" do
+  test "absorb! adopts the response's scope set authoritatively and refreshes tokens + expiry" do
     g = grant(scopes: "email profile", access_token: "old", expires_at: 1.hour.from_now)
     response = {
       "access_token" => "new", "refresh_token" => "new-rt",
@@ -64,7 +64,8 @@ class OauthGrantTest < ActiveSupport::TestCase
     assert_equal "new", g.access_token
     assert_equal "new-rt", g.refresh_token
     assert_equal Time.utc(2026, 5, 23, 13), g.expires_at
-    assert_equal %w[email profile gmail.readonly], g.scope_set
+    assert_equal %w[profile gmail.readonly], g.scope_set,
+                 "response scope replaces the prior set, not unions with it"
   end
 
   test "absorb! preserves prior refresh_token when the response omits it" do
@@ -72,6 +73,24 @@ class OauthGrantTest < ActiveSupport::TestCase
     g.absorb!({ "access_token" => "new", "expires_in" => 3600 })
 
     assert_equal "long-lived-rt", g.reload.refresh_token
+  end
+
+  test "absorb! preserves prior scope set when the response omits scope" do
+    # Google's refresh response carries no `scope` when unchanged.
+    g = grant(scopes: "email profile gmail.readonly")
+    g.absorb!({ "access_token" => "new", "expires_in" => 3600 })
+
+    assert_equal %w[email profile gmail.readonly], g.reload.scope_set
+  end
+
+  test "absorb! narrows scope_set when the user reduces consent — covers? must reflect Google's truth" do
+    g = grant(scopes: "email profile gmail.readonly gmail.compose")
+    g.absorb!({ "access_token" => "new", "expires_in" => 3600,
+                "scope" => "email profile gmail.readonly" })
+
+    g.reload
+    refute g.covers?([ "gmail.compose" ])
+    assert g.covers?([ "gmail.readonly" ])
   end
 
   test "absorb! defaults expires_at to ~1h from `at` when neither prior nor response carry one" do

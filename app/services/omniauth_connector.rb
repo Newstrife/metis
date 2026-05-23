@@ -39,14 +39,11 @@ class OmniauthConnector
       connector = user.personal_team.connectors.find_or_initialize_by(catalog_key: app.key)
       connector.update!(name: app.key, transport: app.transport, definition: app.definition)
       credential = connector.connector_credentials.find_or_initialize_by(user: user)
-      # external_login is rendered as a public-ish handle ("@mgc"); only
-      # set when the provider gives a real one (GitHub's nickname). For
-      # Google there's no nickname; the view's "Your <app> account is
-      # connected" fallback covers the blank case.
-      attrs = {}
-      attrs[:external_login] = auth.info.nickname if auth.info.nickname.present?
-      credential.update!(attrs) unless attrs.empty? && credential.persisted?
-      credential.save! if credential.new_record?
+      # Don't blank a previously-set handle if a later callback omits it
+      # (Google has no nickname; GitHub does). View falls back to a
+      # generic "Your <app> account is connected" when blank.
+      credential.external_login = auth.info.nickname if auth.info.nickname.present?
+      credential.save!
       connector
     end
 

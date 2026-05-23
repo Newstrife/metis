@@ -1,13 +1,12 @@
-# Provider-agnostic OAuth token broker for OauthGrants.
+# Provider-agnostic OAuth token broker for OauthGrants. Returns the
+# current access token for a grant, refreshing through the provider's
+# token endpoint when within `REFRESH_LEEWAY` of expiry. Refresh
+# writes back via OauthGrant#absorb!. See docs/connectors.md.
 #
-# Given an OauthGrant, returns the current access token — refreshing
-# through the provider's token endpoint when the stored one is within
-# `REFRESH_LEEWAY` of expiry. The bearer the MCP server receives is
-# whatever this returns. Refresh writes the new token bundle back to
-# the grant via OauthGrant#absorb!.
-#
-# `grant.provider` (e.g. "github", "google") selects which
-# `Clients::*` module handles the HTTP call. See docs/connectors.md.
+# Also the single source of truth for the strategy/provider name
+# split: Identity stores the omniauth strategy name ("google_oauth2"),
+# OauthGrant + catalog use the canonical name ("google"). All
+# translation goes through `normalize_provider` / `omniauth_strategy`.
 module OauthBroker
   class Error < StandardError; end
 
@@ -15,6 +14,15 @@ module OauthBroker
     "github" => Clients::Github,
     "google" => Clients::Google
   }.freeze
+
+  STRATEGY_TO_PROVIDER = {
+    "github" => "github",
+    "google_oauth2" => "google"
+  }.freeze
+
+  PROVIDER_TO_STRATEGY = STRATEGY_TO_PROVIDER.invert.freeze
+
+  PROVIDERS = STRATEGY_TO_PROVIDER.values.freeze
 
   # The base sign-in scope set per provider — the smallest set that
   # lets us identify the user (matching what config/initializers/devise.rb
@@ -26,6 +34,14 @@ module OauthBroker
   }.freeze
 
   class << self
+    def normalize_provider(strategy)
+      STRATEGY_TO_PROVIDER[strategy.to_s]
+    end
+
+    def omniauth_strategy(provider)
+      PROVIDER_TO_STRATEGY[provider.to_s]
+    end
+
     # The current access token for the grant, refreshing if needed.
     # A grant whose stored access token is blank (legacy backfill row,
     # partial absorb!) must refresh even when fresh? is true — otherwise

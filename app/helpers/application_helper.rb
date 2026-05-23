@@ -98,16 +98,11 @@ module ApplicationHelper
     buckets.reject { |_, list| list.empty? }
   end
 
-  # The Devise omniauth strategy key for a catalog `oauth_provider`.
-  # Most match; Google's gem registers as `google_oauth2`.
-  OMNIAUTH_STRATEGY = { "github" => "github", "google" => "google_oauth2" }.freeze
-  private_constant :OMNIAUTH_STRATEGY
-
   # The plain "Sign in with X" / "Connect X account" authorize path
   # for a catalog app — the *sign-in* shape, with no extra scopes.
   # Returns nil if the app's provider strategy isn't wired up.
   def omniauth_authorize_path_for(app)
-    strategy = OMNIAUTH_STRATEGY[app.oauth_provider]
+    strategy = OauthBroker.omniauth_strategy(app.oauth_provider)
     return nil unless strategy
 
     send("user_#{strategy}_omniauth_authorize_path")
@@ -121,7 +116,7 @@ module ApplicationHelper
   # user has already authorized. The callback dispatches on the
   # `connect=<key>` param to upsert the connector marker.
   def connector_authorize_path_for(app)
-    strategy = OMNIAUTH_STRATEGY[app.oauth_provider]
+    strategy = OauthBroker.omniauth_strategy(app.oauth_provider)
     return nil unless strategy
 
     scopes = (OauthBroker::SIGN_IN_SCOPES.fetch(app.oauth_provider, []) + app.oauth_scopes).uniq.join(",")
