@@ -35,18 +35,35 @@ class User < ApplicationRecord
   # persisted User. Lookup is identity-first (`provider`+`uid`), then
   # falls back to email — so a password user gets the identity attached
   # rather than forked into a second account.
+  #
+  # The create-new-user path is wrapped in a transaction so the
+  # concurrent-first-sign-in race (two callbacks for the same
+  # provider+uid both passing Identity.find_by) doesn't leave an
+  # orphan User + Team + Membership for the losing callback. On
+  # collision the transaction rolls back and we retry once — the
+  # second pass finds the winner's Identity at the top of the method.
   def self.from_omniauth(auth)
-    identity = Identity.find_by(provider: auth.provider, uid: auth.uid.to_s)
-    if identity
-      backfill_real_email(identity.user, auth)
-      return identity.user
-    end
+    attempts = 0
+    begin
+      identity = Identity.find_by(provider: auth.provider, uid: auth.uid.to_s)
+      if identity
+        backfill_real_email(identity.user, auth)
+        return identity.user
+      end
 
-    email = auth.info.email.presence || noreply_email(auth)
-    user = find_or_initialize_by(email: email)
-    user.password = Devise.friendly_token[0, 32] if user.new_record?
-    user.save!
-    create_identity_for(user, auth)
+      transaction do
+        email = auth.info.email.presence || noreply_email(auth)
+        user = find_or_initialize_by(email: email)
+        user.password = Devise.friendly_token[0, 32] if user.new_record?
+        user.save!
+        user.identities.create!(provider: auth.provider, uid: auth.uid.to_s)
+        user
+      end
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+      attempts += 1
+      retry if attempts == 1 && Identity.exists?(provider: auth.provider, uid: auth.uid.to_s)
+      raise
+    end
   end
 
   # A stable synthetic address used when a provider's callback doesn't
@@ -81,24 +98,6 @@ class User < ApplicationRecord
     Rails.logger.warn(
       "User#backfill_real_email skipped for user #{user.id}: #{error.class}: #{error.message}"
     )
-  end
-
-  # Attach the identity to the just-saved user, with a one-shot retry
-  # for the concurrent-first-sign-in race: two callbacks for the same
-  # (provider, uid) both miss Identity.find_by, both reach create!, the
-  # loser hits the unique index. Both Rails-validation (RecordInvalid)
-  # and DB-level (RecordNotUnique) paths are covered — the validation
-  # fires when the winner committed before our validate-uniqueness
-  # SELECT; the DB index fires when it committed in the gap between
-  # validation and insert.
-  def self.create_identity_for(user, auth)
-    user.identities.create!(provider: auth.provider, uid: auth.uid.to_s)
-    user
-  rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-    existing = Identity.find_by(provider: auth.provider, uid: auth.uid.to_s)
-    raise unless existing
-
-    existing.user
   end
 
   private

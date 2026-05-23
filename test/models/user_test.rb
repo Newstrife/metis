@@ -58,18 +58,24 @@ class UserTest < ActiveSupport::TestCase
     assert_equal "999+mgc@users.noreply.github.com", placeholder.reload.email
   end
 
-  test "create_identity_for returns the winner's user when the unique index races" do
-    # The race: two callbacks for the same (provider, uid) both pass
-    # Identity.find_by and both reach create!. Simulate by pre-creating
-    # the winner's identity, then asking create_identity_for to attach
-    # the same (provider, uid) to a different user. The unique index
-    # rejects the insert; the rescue must resolve to the winner.
+  test "from_omniauth race-recovers to the winner's user without leaving an orphan User" do
+    # Simulate the late half of the concurrent-first-sign-in race: the
+    # winner has already committed an Identity for (provider, uid). The
+    # loser's from_omniauth call now: misses Identity.find_by (the test
+    # forces the timing by pre-creating the identity), enters the
+    # transaction, builds a new User with a different email, hits the
+    # unique index on identities.uid, rolls back, retries — second
+    # pass finds the winner's identity and returns the winner.
     winner = User.create!(email: "winner-#{SecureRandom.hex(4)}@example.com", password: "password123")
     winner.identities.create!(provider: "github", uid: "race-1")
-    loser  = User.create!(email: "loser-#{SecureRandom.hex(4)}@example.com",  password: "password123")
-    auth = mock_auth(provider: "github", uid: "race-1")
+    auth = mock_auth(provider: "github", uid: "race-1", email: "loser-#{SecureRandom.hex(4)}@example.com")
 
-    result = User.create_identity_for(loser, auth)
+    result = nil
+    assert_no_difference("User.count", "the loser's User must not be persisted") do
+      assert_no_difference("Team.count", "the loser's personal Team must not be persisted") do
+        result = User.from_omniauth(auth)
+      end
+    end
 
     assert_equal winner, result, "race recovery must return the winner's user"
   end

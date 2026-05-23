@@ -56,6 +56,21 @@ class OauthBrokerTest < ActiveSupport::TestCase
     assert_raises(OauthBroker::Error) { OauthBroker.access_token_for(g) }
   end
 
+  test "refreshes a grant whose access_token is blank even when fresh? would say it's fine" do
+    # Legacy backfill edge case: expires_at is set in the future
+    # (so fresh? returns true) but access_token came over blank.
+    # Returning the blank token would render `Authorization: Bearer `
+    # to the MCP server. The broker must refresh instead.
+    g = grant(access_token: nil, refresh_token: "rt", expires_at: 1.hour.from_now)
+
+    token = with_stub(GithubApp::OauthClient, :refresh, lambda { |_rt|
+      { "access_token" => "fresh", "refresh_token" => "rt2", "expires_in" => 3600 }
+    }) { OauthBroker.access_token_for(g) }
+
+    assert_equal "fresh", token
+    assert_equal "fresh", g.reload.access_token
+  end
+
   test "revoke calls the provider client's revoke method" do
     g = grant(provider: "google")
     called_with = nil

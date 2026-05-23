@@ -74,6 +74,18 @@ class OauthGrantTest < ActiveSupport::TestCase
     assert_equal "long-lived-rt", g.reload.refresh_token
   end
 
+  test "absorb! defaults expires_at to ~1h from `at` when neither prior nor response carry one" do
+    # Backfilled grant whose original ConnectorCredential bundle had a
+    # bad/missing expires_at, and a refresh response that omits expires_in.
+    # Without the default, expires_at stays nil → fresh? always false →
+    # OauthBroker refreshes on every chat turn (refresh storm).
+    g = grant(expires_at: nil)
+    g.absorb!({ "access_token" => "new" }, at: Time.utc(2026, 5, 23, 12))
+
+    assert_equal Time.utc(2026, 5, 23, 13), g.reload.expires_at,
+                 "absorb! must fill in a sane default expiry so fresh? doesn't lie forever"
+  end
+
   test "remove_scopes! deletes scopes from the grant" do
     g = grant(scopes: "email profile gmail.readonly gmail.compose")
 

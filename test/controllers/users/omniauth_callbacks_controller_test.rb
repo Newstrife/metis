@@ -220,6 +220,25 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to root_path
   end
 
+  test "a grant-write failure skips activate_connector so the marker doesn't outlive the grant" do
+    mock_github(uid: "grant-fail-1", login: "mgc", email: "ok2@example.com",
+                scope: "user:email repo read:user", connect: "github")
+
+    with_stub(OmniauthConnector, :record_grant, ->(*_) { raise "grant write boom" }) do
+      get user_github_omniauth_callback_path
+    end
+
+    user = Identity.find_by(provider: "github", uid: "grant-fail-1").user
+    # Grant write failed.
+    refute user.oauth_grants.exists?(provider: "github")
+    # The marker MUST NOT be created when the grant write failed —
+    # otherwise the marketplace tile would show "Connected" for a
+    # connector with no backing grant, and McpConfig would drop it
+    # every turn with no UI affordance to recover.
+    refute user.personal_team.connectors.exists?(catalog_key: "github"),
+           "connector marker must not exist when grant write failed"
+  end
+
   test "a signed-in password user attaches the GitHub identity to their account" do
     user = User.create!(email: "attach-#{SecureRandom.hex(4)}@example.com", password: "password123")
     sign_in user

@@ -27,8 +27,11 @@ module OauthBroker
 
   class << self
     # The current access token for the grant, refreshing if needed.
+    # A grant whose stored access token is blank (legacy backfill row,
+    # partial absorb!) must refresh even when fresh? is true — otherwise
+    # we'd hand the MCP server an empty bearer instead of a 401-or-recovery.
     def access_token_for(grant)
-      return grant.access_token if grant.fresh?
+      return grant.access_token if grant.fresh? && grant.access_token.present?
 
       refresh!(grant)
     end

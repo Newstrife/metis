@@ -24,6 +24,10 @@ class OauthGrant < ApplicationRecord
   # time to refresh before the MCP server sees a 401.
   REFRESH_LEEWAY = 60.seconds
 
+  # Fallback expiry when neither the response nor the prior grant has
+  # one. Matches Google's and GitHub's typical 1-hour access-token TTL.
+  DEFAULT_EXPIRES_IN = 1.hour
+
   def fresh?
     expires_at.present? && (expires_at - Time.current) > REFRESH_LEEWAY
   end
@@ -50,7 +54,14 @@ class OauthGrant < ApplicationRecord
   def absorb!(response, at: Time.current)
     self.access_token = response["access_token"] if response["access_token"].present?
     self.refresh_token = response["refresh_token"] if response["refresh_token"].present?
-    self.expires_at = expires_at_from(response, at) || expires_at
+    # Order matters: prefer the response's expires_in, fall back to the
+    # prior value, and only THEN default to the provider's typical
+    # 1-hour TTL. Without that last fallback, a grant with neither a
+    # prior expires_at nor an incoming expires_in (legacy backfill,
+    # provider quirk) is stuck with expires_at nil — fresh? returns
+    # false forever, so OauthBroker refreshes on every chat turn
+    # (refresh-stampede + provider rate limit).
+    self.expires_at = expires_at_from(response, at) || expires_at || (at + DEFAULT_EXPIRES_IN)
     self.scopes = merge_scopes(response["scope"])
     save!
   end

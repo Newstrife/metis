@@ -152,45 +152,42 @@ class ConnectorsController < ApplicationController
     credential.update!(credential_map: app.credential_map_for(params[:credential]))
   end
 
-  # On disconnect of an OAuth-shaped connector: decide whether the
-  # user's OauthGrant for this provider has any reason to keep
-  # existing.
+  # On disconnect of an OAuth-shaped connector: revoke the grant on
+  # the provider's side and destroy the local row IFF no other
+  # OAuth-shaped connectors for this provider remain wired to the
+  # user. Otherwise leave the grant alone.
   #
-  # If **no** OAuth-shaped connectors for this provider remain wired
-  # to the user, the grant is dead weight. Revoke it on the provider's
-  # side (`OauthBroker.revoke`) and destroy the local row. The user
-  # stays signed in to Metis (the Devise session is separate); their
-  # next "Sign in with Google" or "Connect Gmail" lands as a *fresh*
-  # OAuth — which is the only reliable way to get Google to show
-  # the consent screen again (with the grant on file, `prompt=consent`
+  # We deliberately do NOT prune `grant.scopes` when other connectors
+  # remain — we have no way to ask Google to shrink the authorization
+  # (Google's revoke is all-or-nothing), so the local scope set should
+  # reflect what Google actually has, not what we *wish* they had.
+  # Rewriting `scopes` locally would silently drop coverage for
+  # scopes the user still legitimately holds (e.g. catalog tightened
+  # mid-life, or a scope shared between two connectors gets dropped
+  # when one is disconnected).
+  #
+  # Revoke-on-last is the part that matters: after the user disconnects
+  # their last OAuth connector for a provider, the next "Sign in" or
+  # "Connect" lands as a *fresh* OAuth — the only reliable way to get
+  # the consent screen back (with the grant on file, `prompt=consent`
   # is silently downgraded to `prompt=none`).
-  #
-  # If other OAuth-shaped connectors still need the grant, prune its
-  # `scopes` down to the union those connectors require plus the
-  # base sign-in scopes.
   def prune_or_revoke_oauth_grant(app)
     grant = current_user.oauth_grants.find_by(provider: app.oauth_provider)
     return unless grant
+    return if active_connectors_for?(app.oauth_provider)
 
-    connector_scopes = active_connector_scopes_for(app.oauth_provider)
-    if connector_scopes.empty?
-      OauthBroker.revoke(grant)
-      grant.destroy
-    else
-      base = OauthBroker::SIGN_IN_SCOPES.fetch(app.oauth_provider, [])
-      grant.update!(scopes: (base + connector_scopes).uniq.join(" "))
-    end
+    OauthBroker.revoke(grant)
+    grant.destroy
   end
 
-  # The union of `oauth_scopes` across every OAuth-shaped connector
-  # the current user has wired through this provider — empty when
-  # they have no active connectors left for this provider.
-  def active_connector_scopes_for(provider)
+  # True if the current user still has any OAuth-shaped connector
+  # wired through this provider (after the just-destroyed one was
+  # cascade-removed from connector_credentials).
+  def active_connectors_for?(provider)
     catalog_keys = ConnectorCatalog.all.select { |a| a.oauth_provider == provider }.map(&:key)
     current_user.connector_credentials
                 .joins(:connector)
                 .where(connectors: { catalog_key: catalog_keys })
-                .flat_map { |c| c.connector.catalog_app.oauth_scopes }
-                .uniq
+                .exists?
   end
 end

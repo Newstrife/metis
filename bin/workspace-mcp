@@ -13,8 +13,10 @@
 #
 # Auto-restarts on crash with exponential backoff (capped at 30s) so a
 # transient failure doesn't take down the dev shell with it.
-
-set -e
+#
+# We **don't** use `set -e` — the restart loop EXPECTS the server to
+# exit non-zero on crash and recover; `set -e` would kill the script
+# on the first crash, the opposite of what the comment promises.
 
 # OAuth credentials are loaded by foreman from .env. The Devise
 # initializer reads the same vars; both processes agree on the
@@ -35,23 +37,24 @@ export WORKSPACE_MCP_STATELESS_MODE=true
 SOURCE="${WORKSPACE_MCP_SOURCE:-git+https://github.com/chagel/google_workspace_mcp}"
 PROJECT="${WORKSPACE_MCP_PROJECT:-}"  # local checkout, optional
 
-# Choose the run command:
-#   - WORKSPACE_MCP_PROJECT set + uv available → run from local source
-#   - uv available                              → uvx from git URL
-#   - workspace-mcp on PATH                     → run the installed binary
-# Fall through with a clear instruction when nothing works.
+# Choose the run command as a bash ARRAY so paths/URLs with spaces
+# survive expansion (the macOS "My Projects" trap). A plain string +
+# unquoted `$CMD` would word-split each component into separate argv
+# tokens and uv would see malformed args.
 build_cmd() {
   if [ -n "$PROJECT" ] && [ -d "$PROJECT" ] && command -v uv &> /dev/null; then
-    echo "uv run --project $PROJECT workspace-mcp"
+    CMD=(uv run --project "$PROJECT" workspace-mcp)
   elif command -v uv &> /dev/null; then
-    echo "uvx --from $SOURCE workspace-mcp"
+    CMD=(uvx --from "$SOURCE" workspace-mcp)
   elif command -v workspace-mcp &> /dev/null; then
-    echo "workspace-mcp"
+    CMD=(workspace-mcp)
+  else
+    CMD=()
   fi
 }
 
-CMD=$(build_cmd)
-if [ -z "$CMD" ]; then
+build_cmd
+if [ ${#CMD[@]} -eq 0 ]; then
   echo "[workspace-mcp] Neither 'uv' nor an installed 'workspace-mcp' binary is on PATH." >&2
   echo "[workspace-mcp] Install uv (https://docs.astral.sh/uv) or pipx install workspace-mcp." >&2
   echo "[workspace-mcp] (Or comment out the workspace_mcp line in Procfile.dev.)" >&2
@@ -60,8 +63,9 @@ fi
 
 DELAY=1
 while true; do
-  $CMD --transport streamable-http --permissions gmail:drafts
-  echo "[workspace-mcp] Process exited ($?), restarting in ${DELAY}s..." >&2
-  sleep $DELAY
+  "${CMD[@]}" --transport streamable-http --permissions gmail:drafts
+  status=$?
+  echo "[workspace-mcp] Process exited (${status}), restarting in ${DELAY}s..." >&2
+  sleep "$DELAY"
   DELAY=$((DELAY < 30 ? DELAY * 2 : 30))
 done

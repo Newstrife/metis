@@ -43,8 +43,13 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     params = request.env["omniauth.params"] || {}
 
     target = was_signed_in ? attach_identity(current_user, auth) : User.from_omniauth(auth)
-    record_grant(target, auth, provider)
-    activate_connector_if_requested(target, params, auth)
+    grant_recorded = record_grant(target, auth, provider)
+    # Only mark the connector as wired when the grant write that
+    # backs it actually landed — otherwise the marketplace tile would
+    # show "Connected" for a connector McpConfig drops every turn
+    # (no grant → no bearer), and the user would have no in-app path
+    # to re-trigger the OAuth flow.
+    activate_connector_if_requested(target, params, auth) if grant_recorded
     finish_sign_in(target, provider)
   rescue IdentityAlreadyLinked
     redirect_to return_path,
@@ -57,16 +62,18 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     redirect_to new_user_session_path, alert: "Sign-in failed."
   end
 
+  # True if the grant landed; false if it raised (logged + sign-in
+  # still proceeds, but the caller skips connector activation so the
+  # UI doesn't show a marker without a backing grant).
   def record_grant(target, auth, provider)
     OmniauthConnector.record_grant(target, auth, provider: provider)
+    true
   rescue StandardError => error
-    # Grant write failure shouldn't block a sign-in whose auth half
-    # worked — the user can re-trigger Connect later. McpConfig will
-    # drop the affected connector until the grant is recorded.
     Rails.logger.error(
       "Omniauth(#{provider}) grant write failed for user #{target&.id}: " \
       "#{error.class}: #{error.message}"
     )
+    false
   end
 
   def activate_connector_if_requested(target, params, auth)
