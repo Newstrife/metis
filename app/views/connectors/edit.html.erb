@@ -35,7 +35,8 @@
               </div>
                 <div class="conn-status-sub">Re-authorize if access stops working.</div>
               </div>
-              <%= link_to "Re-authorize", connector_github_start_path, class: "btn btn-ghost" %>
+              <%= button_to "Re-authorize", user_github_omniauth_authorize_path,
+                    data: { turbo: false }, class: "btn btn-ghost" %>
             </section>
           <% else %>
             <section class="conn-status">
@@ -47,7 +48,8 @@
                 <div class="conn-status-title">Not connected yet</div>
                 <div class="conn-status-sub">Each member connects their own <%= @app.name %> account.</div>
               </div>
-              <%= link_to "Authorize on #{@app.name}", connector_github_start_path, class: "btn btn-primary" %>
+              <%= button_to "Authorize on #{@app.name}", user_github_omniauth_authorize_path,
+                    data: { turbo: false }, class: "btn btn-primary" %>
             </section>
           <% end %>
         <% end %>

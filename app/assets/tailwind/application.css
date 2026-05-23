@@ -568,3 +568,23 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
 .conn-status-main { flex:1; min-width:0; }
 .conn-status-title { font-weight:600; font-size:14px; color:var(--ink); }
 .conn-status-sub { font-size:12.5px; color:var(--ink-3); margin-top:2px; }
+
+/* Devise — Sign in / Sign up with GitHub */
+.auth-oauth-row { display:flex; flex-direction:column; gap:14px; margin-top:18px; }
+.auth-oauth-row form { margin:0; }
+.auth-oauth {
+  width:100%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  font-family:var(--fb); font-size:14px; font-weight:600;
+  color:var(--ink); background:var(--card);
+  border:1px solid var(--line-2); border-radius:11px; padding:10px 14px;
+  transition:background-color .15s,border-color .15s;
+}
+.auth-oauth:hover { background:var(--bg); border-color:var(--ink-3); }
+.auth-oauth svg { width:18px; height:18px; }
+.auth-or {
+  display:flex; align-items:center; gap:12px;
+  font-family:var(--fm); font-size:10.5px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--faint);
+}
+.auth-or::before,.auth-or::after { content:""; flex:1; height:1px; background:var(--line); }

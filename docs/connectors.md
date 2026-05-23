@@ -131,6 +131,21 @@ silently from the rendered file, mirroring the existing "no credential
 the member can use → omit" policy. Members who have not connected
 simply have no GitHub entry in their `.mcp.json`.
 
+**One flow, both jobs.** The same GitHub App OAuth handles sign-in
+*and* connector authorization, through Devise OmniAuth
+(`omniauth-github`). "Sign in with GitHub" on the auth pages and
+"Connect" on the connectors marketplace tile both POST to
+`/users/auth/github/authorize`; GitHub returns to
+`/users/auth/github/callback`, where `Users::OmniauthCallbacksController`
+either finds/creates the user, signs them in, and upserts the GitHub
+Connector + per-member `ConnectorCredential` from the OAuth tokens — or,
+if the user was already signed in, attaches the GitHub identity to them
+and updates the connector. There is no separate "Connect GitHub" step:
+logging in via GitHub *is* the connection.
+
+Configure the GitHub App's callback URL as `/users/auth/github/callback`
+(it can hold several; add this one if you used a different path before).
+
 ## Accepted tradeoff
 
 A service that ships only a CLI, with no MCP server, is not connectable

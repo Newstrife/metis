@@ -19,6 +19,11 @@ gem "tailwindcss-rails"
 
 # Authentication
 gem "devise"
+# GitHub sign-in (Devise omniauthable) — uses the same GitHub App as
+# the connector. omniauth-rails_csrf_protection turns the authorize
+# request into a POST so it carries the CSRF token.
+gem "omniauth-github"
+gem "omniauth-rails_csrf_protection"
 
 # Render Markdown message content to HTML (GFM-compliant, native tables)
 gem "commonmarker"

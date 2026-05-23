@@ -21,11 +21,15 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".app-tile"
   end
 
-  test "new with an oauth app renders the authorize button" do
+  test "new with an oauth app redirects to the marketplace" do
     get new_connector_path(app: "github")
+    assert_redirected_to connectors_path
+  end
 
+  test "the marketplace tile for github authorizes via OmniAuth" do
+    get connectors_path
     assert_response :success
-    assert_select "a[href=?]", connector_github_start_path
+    assert_select "form[action=?]", user_github_omniauth_authorize_path
   end
 
   test "new with an already-connected app redirects to manage" do
@@ -39,12 +43,12 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "POSTing to connect an oauth app redirects through its OAuth start" do
+  test "POSTing to connect an oauth app redirects to the marketplace" do
     assert_no_difference([ "Connector.count", "ConnectorCredential.count" ]) do
       post connectors_path, params: { catalog_key: "github", credential: "ghp_secret" }
     end
 
-    assert_redirected_to connector_github_start_path
+    assert_redirected_to connectors_path
   end
 
   test "creating a custom connector from the structured form" do

@@ -2,6 +2,10 @@ ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
 
+# Tests never reach GitHub — every omniauth callback uses a mock_auth
+# set up by the test (or returns OmniAuth's default invalid_credentials).
+OmniAuth.config.test_mode = true
+
 module ActiveSupport
   class TestCase
     # Single-process until the suite is large enough to benefit. Parallel

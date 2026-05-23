@@ -20,7 +20,12 @@ class ConnectorsController < ApplicationController
   def new
     if (@app = ConnectorCatalog.find(params[:app]))
       existing = team.connectors.find_by(catalog_key: @app.key)
-      existing ? redirect_to(edit_connector_path(existing)) : render(:connect)
+      return redirect_to edit_connector_path(existing) if existing
+      # OAuth apps connect through Devise omniauth (the marketplace tile
+      # button POSTs straight to it); there's no intermediate page.
+      return redirect_to connectors_path if @app.oauth?
+
+      render :connect
     else
       @connector = team.connectors.new(transport: :stdio)
     end
@@ -69,7 +74,8 @@ class ConnectorsController < ApplicationController
   # --- catalog connect --------------------------------------------------
 
   def connect_app(app)
-    return redirect_to(connector_github_start_path) if app.oauth?
+    # OAuth apps come through the omniauth callback, not this endpoint.
+    return redirect_to(connectors_path) if app.oauth?
 
     connector = team.connectors.find_or_initialize_by(catalog_key: app.key)
     connector.update!(

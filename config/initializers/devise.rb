@@ -271,10 +271,16 @@ Devise.setup do |config|
   # The default HTTP method used to sign out a resource. Default is :delete.
   config.sign_out_via = :delete
 
-  # ==> OmniAuth
-  # Add a new OmniAuth provider. Check the wiki for more information on setting
-  # up on your models and hooks.
-  # config.omniauth :github, 'APP_ID', 'APP_SECRET', scope: 'user,public_repo'
+  # ==> OmniAuth — GitHub sign-in via the deployment's GitHub App.
+  # The same OAuth credentials drive the connector authorization, so
+  # signing in via GitHub also wires up the agent connector in one flow.
+  # When the env vars are absent (e.g. tests, no-OAuth deployments)
+  # the strategy is left unregistered.
+  if ENV["GITHUB_APP_CLIENT_ID"].present? && ENV["GITHUB_APP_CLIENT_SECRET"].present?
+    config.omniauth :github,
+                    ENV.fetch("GITHUB_APP_CLIENT_ID"),
+                    ENV.fetch("GITHUB_APP_CLIENT_SECRET")
+  end
 
   # ==> Warden configuration
   # If you want to use other strategies, that are not supported by Devise, or
