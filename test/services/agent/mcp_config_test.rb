@@ -71,13 +71,6 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     assert_equal [], rendered["mcpServers"].keys
   end
 
-  test "omits disabled connectors" do
-    add_connector(name: "on")
-    add_connector(name: "off", enabled: false)
-
-    assert_equal [ "on" ], rendered["mcpServers"].keys
-  end
-
   test "an oauth credential projects its live access token as a bearer header" do
     connector = add_connector(name: "github", transport: :http,
                               definition: { "url" => "https://mcp.example/" },

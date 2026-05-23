@@ -50,7 +50,7 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
   test "creating a custom connector from the structured form" do
     assert_difference("Connector.count", 1) do
       post connectors_path, params: {
-        connector: { name: "fs", transport: "stdio", enabled: "1", command: "npx", args: "-y" }
+        connector: { name: "fs", transport: "stdio", command: "npx", args: "-y" }
       }
     end
     assert_equal "npx", team.connectors.last.definition["command"]
@@ -63,7 +63,7 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
 
   test "updating an oauth app ignores any typed-in credential" do
     connector = github_connector
-    patch connector_path(connector), params: { connector: { enabled: "1" }, credential: "ghp_new" }
+    patch connector_path(connector), params: { credential: "ghp_new" }
 
     assert_nil connector.credential_for(@user)
   end

@@ -1,7 +1,7 @@
-# One configured MCP server, owned by a team. Each enabled connector
-# becomes a `mcpServers` entry in the `.mcp.json` the runtime stages for
-# a turn; pi-mcp-adapter then exposes its tools to the agent. The
-# non-secret server definition lives here; secrets are separate
+# One configured MCP server, owned by a team. Each connector becomes a
+# `mcpServers` entry in the `.mcp.json` the runtime stages for a turn;
+# pi-mcp-adapter then exposes its tools to the agent. The non-secret
+# server definition lives here; secrets are separate
 # ConnectorCredentials, shared or per-member. See docs/connectors.md.
 class Connector < ApplicationRecord
   belongs_to :team
@@ -9,8 +9,6 @@ class Connector < ApplicationRecord
 
   # stdio — a `command` server entry; http — a `url` server entry.
   enum :transport, { stdio: 0, http: 1 }
-
-  scope :enabled, -> { where(enabled: true) }
 
   validates :name, presence: true,
                     format: { with: /\A[a-z0-9][a-z0-9_-]*\z/i },

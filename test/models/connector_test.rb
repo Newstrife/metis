@@ -86,14 +86,6 @@ class ConnectorTest < ActiveSupport::TestCase
     assert_nil connector.credential_for(make_user)
   end
 
-  test "the enabled scope returns only enabled connectors" do
-    on = stdio_connector(name: "on")
-    on.save!
-    stdio_connector(name: "off", enabled: false).save!
-
-    assert_equal [ on.id ], team.connectors.enabled.pluck(:id)
-  end
-
   test "destroying a connector destroys its credentials" do
     connector = stdio_connector
     connector.save!

@@ -1,6 +1,6 @@
 module Agent
   # Renders the `.mcp.json` that pi-mcp-adapter reads, from the
-  # conversation team's enabled Connectors. Each connector resolves to
+  # conversation team's Connectors. Each connector resolves to
   # the conversation member's credential — their own, else the team's
   # shared one. A connector the member has no credential for is omitted;
   # a connector with no credentials at all is kept (a no-auth server).
@@ -32,7 +32,7 @@ module Agent
     private
 
     def connectors
-      @conversation.team.connectors.enabled
+      @conversation.team.connectors
     end
 
     # A connector's server entry for this conversation's member, or nil

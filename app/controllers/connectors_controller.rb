@@ -41,7 +41,7 @@ class ConnectorsController < ApplicationController
   end
 
   def update
-    @connector.assign_attributes(connector_update_params)
+    @connector.assign_attributes(custom_params) unless @connector.catalog_key
     if @connector.save
       save_credential
       redirect_to edit_connector_path(@connector), notice: "Connector saved."
@@ -105,28 +105,18 @@ class ConnectorsController < ApplicationController
     end
   end
 
+  # Custom connectors only — a catalog connector's definition is owned
+  # by the catalog and has no editable structural fields here.
   def custom_params
     form = connector_form
     {
       name: form[:name], transport: form[:transport],
-      enabled: form.fetch(:enabled, true), definition: definition_from(form)
-    }
-  end
-
-  # A catalog connector's definition is owned by the catalog — only its
-  # enabled flag is editable. A custom one edits its whole definition.
-  def connector_update_params
-    form = connector_form
-    return { enabled: form.fetch(:enabled, true) } if @connector.catalog_key
-
-    {
-      name: form[:name], transport: form[:transport],
-      enabled: form.fetch(:enabled, true), definition: definition_from(form)
+      definition: definition_from(form)
     }
   end
 
   def connector_form
-    params.require(:connector).permit(:name, :transport, :enabled, :command, :args, :url)
+    params.require(:connector).permit(:name, :transport, :command, :args, :url)
   end
 
   # The structured form posts transport-specific fields; assemble them

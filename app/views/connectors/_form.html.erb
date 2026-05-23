@@ -32,11 +32,6 @@
           id: "connector_url", placeholder: "https://example.com/mcp" %>
   </div>
 
-  <label class="field-check">
-    <%= f.check_box :enabled %>
-    <span>Enabled — staged into the agent's <code>.mcp.json</code>.</span>
-  </label>
-
   <div class="form-actions">
     <%= f.submit(connector.persisted? ? "Save connector" : "Create connector", class: "btn btn-primary") %>
     <%= link_to "Cancel", connectors_path, class: "btn btn-ghost" %>
