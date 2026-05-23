@@ -27,6 +27,7 @@ module Connectors
       connector = upsert_connector
       credential = connector.connector_credentials.find_or_initialize_by(user: current_user)
       credential.assign_oauth_token!(response)
+      capture_external_login(credential, response["access_token"])
       redirect_to edit_connector_path(connector), notice: "GitHub connected."
     rescue GithubApp::TokenService::Error => error
       Rails.logger.error("Connectors::GithubController#callback: #{error.message}")
@@ -34,6 +35,16 @@ module Connectors
     end
 
     private
+
+    # Best-effort capture of the member's GitHub `login` for display +
+    # agent context. The OAuth bundle is the load-bearing piece; if
+    # /user fails we still keep the credential.
+    def capture_external_login(credential, access_token)
+      info = GithubApp::UserInfo.fetch(access_token)
+      credential.update!(external_login: info["login"]) if info["login"].present?
+    rescue StandardError => error
+      Rails.logger.warn("Connectors::GithubController#callback: /user fetch failed: #{error.message}")
+    end
 
     def authorize_url(state)
       query = URI.encode_www_form(

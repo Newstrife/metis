@@ -51,8 +51,10 @@ class Connectors::GithubControllerTest < ActionDispatch::IntegrationTest
 
     with_config do
       with_stub(GithubApp::OauthClient, :exchange_code, ->(_code, redirect_uri:) { response_body }) do
-        assert_difference([ "Connector.count", "ConnectorCredential.count" ], 1) do
-          get connector_github_callback_path, params: { code: "abc", state: state }
+        with_stub(GithubApp::UserInfo, :fetch, ->(_token) { { "login" => "mgc", "id" => 42 } }) do
+          assert_difference([ "Connector.count", "ConnectorCredential.count" ], 1) do
+            get connector_github_callback_path, params: { code: "abc", state: state }
+          end
         end
       end
     end
@@ -61,7 +63,30 @@ class Connectors::GithubControllerTest < ActionDispatch::IntegrationTest
     credential = connector.credential_for(@user)
     assert_equal @user, credential.user
     assert_equal "live-token", credential.oauth_token["access_token"]
+    assert_equal "mgc", credential.external_login
     assert_redirected_to edit_connector_path(connector)
+  end
+
+  test "callback still succeeds when the /user fetch fails" do
+    state = GithubApp::StateToken.generate(user_id: @user.id)
+    response_body = {
+      "access_token" => "live-token", "refresh_token" => "rt-1", "expires_in" => 28_800
+    }
+
+    with_config do
+      with_stub(GithubApp::OauthClient, :exchange_code, ->(_code, redirect_uri:) { response_body }) do
+        with_stub(GithubApp::UserInfo, :fetch,
+                  ->(_token) { raise GithubApp::TokenService::Error, "boom" }) do
+          assert_difference("ConnectorCredential.count", 1) do
+            get connector_github_callback_path, params: { code: "abc", state: state }
+          end
+        end
+      end
+    end
+
+    credential = @user.personal_team.connectors.find_by(catalog_key: "github").credential_for(@user)
+    assert_equal "live-token", credential.oauth_token["access_token"]
+    assert_nil credential.external_login
   end
 
   test "callback rejects a tampered state" do

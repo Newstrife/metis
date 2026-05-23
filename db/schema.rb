@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_22_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_22_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -46,6 +46,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_120000) do
     t.bigint "connector_id", null: false
     t.datetime "created_at", null: false
     t.text "credentials"
+    t.string "external_login"
     t.datetime "updated_at", null: false
     t.bigint "user_id"
     t.index ["connector_id", "user_id"], name: "index_connector_credentials_on_connector_id_and_user_id", unique: true, nulls_not_distinct: true
@@ -59,6 +60,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_22_120000) do
     t.jsonb "definition", default: {}, null: false
     t.boolean "enabled", default: true, null: false
     t.string "name", null: false
+    t.jsonb "settings", default: {}, null: false
     t.bigint "team_id", null: false
     t.integer "transport", null: false
     t.datetime "updated_at", null: false
