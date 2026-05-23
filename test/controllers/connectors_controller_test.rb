@@ -26,10 +26,44 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to connectors_path
   end
 
-  test "the marketplace tile for github authorizes via OmniAuth" do
-    get connectors_path
-    assert_response :success
-    assert_select "form[action=?]", user_github_omniauth_authorize_path
+  test "the marketplace tile for github posts to the connector authorize URL with incremental scopes" do
+    with_stub(GithubApp::Config, :configured?, -> { true }) do
+      get connectors_path
+      assert_response :success
+      # The Connect button posts to the omniauth authorize URL with the
+      # connector's required scopes appended + prompt=consent — the
+      # incremental-scope flow that themis-style sign-up uses.
+      assert_select %(form[action^="#{user_github_omniauth_authorize_path}"]) do |forms|
+        action = forms.first[:action]
+        assert_includes action, "connect=github"
+        assert_includes action, "prompt=consent"
+        assert_includes action, "include_granted_scopes=true"
+        assert_match(/scope=[^&]*user(%3A|:)email/, action)
+        assert_match(/scope=[^&]*repo/, action)
+      end
+    end
+  end
+
+  test "the marketplace does not show an oauth connect button when provider config is absent" do
+    with_stub(GoogleApp::Config, :configured?, -> { false }) do
+      get connectors_path
+      assert_response :success
+
+      assert_select %(form[action^="#{user_google_oauth2_omniauth_authorize_path}"]), false
+      assert_select ".app-state", text: "OAuth — coming soon"
+    end
+  end
+
+  test "oauth manage page explains missing provider config" do
+    connector = github_connector
+
+    with_stub(GithubApp::Config, :configured?, -> { false }) do
+      get edit_connector_path(connector)
+      assert_response :success
+
+      assert_select ".conn-status-title", text: "GitHub OAuth is not configured"
+      assert_select %(form[action^="#{user_github_omniauth_authorize_path}"]), false
+    end
   end
 
   test "new with an already-connected app redirects to manage" do

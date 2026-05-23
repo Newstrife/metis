@@ -107,44 +107,123 @@ still the OAuth broker — it runs the authorization flow, stores per-user
 and per-team tokens encrypted, and hands them to the bridge. The win is
 *one* uniform implementation of the right shape, not zero work.
 
-## GitHub — the OAuth shape, concretely
+## OAuth, incremental — sign-in and connector are different acts
 
-The GitHub connector is the first one with `auth: oauth` in the catalog,
-and it sets the pattern. Each member authorizes the metis GitHub App
-once; metis stores a per-member access + refresh token (encrypted, on
-`ConnectorCredential`); the MCP server receives the live access token
-as `Authorization: Bearer …`. The agent acts **as that member** — not
-as a bot — so commits, reviews, and issue traffic carry the right
-identity, and what the agent can see is exactly what the member can.
+Metis splits the OAuth flow into two distinct phases, on the same
+underlying provider grant:
 
-A single GitHub App registration drives this. The deployment configures
-its OAuth credentials in the environment — `GITHUB_APP_CLIENT_ID` and
-`GITHUB_APP_CLIENT_SECRET` (see `.env.example`). The app **must** have
-"User-to-server token expiration" active under Settings → Optional
-features (new Apps default to it); without it GitHub issues no refresh
-token and the 8-hour access token cannot be renewed without sending the
-member back through the flow.
+* **Sign in** asks for the minimum identity scopes only
+  (`email,profile` for Google, `user:email` for GitHub). The user
+  picks an account, we record a `User` + `Identity` + a per-(user,
+  provider) `OauthGrant` carrying those scopes. No connectors are
+  wired by sign-in.
+* **Connect <connector>** sends the user *back* through OAuth via
+  `connector_authorize_path_for(app)`, which builds an authorize URL
+  with `scope = sign-in scopes + connector's oauth_scopes`,
+  `prompt: consent`, and `include_granted_scopes: true`. The new
+  grant unions with the prior one; the callback marks the connector
+  as wired for this user (a `ConnectorCredential` row with no
+  secret — just presence).
 
-`GithubApp::TokenService` mints/refreshes the access token on demand
-when staging `.mcp.json`; if a refresh fails, the connector is dropped
-silently from the rendered file, mirroring the existing "no credential
-the member can use → omit" policy. Members who have not connected
-simply have no GitHub entry in their `.mcp.json`.
+The win: when the deployment adds a *new* connector later (Drive on
+top of Gmail), the user sees consent only for the new scope — Google
+shows the new permission and asks for it explicitly. The
+all-or-nothing consent at sign-in is gone, and adding scopes after
+the fact actually does prompt the user.
 
-**One flow, both jobs.** The same GitHub App OAuth handles sign-in
-*and* connector authorization, through Devise OmniAuth
-(`omniauth-github`). "Sign in with GitHub" on the auth pages and
-"Connect" on the connectors marketplace tile both POST to
-`/users/auth/github/authorize`; GitHub returns to
-`/users/auth/github/callback`, where `Users::OmniauthCallbacksController`
-either finds/creates the user, signs them in, and upserts the GitHub
-Connector + per-member `ConnectorCredential` from the OAuth tokens — or,
-if the user was already signed in, attaches the GitHub identity to them
-and updates the connector. There is no separate "Connect GitHub" step:
-logging in via GitHub *is* the connection.
+### Where the tokens live
 
-Configure the GitHub App's callback URL as `/users/auth/github/callback`
-(it can hold several; add this one if you used a different path before).
+* **`OauthGrant`** — one per `(user, provider)`. Holds the encrypted
+  access + refresh tokens, the expiry, and the union of every scope
+  ever granted. Single source of truth.
+* **`ConnectorCredential`** — for OAuth-shaped connectors, this is a
+  *marker*: its existence says "this member has wired this connector"
+  and McpConfig will stage it. The actual bearer comes from the
+  user's `OauthGrant`. For token-shaped connectors, this row holds
+  the secret directly (no change).
+
+`OauthBroker.access_token_for(grant)` mints/refreshes the access
+token when staging `.mcp.json`, dispatching to the per-provider
+client (`OauthBroker::Clients::Github`, `::Google`) based on the
+grant's `provider`. McpConfig checks that the grant covers the
+connector's `oauth_scopes` before staging; if not, the connector is
+dropped from the file (the member needs to Connect through the
+marketplace to add the missing scopes).
+
+### Disconnect, prune, revoke
+
+When a member disconnects an OAuth-shaped connector from the
+marketplace, the `ConnectorCredential` is destroyed and the grant's
+scope set is pruned to what the member's *remaining* connectors
+still need. When no OAuth-shaped connectors are left for that
+provider, `OauthBroker.revoke(grant)` severs the grant on the
+provider's side (Google: `https://oauth2.googleapis.com/revoke`;
+GitHub: `DELETE /applications/{client_id}/grant`) and the local
+`OauthGrant` is destroyed too. That's the "fully sever" semantics —
+the next Connect lands as a fresh consent screen because nothing is
+on file anywhere.
+
+### Per-provider notes
+
+* **GitHub**: the App must have "User-to-server token expiration"
+  active under Settings → Optional features (new Apps default to it)
+  — without it GitHub issues no refresh token. Callback URL:
+  `/users/auth/github/callback`. Connector scopes: `repo`, `read:user`.
+* **Google**: Devise sign-in passes `access_type: offline` for a
+  refresh token, `prompt: select_account` so returning users can
+  pick the right account without re-consent, and
+  `include_granted_scopes: true` so per-connector grants union with
+  the sign-in grant. Per-connector authorize URLs override with
+  `prompt: consent`. Refresh responses omit `refresh_token`;
+  `OauthGrant#absorb!` preserves the prior one.
+
+### Gmail — self-hosted MCP server
+
+We **don't** use Google's hosted `gmailmcp.googleapis.com` because
+it gates tool execution at the OAuth-client level — every call from
+a non-allowlisted client (including ours) returns "caller does not
+have permission" regardless of OAuth scopes. Instead the Gmail
+catalog entry points at a self-hosted instance of
+[`chagel/google_workspace_mcp`](https://github.com/chagel/google_workspace_mcp),
+run in external-OAuth mode so it validates the bearer metis sends
+against Google's userinfo API per request.
+
+The catalog URL comes from `GMAIL_MCP_URL` via ERB
+(`config/connector_catalog.yml`), so the same code targets a local
+dev server (`http://localhost:10299/mcp/`) or a hosted instance.
+
+`bin/dev` boots the server alongside Rails via Procfile.dev's
+`workspace_mcp` entry (`bin/workspace-mcp`). The launcher defaults
+to `uvx --from git+https://github.com/chagel/google_workspace_mcp
+workspace-mcp` — uv pulls + caches the package on first run, no
+local checkout needed. (Requires uv: https://docs.astral.sh/uv.)
+
+Three escape hatches via env vars:
+
+- `WORKSPACE_MCP_SOURCE` — pin a tag or commit, e.g.
+  `git+https://github.com/chagel/google_workspace_mcp@v1.2.3`.
+- `WORKSPACE_MCP_PROJECT` — point at a local source checkout when
+  you're developing the MCP server itself.
+- `WORKSPACE_MCP_PORT` — change the listen port (matches GMAIL_MCP_URL).
+
+The launcher reads `GOOGLE_OAUTH_CLIENT_ID` /
+`GOOGLE_OAUTH_CLIENT_SECRET` from the environment (same vars the
+Devise initializer uses), exports `MCP_ENABLE_OAUTH21=true` +
+`EXTERNAL_OAUTH21_PROVIDER=true`, and auto-restarts on crash with
+exponential backoff.
+
+The server picks which Gmail tools to expose based on the scopes
+the bearer was granted. The metis catalog asks for `gmail.readonly`
++ `gmail.compose` today (read + draft tier); expand the catalog's
+`oauth_scopes` list to enable label-modification or send tools.
+
+## Identities, not a single provider per user
+
+A user has many `Identity` rows — one per provider they've signed in
+through or whose connector they've authorized. Sign-in looks up the
+user by `(provider, uid)` first and falls back to email match, so a
+GitHub user can additionally connect Google (and vice versa) without
+forking a second account.
 
 ## Accepted tradeoff
 

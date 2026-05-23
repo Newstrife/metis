@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Starts the Google Workspace MCP server in external-OAuth mode for
+# the metis Gmail connector. Used by Procfile.dev. The server
+# validates the bearer metis sends against Google's userinfo API and
+# dispatches Gmail tools based on the token's scopes; metis never
+# gives it a refresh token or its own consent flow.
+#
+# Default install: `uvx` pulls the fork (chagel/google_workspace_mcp)
+# straight from GitHub on first run and caches it — no source checkout
+# to maintain. Override `WORKSPACE_MCP_SOURCE` to pin a tag/commit, or
+# set `WORKSPACE_MCP_PROJECT` to a local checkout when you're developing
+# the server itself.
+#
+# Auto-restarts on crash with exponential backoff (capped at 30s) so a
+# transient failure doesn't take down the dev shell with it.
+#
+# We **don't** use `set -e` — the restart loop EXPECTS the server to
+# exit non-zero on crash and recover; `set -e` would kill the script
+# on the first crash, the opposite of what the comment promises.
+
+# OAuth credentials loaded by foreman from .env. Devise's initializer
+# reads the same vars so both processes agree on the client the user's
+# grant was issued against. Hard-stop if unset — otherwise the server
+# boots and every request fails opaquely inside the restart loop.
+# Exit 0 so foreman doesn't take the rest of the Procfile down.
+if [ -z "${GOOGLE_OAUTH_CLIENT_ID:-}" ] || [ -z "${GOOGLE_OAUTH_CLIENT_SECRET:-}" ]; then
+  echo "[workspace-mcp] GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET must both be set." >&2
+  echo "[workspace-mcp] Add them to .env (see .env.example) or comment out workspace_mcp in Procfile.dev." >&2
+  exit 0
+fi
+export GOOGLE_OAUTH_CLIENT_ID
+export GOOGLE_OAUTH_CLIENT_SECRET
+
+export WORKSPACE_MCP_PORT=${WORKSPACE_MCP_PORT:-10299}
+# Unset PORT so the server uses WORKSPACE_MCP_PORT rather than the
+# generic PORT that foreman injects (which collides with the web process).
+unset PORT
+export MCP_ENABLE_OAUTH21=true
+export EXTERNAL_OAUTH21_PROVIDER=true
+export WORKSPACE_MCP_STATELESS_MODE=true
+
+# The package source. uv understands `git+<url>@<ref>` so the same
+# value can pin a tag (…@v1.2.3) or a commit (…@<sha>).
+SOURCE="${WORKSPACE_MCP_SOURCE:-git+https://github.com/chagel/google_workspace_mcp}"
+PROJECT="${WORKSPACE_MCP_PROJECT:-}"  # local checkout, optional
+
+# Choose the run command as a bash ARRAY so paths/URLs with spaces
+# survive expansion (the macOS "My Projects" trap). A plain string +
+# unquoted `$CMD` would word-split each component into separate argv
+# tokens and uv would see malformed args.
+build_cmd() {
+  if [ -n "$PROJECT" ] && [ -d "$PROJECT" ] && command -v uv &> /dev/null; then
+    CMD=(uv run --project "$PROJECT" workspace-mcp)
+  elif command -v uv &> /dev/null; then
+    CMD=(uvx --from "$SOURCE" workspace-mcp)
+  elif command -v workspace-mcp &> /dev/null; then
+    CMD=(workspace-mcp)
+  else
+    CMD=()
+  fi
+}
+
+build_cmd
+if [ ${#CMD[@]} -eq 0 ]; then
+  echo "[workspace-mcp] Neither 'uv' nor an installed 'workspace-mcp' binary is on PATH." >&2
+  echo "[workspace-mcp] Install uv (https://docs.astral.sh/uv) or pipx install workspace-mcp." >&2
+  echo "[workspace-mcp] (Or comment out the workspace_mcp line in Procfile.dev.)" >&2
+  exit 0
+fi
+
+DELAY=1
+while true; do
+  "${CMD[@]}" --transport streamable-http --permissions gmail:drafts
+  status=$?
+  echo "[workspace-mcp] Process exited (${status}), restarting in ${DELAY}s..." >&2
+  sleep "$DELAY"
+  DELAY=$((DELAY < 30 ? DELAY * 2 : 30))
+done

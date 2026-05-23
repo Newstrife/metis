@@ -98,6 +98,48 @@ module ApplicationHelper
     buckets.reject { |_, list| list.empty? }
   end
 
+  # The plain "Sign in with X" / "Connect X account" authorize path
+  # for a catalog app — the *sign-in* shape, with no extra scopes.
+  # Returns nil if the app's provider strategy isn't wired up.
+  def omniauth_authorize_path_for(app)
+    strategy = OauthBroker.omniauth_strategy(app.oauth_provider)
+    return nil unless strategy
+    return nil unless oauth_provider_configured?(app.oauth_provider)
+
+    send("user_#{strategy}_omniauth_authorize_path")
+  end
+
+  # The *connect this connector* authorize path — same omniauth
+  # strategy, but with the connector's required oauth_scopes added
+  # on top of the base sign-in scopes, prompt=consent so the user
+  # sees the new scope on the consent screen, and
+  # include_granted_scopes so the new grant unions with whatever the
+  # user has already authorized. The callback dispatches on the
+  # `connect=<key>` param to upsert the connector marker.
+  def connector_authorize_path_for(app)
+    strategy = OauthBroker.omniauth_strategy(app.oauth_provider)
+    return nil unless strategy
+    return nil unless oauth_provider_configured?(app.oauth_provider)
+
+    scopes = (OauthBroker::SIGN_IN_SCOPES.fetch(app.oauth_provider, []) + app.oauth_scopes).uniq.join(",")
+    send("user_#{strategy}_omniauth_authorize_path",
+         connect: app.key,
+         scope: scopes,
+         prompt: "consent",
+         include_granted_scopes: true)
+  end
+
+  def oauth_provider_configured?(provider)
+    case OauthBroker.normalize_provider(provider) || provider.to_s
+    when "github"
+      GithubApp::Config.configured?
+    when "google"
+      GoogleApp::Config.configured?
+    else
+      false
+    end
+  end
+
   private
 
   def add_link_target_blank(html)

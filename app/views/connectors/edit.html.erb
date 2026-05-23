@@ -19,7 +19,18 @@
         <p class="pane-lead"><%= @app.description %></p>
 
         <% if @app.oauth? %>
-          <% if @credential&.oauth_token %>
+          <% oauth_path = connector_authorize_path_for(@app) %>
+          <% if oauth_path.nil? %>
+            <section class="conn-status">
+              <div class="conn-status-main">
+                <div class="conn-status-title"><%= @app.name %> OAuth is not configured</div>
+                <div class="conn-status-sub">
+                  This deployment hasn't set OAuth credentials for <%= @app.name %>.
+                  Ask your admin to configure it before connecting.
+                </div>
+              </div>
+            </section>
+          <% elsif @credential&.oauth_ready? %>
             <section class="conn-status ok">
               <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                    stroke-width="2" aria-hidden="true">
@@ -35,7 +46,7 @@
               </div>
                 <div class="conn-status-sub">Re-authorize if access stops working.</div>
               </div>
-              <%= button_to "Re-authorize", user_github_omniauth_authorize_path,
+              <%= button_to "Re-authorize", oauth_path,
                     data: { turbo: false }, class: "btn btn-ghost" %>
             </section>
           <% else %>
@@ -48,7 +59,7 @@
                 <div class="conn-status-title">Not connected yet</div>
                 <div class="conn-status-sub">Each member connects their own <%= @app.name %> account.</div>
               </div>
-              <%= button_to "Authorize on #{@app.name}", user_github_omniauth_authorize_path,
+              <%= button_to "Authorize on #{@app.name}", oauth_path,
                     data: { turbo: false }, class: "btn btn-primary" %>
             </section>
           <% end %>

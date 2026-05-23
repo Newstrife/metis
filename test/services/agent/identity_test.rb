@@ -36,8 +36,11 @@ class Agent::IdentityTest < ActiveSupport::TestCase
       name: "github", transport: :http,
       definition: { "url" => "https://mcp.example/" }, catalog_key: "github"
     )
-    cred = connector.connector_credentials.create!(user: conversation.user)
-    cred.assign_oauth_token!({ "access_token" => "live", "expires_in" => 3600 })
+    connector.connector_credentials.create!(user: conversation.user)
+    conversation.user.oauth_grants.create!(
+      provider: "github", access_token: "live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "user:email repo read:user"
+    )
 
     out = render
 
@@ -46,6 +49,25 @@ class Agent::IdentityTest < ActiveSupport::TestCase
 
   test "explicitly notes when no connectors are wired" do
     assert_match(/None enabled/i, render)
+  end
+
+  test "an OAuth connector with no covering grant is described as not authorized, not 'as you'" do
+    # Connector + credential marker exist, but the OauthGrant either
+    # isn't present or doesn't cover the catalog scopes — the same
+    # condition that makes McpConfig drop the connector for this turn.
+    # The identity prompt must mirror that gate; if it lies, the agent
+    # reads 'as you (OAuth)' and burns turns calling tools it doesn't have.
+    connector = conversation.team.connectors.create!(
+      name: "github", transport: :http,
+      definition: { "url" => "https://mcp.example/" }, catalog_key: "github"
+    )
+    connector.connector_credentials.create!(user: conversation.user)
+    # No OauthGrant for this user.
+
+    out = render
+
+    refute_match(/as you \(OAuth\)/i, out, "identity must not lie when McpConfig drops the connector")
+    assert_match(/not yet authorized/i, out)
   end
 
   test "tells the agent that uploads and .mcp.json are projected inputs" do

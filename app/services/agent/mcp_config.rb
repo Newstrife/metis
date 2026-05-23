@@ -37,8 +37,20 @@ module Agent
 
     # A connector's server entry for this conversation's member, or nil
     # to omit it: omitted when the connector has credentials but none the
-    # member can use; kept (definition only) when it has none at all.
+    # member can use; omitted when its catalog_key points at a missing
+    # entry (data is misconfigured — better silent-drop than render a
+    # likely-broken no-auth server); kept (definition only) when it has
+    # no credentials at all (a no-auth server).
     def server_entry(connector)
+      if connector.catalog_key.present? && connector.catalog_app.nil?
+        Rails.logger.error(
+          "McpConfig: connector #{connector.id} (#{connector.name}) references " \
+          "catalog_key=#{connector.catalog_key.inspect} which has no entry — " \
+          "dropping from .mcp.json"
+        )
+        return nil
+      end
+
       credential = connector.credential_for(@conversation.user)
       return nil if credential.nil? && connector.connector_credentials.exists?
 
@@ -54,15 +66,36 @@ module Agent
     end
 
     # The header/env values a credential contributes to its connector's
-    # entry. `nil` means: omit the connector entirely (an OAuth refresh
-    # failed). `{}` means: contribute nothing (a no-auth server).
+    # entry. `nil` means: omit the connector entirely (no usable OAuth
+    # grant, or refresh failed). `{}` means: contribute nothing (a
+    # no-auth server).
     def secrets_for(connector, credential)
       return {} if credential.nil?
-      return credential.credential_map unless credential.oauth_token
 
-      token = GithubApp::TokenService.access_token_for(credential)
-      connector.catalog_app&.credential_map_for(token) || {}
-    rescue GithubApp::TokenService::Error => error
+      app = connector.catalog_app
+      return credential.credential_map unless app&.oauth?
+
+      grant = credential.oauth_grant
+      if grant.nil?
+        Rails.logger.warn(
+          "McpConfig: connector #{connector.id} (#{connector.name}) has no OAuth " \
+          "grant for user #{@conversation.user_id} — dropping from .mcp.json"
+        )
+        return nil
+      end
+
+      unless grant.covers?(app.oauth_scopes)
+        Rails.logger.warn(
+          "McpConfig: connector #{connector.id} (#{connector.name}) needs " \
+          "#{app.oauth_scopes.inspect} but user #{@conversation.user_id}'s grant " \
+          "only has #{grant.scope_set.inspect} — dropping from .mcp.json"
+        )
+        return nil
+      end
+
+      token = OauthBroker.access_token_for(grant)
+      app.credential_map_for(token) || {}
+    rescue OauthBroker::Error => error
       Rails.logger.error("McpConfig: OAuth refresh failed for connector " \
                           "#{connector.id}: #{error.message}")
       nil

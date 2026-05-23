@@ -277,9 +277,42 @@ Devise.setup do |config|
   # When the env vars are absent (e.g. tests, no-OAuth deployments)
   # the strategy is left unregistered.
   if ENV["GITHUB_APP_CLIENT_ID"].present? && ENV["GITHUB_APP_CLIENT_SECRET"].present?
+    # `scope: "user:email"` tells omniauth-github to call /user/emails
+    # and pick the user's primary verified address — the basic /user
+    # endpoint omits email unless it's set public on the profile. The
+    # GitHub App must also have the "Email addresses (read)" user
+    # permission set on github.com for this to return anything.
     config.omniauth :github,
                     ENV.fetch("GITHUB_APP_CLIENT_ID"),
-                    ENV.fetch("GITHUB_APP_CLIENT_SECRET")
+                    ENV.fetch("GITHUB_APP_CLIENT_SECRET"),
+                    scope: "user:email"
+  end
+
+  # Google sign-in. This is the **sign-in** strategy — it asks for
+  # the smallest scope set that lets us identify the user (`email,
+  # profile`) and nothing else. Connector scopes (Gmail, Drive, …) are
+  # added incrementally through `connector_authorize_path_for(app)` in
+  # `application_helper.rb`, which builds its own authorize URL with
+  # `prompt: consent` + `include_granted_scopes: true` per connector.
+  #
+  # - `access_type: offline` keeps a refresh_token across all flows.
+  # - `prompt: select_account` shows the account picker on returning
+  #   sign-ins (the user can switch Google accounts) without forcing
+  #   a re-consent on every sign-in.
+  # - `include_granted_scopes: true` lets later per-connector grants
+  #   union with this base set, so the user holds one Google grant
+  #   that covers everything they've ever connected.
+  # `test/controllers/users/omniauth_callbacks_controller_test.rb`
+  # locks these options in place so a refactor can't strip them
+  # without the test failing.
+  if ENV["GOOGLE_OAUTH_CLIENT_ID"].present? && ENV["GOOGLE_OAUTH_CLIENT_SECRET"].present?
+    config.omniauth :google_oauth2,
+                    ENV.fetch("GOOGLE_OAUTH_CLIENT_ID"),
+                    ENV.fetch("GOOGLE_OAUTH_CLIENT_SECRET"),
+                    scope: "email,profile",
+                    access_type: "offline",
+                    prompt: "select_account",
+                    include_granted_scopes: true
   end
 
   # ==> Warden configuration

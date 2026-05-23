@@ -101,9 +101,17 @@ module Agent
     def connector_auth_description(connector, app)
       credential = connector.credential_for(user)
       return "no credential — you'll see the server, but it may reject calls" if credential.nil?
-      return "as you (OAuth)" if credential.oauth_token
 
-      app&.oauth? ? "as you (OAuth)" : (credential.user_id ? "as you" : "team-shared credential")
+      if app&.oauth?
+        # Mirror McpConfig's gate exactly — telling the agent it's
+        # authenticated when McpConfig is actually dropping the
+        # connector makes the agent try tools it doesn't have.
+        return "as you (OAuth)" if credential.oauth_ready?
+
+        return "OAuth not yet authorized — connector will be omitted from this turn"
+      end
+
+      credential.user_id ? "as you" : "team-shared credential"
     end
 
     def enabled_connectors

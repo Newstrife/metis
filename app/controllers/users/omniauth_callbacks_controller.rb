@@ -1,52 +1,116 @@
-# Receives the GitHub OAuth callback for both sign-in and connector
-# authorization — one flow, no separate "Connect GitHub" step. Reuses
-# the OAuth tokens to upsert the member's GitHub Connector +
-# ConnectorCredential so the agent can act on GitHub as them right away.
+# Receives OAuth callbacks for two flows on the same omniauth URL:
+#
+# * **Sign in** (`POST /users/auth/<provider>`) — base scopes only,
+#   creates/updates the user, records the OauthGrant. No connector
+#   side-effects.
+# * **Connect a connector** (`POST /users/auth/<provider>?connect=<key>
+#   &scope=<base+connector>&prompt=consent&include_granted_scopes=true`)
+#   — sent by the marketplace "Connect" button. Records the grant
+#   (now carrying the connector's scopes) AND creates a per-member
+#   ConnectorCredential marker on the team's Connector.
+#
+# The dispatch on `omniauth.params["connect"]` is what splits the two
+# paths — sign-in carries no `connect`, connect-flow carries the
+# catalog key. See docs/connectors.md.
 class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
-  def github
-    auth = request.env["omniauth.auth"]
-    target = user_signed_in? ? attach_identity(current_user, auth) : User.from_github_omniauth(auth)
-    upsert_github_connector(target, auth)
+  # Raised when a signed-in user tries to link an identity already
+  # claimed by another Metis user. The controller turns this into a
+  # specific alert, not the generic "Sign-in failed."
+  class IdentityAlreadyLinked < StandardError; end
 
-    if user_signed_in?
-      redirect_to after_sign_in_path_for(target), notice: "Connected to GitHub."
-    else
-      sign_in_and_redirect target, event: :authentication
-    end
-  rescue StandardError => error
-    Rails.logger.error("GitHub omniauth failed: #{error.class}: #{error.message}")
-    redirect_to new_user_session_path, alert: "GitHub sign-in failed."
+  def github
+    handle(OauthBroker.normalize_provider("github"))
+  end
+
+  def google_oauth2
+    handle(OauthBroker.normalize_provider("google_oauth2"))
   end
 
   def failure
-    redirect_to new_user_session_path, alert: "GitHub sign-in was cancelled."
+    redirect_to new_user_session_path, alert: "Sign-in was cancelled."
   end
 
   private
 
+  def handle(provider)
+    # Capture sign-in state up front — Devise's omniauth controller
+    # mutates the warden session during processing, so user_signed_in?
+    # read inside a rescue is unreliable.
+    was_signed_in = user_signed_in?
+    return_path   = was_signed_in ? root_path : new_user_session_path
+
+    auth   = request.env["omniauth.auth"]
+    params = request.env["omniauth.params"] || {}
+
+    target = was_signed_in ? attach_identity(current_user, auth) : User.from_omniauth(auth)
+    grant_recorded = record_grant(target, auth, provider)
+    # Only mark the connector as wired when the grant write that
+    # backs it actually landed — otherwise the marketplace tile would
+    # show "Connected" for a connector McpConfig drops every turn
+    # (no grant → no bearer), and the user would have no in-app path
+    # to re-trigger the OAuth flow.
+    activate_connector_if_requested(target, params, auth) if grant_recorded
+    finish_sign_in(target, provider)
+  rescue IdentityAlreadyLinked
+    redirect_to return_path,
+                alert: "This #{provider.titleize} account is already linked to another Metis user."
+  rescue StandardError => error
+    Rails.logger.error(
+      "Omniauth(#{provider}) failed: #{error.class}: #{error.message}\n" \
+      "#{error.backtrace.first(5).join("\n")}"
+    )
+    redirect_to new_user_session_path, alert: "Sign-in failed."
+  end
+
+  # True if the grant landed; false if it raised (logged + sign-in
+  # still proceeds, but the caller skips connector activation so the
+  # UI doesn't show a marker without a backing grant).
+  def record_grant(target, auth, provider)
+    OmniauthConnector.record_grant(target, auth, provider: provider)
+    true
+  rescue StandardError => error
+    Rails.logger.error(
+      "Omniauth(#{provider}) grant write failed for user #{target&.id}: " \
+      "#{error.class}: #{error.message}"
+    )
+    false
+  end
+
+  def activate_connector_if_requested(target, params, auth)
+    catalog_key = params["connect"].presence
+    return if catalog_key.blank?
+
+    app = ConnectorCatalog.find(catalog_key)
+    return unless app
+
+    OmniauthConnector.activate_connector(target, app, auth)
+  rescue StandardError => error
+    # Connector activation failure is non-fatal for the same reason as
+    # grant write failure — the sign-in half succeeded.
+    Rails.logger.error(
+      "Omniauth connector activation failed for user #{target&.id} app=#{params['connect']}: " \
+      "#{error.class}: #{error.message}"
+    )
+  end
+
+  def finish_sign_in(target, provider)
+    if user_signed_in?
+      redirect_to after_sign_in_path_for(target), notice: "Connected to #{provider.titleize}."
+    else
+      sign_in_and_redirect target, event: :authentication
+    end
+  end
+
   def attach_identity(user, auth)
-    user.update!(provider: "github", uid: auth.uid.to_s)
+    user.identities.find_or_create_by!(provider: auth.provider, uid: auth.uid.to_s)
     user
-  end
-
-  def upsert_github_connector(user, auth)
-    app = ConnectorCatalog.find("github")
-    connector = user.personal_team.connectors.find_or_initialize_by(catalog_key: "github")
-    connector.update!(name: "github", transport: app.transport, definition: app.definition)
-    credential = connector.connector_credentials.find_or_initialize_by(user: user)
-    credential.assign_oauth_token!(github_token_bundle(auth.credentials))
-    credential.update!(external_login: auth.info.nickname) if auth.info.nickname.present?
-  end
-
-  # Map OmniAuth credentials into the response shape ConnectorCredential
-  # expects (matches the direct OAuth code-exchange response).
-  def github_token_bundle(credentials)
-    expires_in = credentials.expires_at ? credentials.expires_at - Time.current.to_i : nil
-    {
-      "access_token" => credentials.token,
-      "refresh_token" => credentials.refresh_token,
-      "expires_in" => expires_in,
-      "scope" => credentials.respond_to?(:scope) ? credentials.scope : nil
-    }.compact
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
+    # The (provider, uid) is owned by a different user — the scoped
+    # find_or_create_by missed it, and either the model's uniqueness
+    # validation (RecordInvalid) or the DB index (RecordNotUnique)
+    # rejected the insert. Identity's only validation that can fail
+    # here is the unique (provider, uid), so we treat both as the
+    # same "already linked elsewhere" condition.
+    raise IdentityAlreadyLinked
   end
 end

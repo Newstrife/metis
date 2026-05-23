@@ -24,4 +24,19 @@ class ConnectorCatalogTest < ActiveSupport::TestCase
   test "by_category groups the apps" do
     assert_includes ConnectorCatalog.by_category.keys, "Development"
   end
+
+  test "ERB in the catalog yaml interpolates from the environment" do
+    # The Gmail entry sources its MCP server URL from GMAIL_MCP_URL via
+    # ERB, so a self-hosted google_workspace_mcp can move between dev
+    # and prod without a code change. Verify the interpolation fires.
+    original = ENV["GMAIL_MCP_URL"]
+    ENV["GMAIL_MCP_URL"] = "https://workspace-mcp.example/mcp/"
+    ConnectorCatalog.instance_variable_set(:@all, nil)
+
+    assert_equal "https://workspace-mcp.example/mcp/",
+                 ConnectorCatalog.find("gmail").definition["url"]
+  ensure
+    original.nil? ? ENV.delete("GMAIL_MCP_URL") : ENV["GMAIL_MCP_URL"] = original
+    ConnectorCatalog.instance_variable_set(:@all, nil)
+  end
 end

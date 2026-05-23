@@ -58,6 +58,70 @@ class ChatJobTest < ActiveSupport::TestCase
     assert @assistant_message.done?
   end
 
+  test "strips U+0000 from a tool call's output so the turn persists" do
+    run_with([
+               Agent::UiEvent.new(:tool_call_started,
+                                  data: { tool_call_id: "t1", name: "bash", args: { "command" => "od file" } }),
+               Agent::UiEvent.new(:tool_call_finished,
+                                  data: { tool_call_id: "t1",
+                                          output: "ok\x00here", is_error: false }),
+               Agent::UiEvent.new(:turn_finished)
+             ])
+
+    @assistant_message.reload
+    assert_predicate @assistant_message, :done?, "turn should persist instead of getting stuck"
+    assert_equal "okhere", @assistant_message.tool_calls.sole["output"]
+  end
+
+  test "strips U+0000 from Hash keys nested in a tool call's output" do
+    # A tool-call output Hash whose KEY contains U+0000 — the original
+    # scrub_null_bytes used transform_values and missed keys, leaving
+    # the poisoned key to crash the JSON write the scrub was meant to
+    # prevent.
+    run_with([
+               Agent::UiEvent.new(:tool_call_started,
+                                  data: { tool_call_id: "t-k", name: "read_files",
+                                          args: { "paths" => [ "ok" ] } }),
+               Agent::UiEvent.new(:tool_call_finished,
+                                  data: { tool_call_id: "t-k",
+                                          output: { "path\x00bad" => "data" },
+                                          is_error: false }),
+               Agent::UiEvent.new(:turn_finished)
+             ])
+
+    @assistant_message.reload
+    assert_predicate @assistant_message, :done?
+    output = @assistant_message.tool_calls.sole["output"]
+    assert_equal({ "pathbad" => "data" }, output)
+  end
+
+  test "strips U+0000 from streamed text and reasoning" do
+    run_with([
+               Agent::UiEvent.new(:text_delta, data: { delta: "hi\x00bye" }),
+               Agent::UiEvent.new(:reasoning_delta, data: { delta: "think\x00ing" }),
+               Agent::UiEvent.new(:turn_finished)
+             ])
+
+    @assistant_message.reload
+    assert_equal "hibye", @assistant_message.content
+    assert_equal "thinking", @assistant_message.reasoning
+  end
+
+  test "fail_message reloads before updating so a poisoned in-memory state can't block recovery" do
+    # Simulate the original bug: the persist update has already been
+    # attempted and rolled back, leaving the in-memory record dirty
+    # with content PostgreSQL would refuse. fail_message must reload
+    # to drop those dirty attrs, otherwise it rolls back too and the
+    # message stays frozen mid-turn.
+    @assistant_message.streaming_status = :streaming
+    @assistant_message.content = "ok\x00here"
+
+    ChatJob.new.send(:fail_message, @assistant_message, nil, "the agent run failed.")
+
+    @assistant_message.reload
+    assert_predicate @assistant_message, :errored?
+  end
+
   test "persists the reasoning log and tool calls so they survive a refresh" do
     run_with([
                Agent::UiEvent.new(:reasoning_delta, data: { delta: "thinking " }),

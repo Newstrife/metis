@@ -57,7 +57,9 @@ class ConnectorsController < ApplicationController
   end
 
   def destroy
+    app = @connector.catalog_app
     @connector.destroy
+    prune_or_revoke_oauth_grant(app) if app&.oauth?
     redirect_to connectors_path, notice: "#{@connector.name} disconnected."
   end
 
@@ -148,5 +150,44 @@ class ConnectorsController < ApplicationController
 
     credential = @connector.connector_credentials.find_or_initialize_by(user: current_user)
     credential.update!(credential_map: app.credential_map_for(params[:credential]))
+  end
+
+  # On disconnect of an OAuth-shaped connector: revoke the grant on
+  # the provider's side and destroy the local row IFF no other
+  # OAuth-shaped connectors for this provider remain wired to the
+  # user. Otherwise leave the grant alone.
+  #
+  # We deliberately do NOT prune `grant.scopes` when other connectors
+  # remain — we have no way to ask Google to shrink the authorization
+  # (Google's revoke is all-or-nothing), so the local scope set should
+  # reflect what Google actually has, not what we *wish* they had.
+  # Rewriting `scopes` locally would silently drop coverage for
+  # scopes the user still legitimately holds (e.g. catalog tightened
+  # mid-life, or a scope shared between two connectors gets dropped
+  # when one is disconnected).
+  #
+  # Revoke-on-last is the part that matters: after the user disconnects
+  # their last OAuth connector for a provider, the next "Sign in" or
+  # "Connect" lands as a *fresh* OAuth — the only reliable way to get
+  # the consent screen back (with the grant on file, `prompt=consent`
+  # is silently downgraded to `prompt=none`).
+  def prune_or_revoke_oauth_grant(app)
+    grant = current_user.oauth_grants.find_by(provider: app.oauth_provider)
+    return unless grant
+    return if active_connectors_for?(app.oauth_provider)
+
+    OauthBroker.revoke(grant)
+    grant.destroy
+  end
+
+  # True if the current user still has any OAuth-shaped connector
+  # wired through this provider (after the just-destroyed one was
+  # cascade-removed from connector_credentials).
+  def active_connectors_for?(provider)
+    catalog_keys = ConnectorCatalog.all.select { |a| a.oauth_provider == provider }.map(&:key)
+    current_user.connector_credentials
+                .joins(:connector)
+                .where(connectors: { catalog_key: catalog_keys })
+                .exists?
   end
 end

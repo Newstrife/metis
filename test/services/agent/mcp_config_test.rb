@@ -71,14 +71,15 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     assert_equal [], rendered["mcpServers"].keys
   end
 
-  test "an oauth credential projects its live access token as a bearer header" do
+  test "an oauth credential projects its grant's live access token as a bearer header" do
     connector = add_connector(name: "github", transport: :http,
                               definition: { "url" => "https://mcp.example/" },
                               catalog_key: "github")
-    cred = connector.connector_credentials.create!(user: member)
-    cred.assign_oauth_token!({
-      "access_token" => "live", "refresh_token" => "rt", "expires_in" => 3600
-    })
+    connector.connector_credentials.create!(user: member)
+    member.oauth_grants.create!(
+      provider: "github", access_token: "live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "repo read:user user:email"
+    )
 
     assert_equal({ "Authorization" => "Bearer live" }, rendered["mcpServers"]["github"]["headers"])
   end
@@ -87,11 +88,48 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     connector = add_connector(name: "github", transport: :http,
                               definition: { "url" => "https://mcp.example/" },
                               catalog_key: "github")
-    cred = connector.connector_credentials.create!(user: member)
-    cred.assign_oauth_token!({ "access_token" => "expired", "expires_in" => -10 })
+    connector.connector_credentials.create!(user: member)
+    member.oauth_grants.create!(
+      provider: "github", access_token: "expired", refresh_token: "rt",
+      expires_at: 10.seconds.ago, scopes: "repo read:user user:email"
+    )
 
-    with_stub(GithubApp::OauthClient, :refresh, ->(_) { raise GithubApp::TokenService::Error, "boom" }) do
+    with_stub(GithubApp::OauthClient, :refresh, ->(_) { raise OauthBroker::Error, "boom" }) do
       assert_equal [], rendered["mcpServers"].keys
     end
+  end
+
+  test "an oauth connector with no grant for the user is dropped" do
+    connector = add_connector(name: "github", transport: :http,
+                              definition: { "url" => "https://mcp.example/" },
+                              catalog_key: "github")
+    connector.connector_credentials.create!(user: member)
+    # No OauthGrant for this user — they never completed the connect flow.
+
+    assert_equal [], rendered["mcpServers"].keys
+  end
+
+  test "an oauth connector whose grant lacks required scopes is dropped" do
+    connector = add_connector(name: "github", transport: :http,
+                              definition: { "url" => "https://mcp.example/" },
+                              catalog_key: "github")
+    connector.connector_credentials.create!(user: member)
+    # Grant exists but only has sign-in scope — missing repo + read:user.
+    member.oauth_grants.create!(
+      provider: "github", access_token: "live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "user:email"
+    )
+
+    assert_equal [], rendered["mcpServers"].keys
+  end
+
+  test "an oauth credential whose catalog entry has gone missing is dropped" do
+    connector = add_connector(name: "ghost", transport: :http,
+                              definition: { "url" => "https://mcp.example/" },
+                              catalog_key: "nope-removed")
+    connector.connector_credentials.create!(user: member)
+
+    assert_equal [], rendered["mcpServers"].keys,
+                 "connector with no catalog entry must be dropped, not rendered without auth"
   end
 end

@@ -88,4 +88,32 @@ class ApplicationHelperTest < ActionView::TestCase
   test "activity_summary falls back to Activity for a bare finished turn" do
     assert_equal "Activity", activity_summary(Message.new(streaming_status: :done))
   end
+
+  test "connector_authorize_path_for returns nil when the provider is not configured" do
+    app = ConnectorCatalog.find("gmail")
+
+    with_stub(GoogleApp::Config, :configured?, -> { false }) do
+      assert_nil connector_authorize_path_for(app)
+    end
+  end
+
+  test "connector_authorize_path_for returns an incremental OAuth URL when configured" do
+    app = ConnectorCatalog.find("github")
+
+    with_stub(GithubApp::Config, :configured?, -> { true }) do
+      path = connector_authorize_path_for(app)
+
+      assert_includes path, user_github_omniauth_authorize_path
+      assert_includes path, "connect=github"
+      assert_includes path, "prompt=consent"
+      assert_includes path, "include_granted_scopes=true"
+      assert_match(/scope=[^&]*repo/, path)
+    end
+  end
+
+  test "oauth_provider_configured? normalizes omniauth strategy names" do
+    with_stub(GoogleApp::Config, :configured?, -> { true }) do
+      assert oauth_provider_configured?(:google_oauth2)
+    end
+  end
 end
