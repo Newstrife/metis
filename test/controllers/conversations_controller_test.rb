@@ -60,23 +60,24 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
-  test "sidebar paginates with a sentinel when there are more than one page of conversations" do
+  test "sidebar paginates with a sentinel when more pages exist" do
     sign_in @user
     stub_const(ApplicationController, :SIDEBAR_PAGE_SIZE, 2) do
       3.times { |i| @user.conversations.create!(title: "Convo #{i}") }
       get conversations_path
       assert_response :success
-      assert_select "#convos-sentinel[data-sidebar-infinite-scroll-url-value*='page=2']"
+      assert_select "#convos-list[data-controller='infinite-scroll']"
+      assert_select "#convos-sentinel[data-infinite-scroll-target='sentinel'][data-url*='page=2']"
       assert_select "#convos-list .convo", count: 2
     end
   end
 
-  test "sidebar omits the active sentinel when only one page exists" do
+  test "sidebar omits the sentinel when only one page exists" do
     sign_in @user
     @user.conversations.create!(title: "Only")
     get conversations_path
     assert_response :success
-    assert_select "#convos-sentinel[data-controller]", count: 0
+    assert_select "#convos-sentinel", count: 0
   end
 
   test "endless-scroll turbo_stream returns the next page of conversations" do
@@ -87,7 +88,9 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
           headers: { "Accept" => "text/vnd.turbo-stream.html" }
       assert_response :success
       assert_equal "text/vnd.turbo-stream.html", response.media_type
-      assert_match(/turbo-stream/, response.body)
+      # Append items before the sentinel, then remove it (last page).
+      assert_match(/turbo-stream action="before" target="convos-sentinel"/, response.body)
+      assert_match(/turbo-stream action="remove" target="convos-sentinel"/, response.body)
       assert_match(/Convo 0/, response.body)
     end
   end

@@ -69,41 +69,31 @@ module ApplicationHelper
     format("%gk", (count / 100.0).round / 10.0)
   end
 
-  # Group conversations (already ordered newest-first) by last activity
-  # into calendar recency buckets for the sidebar — today, yesterday,
-  # then the current week and month. Empty buckets are dropped. Matches
-  # Themis's inbox_time_bucket.
-  def conversation_groups(conversations)
-    now = Time.current
-    buckets = {
-      "Today" => [], "Yesterday" => [],
-      "This week" => [], "This month" => [], "Older" => []
-    }
-    conversations.each do |conversation|
-      at = conversation.updated_at
-      bucket =
-        if at.to_date == now.to_date
-          "Today"
-        elsif at.to_date == now.yesterday.to_date
-          "Yesterday"
-        elsif at >= now.beginning_of_week
-          "This week"
-        elsif at >= now.beginning_of_month
-          "This month"
-        else
-          "Older"
-        end
-      buckets[bucket] << conversation
-    end
-    buckets.reject { |_, list| list.empty? }
-  end
+  # Recency-bucket labels for the sidebar conversation list. Buckets
+  # are addressed by symbol (data) and rendered via the label (display)
+  # — same split as Themis's inbox_time_bucket.
+  CONVERSATION_TIME_BUCKET_LABELS = {
+    today: "Today",
+    yesterday: "Yesterday",
+    this_week: "This week",
+    this_month: "This month",
+    older: "Older"
+  }.freeze
 
-  # Stable dom id for a recency bucket label — the endless-scroll
-  # turbo_stream targets `#{dom_id_for_bucket(label)}-items` to append
-  # new conversations into an existing bucket without duplicating its
-  # header.
-  def dom_id_for_bucket(label)
-    "convo-group-#{label.to_s.parameterize}"
+  # The recency bucket a timestamp falls into. Used by _convo_items to
+  # emit an inline group header only when the bucket changes from the
+  # previous row — endless-scroll passes the last page's final bucket
+  # back via `last_bucket=`, so cross-page continuity is automatic.
+  def conversation_time_bucket(timestamp)
+    return :older unless timestamp
+
+    now = Time.current
+    if timestamp.to_date == now.to_date           then :today
+    elsif timestamp.to_date == now.yesterday.to_date then :yesterday
+    elsif timestamp >= now.beginning_of_week      then :this_week
+    elsif timestamp >= now.beginning_of_month     then :this_month
+    else :older
+    end
   end
 
   # The plain "Sign in with X" / "Connect X account" authorize path

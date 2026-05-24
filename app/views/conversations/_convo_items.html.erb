@@ -1,0 +1,17 @@
+<%# locals: (conversations:, last_bucket: nil, grouped: true)
+
+    Flat-render a slice of the conversation list. When `grouped` is true,
+    emit a `.grp-label` header only when the recency bucket changes from
+    the previous row \u2014 the `last_bucket` local carries the previous
+    page's final bucket, so cross-page continuity is automatic. %>
+<% prev_bucket = last_bucket.presence&.to_sym %>
+<% conversations.each do |conversation| %>
+  <% if grouped %>
+    <% bucket = conversation_time_bucket(conversation.updated_at) %>
+    <% if bucket != prev_bucket %>
+      <div class="grp-label"><%= CONVERSATION_TIME_BUCKET_LABELS[bucket] %></div>
+      <% prev_bucket = bucket %>
+    <% end %>
+  <% end %>
+  <%= render "conversations/convo", conversation: conversation %>
+<% end %>

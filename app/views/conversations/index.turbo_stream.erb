@@ -1,32 +1,19 @@
 <%# Endless-scroll response for the sidebar conversation list.
-    Returned to the sidebar-infinite-scroll Stimulus controller when it
-    asks for ?page=N. We emit one turbo_stream per recency-bucket on
-    this page, plus a replacement for the sentinel so the controller
-    knows whether to keep observing. %>
-<%
-  groups = conversation_groups(@conversations)
-  prev_bucket = params[:prev_bucket].to_s
-%>
-<% groups.each_with_index do |(label, conversations), i| %>
-  <% if i.zero? && label == prev_bucket %>
-    <%# Continue the previous page's last bucket — append rows into
-        its existing items container, no duplicate header. %>
-    <%= turbo_stream.append "#{dom_id_for_bucket(label)}-items" do %>
-      <% conversations.each do |conversation| %>
-        <%= render "conversations/convo", conversation: conversation %>
-      <% end %>
-    <% end %>
-  <% else %>
-    <%# A bucket the sidebar hasn't shown yet — add the whole block. %>
-    <%= turbo_stream.append "convos-list" do %>
-      <%= render "conversations/convo_group",
-            label: label, conversations: conversations %>
-    <% end %>
-  <% end %>
-<% end %>
+    Inserts the next page's rows *before* the sentinel and either
+    swaps the sentinel for a fresh one (more pages) or removes it
+    (last page). The flat _convo_items walker handles cross-page
+    group continuity via `last_bucket`. %>
+<%= turbo_stream.before "convos-sentinel",
+      partial: "conversations/convo_items",
+      locals: { conversations: @conversations,
+                last_bucket: params[:last_bucket],
+                grouped: true } %>
 
-<%= turbo_stream.replace "convos-sentinel" do %>
-  <%= render "conversations/convo_sentinel",
-        pagy: @sidebar_pagy,
-        prev_bucket: groups.keys.last || prev_bucket %>
+<% if @sidebar_pagy.next %>
+  <%= turbo_stream.replace "convos-sentinel",
+        partial: "conversations/convo_sentinel",
+        locals: { pagy: @sidebar_pagy,
+                  last_bucket: conversation_time_bucket(@conversations.last.updated_at) } %>
+<% else %>
+  <%= turbo_stream.remove "convos-sentinel" %>
 <% end %>

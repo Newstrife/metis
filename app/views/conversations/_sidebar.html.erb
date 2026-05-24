@@ -1,7 +1,8 @@
 <%# The persistent shell sidebar: brand, conversation search + list, user.
     Rendered by the "chat" layout on every conversations page. The list
-    is paginated with Pagy and loads more on scroll via the sidebar
-    infinite-scroll Stimulus controller (see _convo_sentinel.html.erb). %>
+    is paginated with Pagy; the infinite-scroll Stimulus controller on
+    #convos-list watches the sentinel target at the bottom and fetches
+    the next page as a turbo_stream when it scrolls into view. %>
 <aside class="sidebar" data-controller="conversation-filter">
   <div class="ws">
     <div class="ws-name">Metis</div>
@@ -32,21 +33,21 @@
            data-action="input->conversation-filter#filter">
   </div>
 
-  <nav class="convos" aria-label="Conversations">
-    <% groups = conversation_groups(@conversations) %>
-    <div id="convos-list">
-      <% if groups.any? %>
-        <% groups.each do |label, conversations| %>
-          <%= render "conversations/convo_group", label: label, conversations: conversations %>
-        <% end %>
+  <nav class="convos" aria-label="Conversations" data-turbo-prefetch="false">
+    <div id="convos-list" data-controller="infinite-scroll">
+      <% if @conversations.any? %>
+        <%= render "conversations/convo_items",
+              conversations: @conversations,
+              last_bucket: nil,
+              grouped: true %>
+        <%= render "conversations/convo_sentinel",
+              pagy: @sidebar_pagy,
+              last_bucket: conversation_time_bucket(@conversations.last.updated_at) %>
       <% else %>
         <div class="convos-empty">No conversations yet — start one on the right.</div>
       <% end %>
     </div>
     <div class="convos-empty" data-conversation-filter-target="empty" hidden>No matches.</div>
-    <%= render "conversations/convo_sentinel",
-          pagy: @sidebar_pagy,
-          prev_bucket: groups.keys.last %>
   </nav>
 
   <nav class="nav" aria-label="Navigate">

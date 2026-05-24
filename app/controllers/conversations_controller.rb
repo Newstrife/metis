@@ -11,7 +11,7 @@ class ConversationsController < ApplicationController
       format.html
       # Endless-scroll fetch from the sidebar: only the incremental
       # page's groups are sent back, plus a refreshed sentinel. See
-      # app/javascript/controllers/sidebar_infinite_scroll_controller.js.
+      # app/javascript/controllers/infinite_scroll_controller.js.
       format.turbo_stream
     end
   end
