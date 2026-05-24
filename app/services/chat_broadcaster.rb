@@ -90,14 +90,32 @@ class ChatBroadcaster
   end
 
   def start_tool(event)
+    collapse_previous_tool
     broadcast(:append, target: "#{base_id}_tools", partial: "messages/tool_call",
-                       locals: record_tool(event, status: :running))
+                       locals: record_tool(event, status: :running).merge(open: true))
   end
 
   def update_tool(event)
     status = event.type == :tool_call_finished ? :done : :running
+    is_latest = event[:tool_call_id] == @tools.keys.last
     broadcast(:replace, target: "tool_#{event[:tool_call_id]}", partial: "messages/tool_call",
-                        locals: record_tool(event, status: status))
+                        locals: record_tool(event, status: status).merge(open: is_latest))
+  end
+
+  # Re-render the previously-latest tool (if any) collapsed, so only the
+  # newest tool stays expanded while a turn streams.
+  def collapse_previous_tool
+    prev_id = @tools.keys.last
+    return unless prev_id
+
+    prev = @tools[prev_id]
+    status = prev[:output].present? ? :done : :running
+    broadcast(:replace, target: "tool_#{prev_id}", partial: "messages/tool_call",
+                        locals: {
+                          tool_call_id: prev_id, name: prev[:name], args: prev[:args],
+                          output: prev[:output], is_error: prev[:is_error],
+                          status: status, open: false
+                        })
   end
 
   def finish

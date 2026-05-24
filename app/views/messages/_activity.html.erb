@@ -12,7 +12,8 @@
         <% message.tool_calls.each do |call| %>
           <%= render "messages/tool_call",
                 tool_call_id: call["tool_call_id"], name: call["name"], args: call["args"],
-                output: call["output"], is_error: call["is_error"], status: call["status"] %>
+                output: call["output"], is_error: call["is_error"], status: call["status"],
+                open: false %>
         <% end %>
       </div>
     </div>
