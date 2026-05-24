@@ -9,7 +9,7 @@
 %>
 <% groups.each_with_index do |(label, conversations), i| %>
   <% if i.zero? && label == prev_bucket %>
-    <%# Continue the previous page's last bucket \u2014 append rows into
+    <%# Continue the previous page's last bucket — append rows into
         its existing items container, no duplicate header. %>
     <%= turbo_stream.append "#{dom_id_for_bucket(label)}-items" do %>
       <% conversations.each do |conversation| %>
@@ -17,7 +17,7 @@
       <% end %>
     <% end %>
   <% else %>
-    <%# A bucket the sidebar hasn't shown yet \u2014 add the whole block. %>
+    <%# A bucket the sidebar hasn't shown yet — add the whole block. %>
     <%= turbo_stream.append "convos-list" do %>
       <%= render "conversations/convo_group",
             label: label, conversations: conversations %>
