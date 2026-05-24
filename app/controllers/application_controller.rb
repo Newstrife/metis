@@ -20,15 +20,15 @@ class ApplicationController < ActionController::Base
   # the "chat" layout. Controllers opt in with `before_action`.
   #
   # Paginated with Pagy's :countless paginator so we never run a COUNT
-  # over the user's full history just to render the sidebar — the next
-  # page is discoverable from `@sidebar_pagy.next` and the items array
-  # size (see docs at ddnexus.github.io/pagy/toolbox/paginators/countless).
+  # over the user's full history just to render the sidebar — it uses
+  # a LIMIT+1 probe instead, so `@sidebar_pagy.next` is populated. (Do
+  # not pass `headless: true`: that mode drops the +1 probe and demands
+  # callers compare `@records.size` against `:limit` themselves.)
   def set_sidebar
     @sidebar_pagy, @conversations = pagy(
       :countless,
       current_user.conversations.recent,
-      limit: SIDEBAR_PAGE_SIZE,
-      headless: true
+      limit: SIDEBAR_PAGE_SIZE
     )
   end
 end
