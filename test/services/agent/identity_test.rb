@@ -26,9 +26,14 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/`local`.*not a security/i, render(runtime_kind: "local"))
   end
 
-  test "sandboxed runtimes name the per-turn archive lifecycle" do
-    assert_match(/session archive/i, render(runtime_kind: "docker"))
-    refute_match(/session archive/i, render(runtime_kind: "local"))
+  test "tells the agent that working-tree files persist between turns" do
+    # All three runtimes are now persistent enough that this holds:
+    # Local on the host filesystem, Docker via the bind mount, E2b via
+    # the session archive. The agent doesn't need to know which.
+    %w[local docker e2b].each do |kind|
+      assert_match(/persist between turns/, render(runtime_kind: kind),
+                   "runtime #{kind} should name persistence")
+    end
   end
 
   test "lists enabled connectors with how the agent acts on them" do
@@ -93,6 +98,11 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/GH_TOKEN/, out)
     assert_match(/gh pr\s+create/, out)
     assert_match(/main/i, out)
+    # The v2 positive framing — the working tree persists. The old
+    # "push to survive" rule is gone; if it reappears here, AGENTS.md
+    # and the runtime have drifted.
+    assert_match(/working tree persists/i, out)
+    refute_match(/scratch/i, out, "AGENTS.md must not describe the working tree as scratch")
   end
 
   test "omits the Coding tools section when the GitHub grant lacks the `repo` scope" do

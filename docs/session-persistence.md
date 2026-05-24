@@ -15,20 +15,25 @@ agent ran — so it belongs to the `Runtime`, not to one shared mechanism.
 - **`Runtime::Local`** — pi runs as a host subprocess on a stable
   filesystem. pi's own file-based session management is enough: the scope
   lives in a persistent, conversation-stable directory and `--continue`
-  resumes it. No archiving. (Valid because Local is single-operator /
-  single-host by definition — multi-host production is what the sandbox
-  runtimes are for.)
+  resumes it. No archiving.
 
-- **`Runtime::Docker` / `Runtime::E2b`** — the execution environment is
-  isolated and disposable: a `--rm` container, a killed microVM. Its
-  filesystem is, by design, separate from metis's durable storage and gone
-  after the turn. Continuity therefore *requires* externalizing state —
-  archive the scope to Active Storage after each turn, restore it before
-  the next. This isn't optional; it is what makes a sandboxed agent
-  runtime possible at all.
+- **`Runtime::Docker`** — the container is still `--rm` and disposable,
+  but the conversation's scope is a **persistent host directory
+  bind-mounted into it**. The container's ephemerality stays a security
+  boundary; persistence rides on the bind mount, which is metis's
+  durable storage. No archive — the host filesystem is the durable
+  source. See [`coding-runtime.md`](coding-runtime.md). The constraint
+  that follows (workers all need access to the persistent workspace
+  root) is the same one `Local` has always had.
 
-`Agent::SessionArchive` is the **sandbox runtimes'** persistence
-mechanism — not a universal layer.
+- **`Runtime::E2b`** — the microVM has no bind mount to a host
+  filesystem; its disk is genuinely gone after the turn. Continuity
+  therefore *still requires* externalizing state — archive the scope to
+  Active Storage after each turn, restore it before the next. The same
+  v2 shape Docker just adopted is on the roadmap (snapshot/restore via
+  E2B's native `pause`/`resume`) but is not shipped yet.
+
+`Agent::SessionArchive` is now used by `Runtime::E2b` only.
 
 ## Scope layout
 
@@ -42,8 +47,9 @@ mechanism — not a universal layer.
 Some workspace contents are *projections* of durable Rails state, not
 agent-produced output: user uploads, the rendered MCP connector config,
 the agent's per-turn boot identity. Each is read straight from its
-durable source at the start of every turn, and **excluded from the
-session archive**.
+durable source at the start of every turn, and **overwritten in place**
+on the persistent workspace (`Local`, `Docker`) or **excluded from the
+session archive** (`E2b`) — same intent expressed in two ways.
 
 | Projected input | Source |
 |---|---|
@@ -51,17 +57,9 @@ session archive**.
 | `workspace/.mcp.json` | `Connector` + `ConnectorCredential` (see [`connectors.md`](connectors.md)) |
 | `workspace/AGENTS.md` | `Conversation` + `Team` + runtime (see [`agent-identity.md`](agent-identity.md)) |
 
-The archive then carries only the transcript and the agent's own
-working files. Archive size becomes independent of upload, connector,
-and identity-doc size — each costs once at its durable source, not
-once per turn.
-
-## Phasing
-
-- **Phase 1 (this change)** — per-runtime persistence (Local goes
-  pi-native) and uploads-as-projected-inputs.
-- **Phase 2 (later)** — split the sandbox archive into `sessions/` and
-  `workspace/`, and skip re-archiving `workspace/` on turns that did not
-  change it.
-- **Phase 3 (deferred — YAGNI)** — delta / content-addressed archiving,
-  for the case where the agent itself builds a very large workspace.
+For `E2b`, the archive then carries only the transcript and the
+agent's own working files — archive size is independent of upload,
+connector, and identity-doc size, each of which costs once at its
+durable source, not once per turn. For `Local` and `Docker` the
+projection writes overwrite the previous turn's file in place, with
+the same end state.

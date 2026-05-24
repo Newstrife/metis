@@ -5,13 +5,13 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     @user = User.create!(email: "rt-docker@example.com", password: "password123")
     @conversation = @user.conversations.create!
     @runtime = Agent::Runtime::Docker.new(conversation: @conversation)
-    @workspace = Agent::Workspace.scratch(@conversation)
+    @workspace = Agent::Workspace.persistent(@conversation)
     # Never shell out to `docker` for teardown in a unit test.
     @runtime.define_singleton_method(:remove_container) { nil }
   end
 
   teardown do
-    FileUtils.rm_rf(Agent::Workspace::SCRATCH_ROOT.join("u#{@user.id}"))
+    FileUtils.rm_rf(Agent::Workspace::PERSISTENT_ROOT.join("u#{@user.id}"))
   end
 
   # Swap PiAgent.session so #run never spawns `docker run`.
@@ -96,7 +96,7 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     assert_empty @runtime.sandbox_env
   end
 
-  test "run provisions the workspace, yields the session, and archives after" do
+  test "run provisions the workspace and yields the session — no archive" do
     session = fake_session
     yielded = nil
 
@@ -109,6 +109,27 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
 
     assert_equal session, yielded
     assert session.closed?, "session closed by the runtime"
-    assert @conversation.pi_session_archive.attached?, "scope archived"
+    refute @conversation.reload.pi_session_archive.attached?,
+           "Docker no longer archives — the persistent bind mount is the durable state holder"
+  end
+
+  test "files the agent writes survive into the next turn via the persistent bind mount" do
+    # Drop something into the workspace during the first turn; assert it
+    # is still there at the start of the second turn. This is the core
+    # property of the v2 lifecycle — no archive, no reset; the host dir
+    # bind-mounted into --rm containers is the conversation's memory.
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { @workspace.workspace_dir.join("wip.txt").write("hello") }
+    end
+
+    # A second runtime instance for the same conversation — a different
+    # turn / different worker / no shared in-memory state.
+    second_runtime = Agent::Runtime::Docker.new(conversation: @conversation)
+    second_runtime.define_singleton_method(:remove_container) { nil }
+    with_pi_session(fake_session) do
+      second_runtime.run(pi_args: [ "--mode", "rpc" ]) do
+        assert_equal "hello", @workspace.workspace_dir.join("wip.txt").read
+      end
+    end
   end
 end

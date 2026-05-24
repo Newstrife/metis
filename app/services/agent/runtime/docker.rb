@@ -9,11 +9,13 @@ module Agent
     # subprocess transport — no custom transport is needed (cf. E2b,
     # which bridges an HTTP API).
     #
-    # The conversation's scope directory is bind-mounted into the
-    # container. The container is disposable — fresh per turn, removed
-    # after — so the scope is scratch, restored from / captured back to
-    # the durable archive (Agent::SessionArchive) around each run. See
-    # docs/session-persistence.md.
+    # The conversation's scope directory is a persistent host path
+    # (Agent::Workspace.persistent) bind-mounted into the container, so
+    # the working tree, `.git`, dependency installs, and untracked WIP
+    # survive between turns naturally — no archive, no per-turn restore.
+    # The container itself is still disposable: --rm wipes anything
+    # outside the bind mount (system installs, $HOME) at end of turn.
+    # See docs/coding-runtime.md.
     #
     # Isolation: namespace + cgroup confinement and dropped capabilities
     # — stronger than Local (pi cannot reach the host filesystem beyond
@@ -23,6 +25,9 @@ module Agent
     # Assumes the worker has direct access to a Docker daemon and can
     # bind-mount host paths (not Docker-in-Docker). pi must be installed
     # in the image (config.x.agent.docker_image — see docker:image).
+    # Multi-worker deployments need shared access to the persistent
+    # workspace root (NFS or equivalent) or per-conversation host pinning
+    # — same shared-state constraint Local has always had.
     class Docker < Base
       # The conversation scope, bind-mounted from the host Workspace.
       SCOPE_DIR = "/metis".freeze
@@ -45,8 +50,7 @@ module Agent
       end
 
       def run(pi_args:)
-        workspace.reset!
-        Agent::SessionArchive.restore(conversation, into: workspace.scope_dir)
+        workspace.ensure!
         workspace.stage_uploads(conversation.uploaded_files)
         workspace.stage_mcp_config(mcp_config)
         workspace.stage_identity(identity_content)
@@ -57,7 +61,6 @@ module Agent
         ensure
           session.close
           remove_container
-          persist
         end
       end
 
@@ -70,7 +73,7 @@ module Agent
       private
 
       def workspace
-        @workspace ||= Agent::Workspace.scratch(conversation)
+        @workspace ||= Agent::Workspace.persistent(conversation)
       end
 
       def container_name
@@ -119,15 +122,6 @@ module Agent
       # killed before --rm could fire (e.g. an aborted turn). Best effort.
       def remove_container
         system("docker", "rm", "--force", container_name, out: File::NULL, err: File::NULL)
-      end
-
-      # Capture the scratch scope back to durable storage (uploads
-      # excluded — see SessionArchive). A persistence failure is logged,
-      # never raised — it must not crash the turn the user just saw.
-      def persist
-        Agent::SessionArchive.store(conversation, from: workspace.scope_dir)
-      rescue StandardError => e
-        Rails.logger.error("Runtime::Docker archive failed for conversation #{conversation.id}: #{e.message}")
       end
 
       def image

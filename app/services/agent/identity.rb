@@ -35,7 +35,9 @@ module Agent
         - **Operator** — #{operator_line}
         - **Team** — #{team.name}
         - **Runtime** — #{runtime_description}
-        - **Workspace** — files you write here persist between turns#{workspace_persistence_caveat}.
+        - **Workspace** — files you write here persist between turns.
+          Anything outside the working tree (system installs, `$HOME`)
+          may not.
         - **Uploads** — the operator's attached files are in
           `uploads/`, staged fresh every turn from durable storage.
 
@@ -76,12 +78,6 @@ module Agent
       else
         "`#{@runtime_kind}`"
       end
-    end
-
-    def workspace_persistence_caveat
-      return "" if @runtime_kind == "local"
-
-      ", restored from a session archive at the start and re-archived at the end"
     end
 
     def connectors_block
@@ -138,10 +134,11 @@ module Agent
         - Work on a feature branch and open a pull request via `gh pr
           create`. Don't push directly to `main` or other protected
           branches — the operator's repo settings reject it.
-        - Anything you want to survive into the next turn must be
-          pushed to GitHub before the turn ends. The working tree is
-          scratch — nothing under your `cwd` outside of `sessions/`
-          is preserved by the runtime#{coding_workspace_caveat}.
+        - The working tree persists across turns in this conversation,
+          so a clone, an in-progress edit, or installed dependencies
+          (`node_modules`, `vendor/bundle`, …) are still here next
+          turn. `git push` when work is ready to publish, not as a
+          save mechanism.
       MD
     end
 
@@ -150,14 +147,6 @@ module Agent
 
       grant = user.oauth_grants.find_by(provider: "github")
       grant&.covers?(%w[repo]) || false
-    end
-
-    def coding_workspace_caveat
-      # Sandboxed runtimes do archive workspace/, but the agent's
-      # mental model should be "treat the working tree as scratch" so
-      # it doesn't rely on quirks of archive layout. Leave the caveat
-      # empty for now — the rule is the rule across runtimes.
-      ""
     end
 
     def user = @conversation.user
