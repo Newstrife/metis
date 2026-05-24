@@ -35,10 +35,11 @@ gmail:
     # external OAuth mode (MCP_ENABLE_OAUTH21=true). The bearer is
     # metis's per-user OauthGrant for Google; the server validates it
     # against Google's userinfo API on every request and dispatches
-    # tools based on the token's scopes. Override GMAIL_MCP_URL in the
-    # environment when running the server somewhere other than the
-    # default port-8000 dev shell.
-    url: <%= ENV.fetch("GMAIL_MCP_URL", "http://localhost:10299/mcp/") %>
+    # tools based on the token's scopes. The same server hosts every
+    # Google connector (Gmail, Calendar, …); the bearer's scopes decide
+    # what each one can call. Override WORKSPACE_MCP_URL in the
+    # environment when running it somewhere other than the dev shell.
+    url: <%= ENV.fetch("WORKSPACE_MCP_URL", "http://localhost:10299/mcp/") %>
   auth: oauth
   oauth_provider: google
   # The full scope set workspace-mcp's `gmail:drafts` permission tier
@@ -51,6 +52,28 @@ gmail:
     - https://www.googleapis.com/auth/gmail.labels
     - https://www.googleapis.com/auth/gmail.modify
     - https://www.googleapis.com/auth/gmail.compose
+  credential:
+    header: Authorization
+    format: "Bearer %{token}"
+
+google_calendar:
+  name: Google Calendar
+  category: Productivity
+  description: Read and manage calendars, events, and invitations as the operator.
+  transport: http
+  definition:
+    # Same self-hosted workspace_mcp instance as gmail (see above) —
+    # the server dispatches calendar tools when the bearer carries
+    # calendar scopes.
+    url: <%= ENV.fetch("WORKSPACE_MCP_URL", "http://localhost:10299/mcp/") %>
+  auth: oauth
+  oauth_provider: google
+  # workspace-mcp's `calendar:full` tier: read + write on the user's
+  # calendars and event collection. One consent screen, all calendar
+  # tools (list/get/create/update/delete events, list calendars, …).
+  oauth_scopes:
+    - https://www.googleapis.com/auth/calendar
+    - https://www.googleapis.com/auth/calendar.events
   credential:
     header: Authorization
     format: "Bearer %{token}"

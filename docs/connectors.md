@@ -177,18 +177,21 @@ on file anywhere.
   `prompt: consent`. Refresh responses omit `refresh_token`;
   `OauthGrant#absorb!` preserves the prior one.
 
-### Gmail — self-hosted MCP server
+### Google connectors — self-hosted Workspace MCP
 
 We **don't** use Google's hosted `gmailmcp.googleapis.com` because
 it gates tool execution at the OAuth-client level — every call from
 a non-allowlisted client (including ours) returns "caller does not
-have permission" regardless of OAuth scopes. Instead the Gmail
-catalog entry points at a self-hosted instance of
+have permission" regardless of OAuth scopes. Instead each Google
+catalog entry (Gmail, Google Calendar, …) points at a single
+self-hosted instance of
 [`chagel/google_workspace_mcp`](https://github.com/chagel/google_workspace_mcp),
 run in external-OAuth mode so it validates the bearer metis sends
-against Google's userinfo API per request.
+against Google's userinfo API per request. One server, many
+connectors: the bearer's scopes decide which tools each connector
+can call.
 
-The catalog URL comes from `GMAIL_MCP_URL` via ERB
+The catalog URL comes from `WORKSPACE_MCP_URL` via ERB
 (`config/connector_catalog.yml`), so the same code targets a local
 dev server (`http://localhost:10299/mcp/`) or a hosted instance.
 
@@ -204,18 +207,22 @@ Three escape hatches via env vars:
   `git+https://github.com/chagel/google_workspace_mcp@v1.2.3`.
 - `WORKSPACE_MCP_PROJECT` — point at a local source checkout when
   you're developing the MCP server itself.
-- `WORKSPACE_MCP_PORT` — change the listen port (matches GMAIL_MCP_URL).
+- `WORKSPACE_MCP_PORT` — change the listen port (matches WORKSPACE_MCP_URL).
 
 The launcher reads `GOOGLE_OAUTH_CLIENT_ID` /
 `GOOGLE_OAUTH_CLIENT_SECRET` from the environment (same vars the
 Devise initializer uses), exports `MCP_ENABLE_OAUTH21=true` +
-`EXTERNAL_OAUTH21_PROVIDER=true`, and auto-restarts on crash with
-exponential backoff.
+`EXTERNAL_OAUTH21_PROVIDER=true`, passes
+`--permissions gmail:drafts calendar:full` so both tool families
+register, and auto-restarts on crash with exponential backoff.
 
-The server picks which Gmail tools to expose based on the scopes
-the bearer was granted. The metis catalog asks for `gmail.readonly`
-+ `gmail.compose` today (read + draft tier); expand the catalog's
-`oauth_scopes` list to enable label-modification or send tools.
+The server picks which tools to expose based on the scopes the
+bearer was granted. Each catalog entry asks Google for the scopes
+its tools need: Gmail uses readonly + labels + modify + compose
+(workspace-mcp's `gmail:drafts` tier); Google Calendar uses
+`calendar` + `calendar.events` (the `calendar:full` tier). Expand
+an entry's `oauth_scopes` to unlock more tools — e.g. add
+`gmail.send` to enable the send-message tool.
 
 ## Identities, not a single provider per user
 

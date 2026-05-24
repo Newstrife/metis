@@ -54,4 +54,12 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Active Record encryption keys for tests. Hard-coded (not pulled from
+  # credentials) so CI doesn't need RAILS_MASTER_KEY to exercise models
+  # that call `encrypts` (Message, OauthGrant, …). The test database is
+  # scratch space — these values have no secrecy value.
+  config.active_record.encryption.primary_key = "test_ar_encryption_primary_key__"
+  config.active_record.encryption.deterministic_key = "test_ar_encryption_deterministic_"
+  config.active_record.encryption.key_derivation_salt = "test_ar_encryption_key_derivation"
 end
