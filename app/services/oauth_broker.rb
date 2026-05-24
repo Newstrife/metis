@@ -47,6 +47,19 @@ module OauthBroker
       PROVIDER_TO_STRATEGY[provider.to_s]
     end
 
+    # True when grant.scopes can be trusted as an authoritative
+    # statement of what the token can do. False for providers whose
+    # OAuth flow doesn't actually carry scopes — GitHub Apps in
+    # particular: their OAuth response does not echo OAuth scopes
+    # (App permissions configured on the App's settings page are the
+    # real gate), so grant.scopes ends up empty/incomplete regardless
+    # of what we asked for. Callers must fall back to "grant + token
+    # present" instead of `grant.covers?(...)` for these providers.
+    # See docs/connectors.md.
+    def scope_check_meaningful?(provider)
+      provider.to_s != "github"
+    end
+
     # The current access token for the grant, refreshing if needed.
     # A grant whose stored access token is blank (legacy backfill row,
     # partial absorb!) must refresh even when fresh? is true — otherwise
@@ -66,7 +79,7 @@ module OauthBroker
     def bearer_for(user:, provider:, required_scopes: [])
       grant = user.oauth_grants.find_by(provider: provider)
       return nil if grant.nil?
-      return nil unless grant.covers?(required_scopes)
+      return nil if scope_check_meaningful?(provider) && !grant.covers?(required_scopes)
 
       access_token_for(grant)
     end

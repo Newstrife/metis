@@ -84,7 +84,7 @@ module Agent
         return nil
       end
 
-      unless grant.covers?(app.oauth_scopes)
+      if OauthBroker.scope_check_meaningful?(grant.provider) && !grant.covers?(app.oauth_scopes)
         Rails.logger.warn(
           "McpConfig: connector #{connector.id} (#{connector.name}) needs " \
           "#{app.oauth_scopes.inspect} but user #{@conversation.user_id}'s grant " \

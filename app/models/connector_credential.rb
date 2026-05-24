@@ -45,11 +45,19 @@ class ConnectorCredential < ApplicationRecord
   end
 
   # True when this is an OAuth-shaped connector AND the user has a
-  # grant that covers the connector's required scopes — i.e. the
-  # runtime can hand the agent a usable bearer.
+  # grant that the runtime can hand the agent as a usable bearer.
+  # For providers where OAuth scopes are meaningful (Google, Linear),
+  # the grant must cover the catalog's required scopes. For
+  # GitHub Apps the OAuth response carries no scopes — presence of a
+  # token is the only gate we have; install-coverage is governed
+  # server-side by the App's installation, not by us
+  # (see docs/connectors.md, OauthBroker.scope_check_meaningful?).
   def oauth_ready?
     grant = oauth_grant
-    grant.present? && grant.access_token.present? && grant.covers?(connector.catalog_app.oauth_scopes)
+    return false if grant.nil? || grant.access_token.blank?
+    return true unless OauthBroker.scope_check_meaningful?(grant.provider)
+
+    grant.covers?(connector.catalog_app.oauth_scopes)
   end
 
   private

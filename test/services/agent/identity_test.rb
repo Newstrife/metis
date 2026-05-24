@@ -105,14 +105,24 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     refute_match(/scratch/i, out, "AGENTS.md must not describe the working tree as scratch")
   end
 
-  test "omits the Coding tools section when the GitHub grant lacks the `repo` scope" do
-    # Sign-in only — no `repo`. McpConfig would drop the connector, the
-    # runtime wouldn't inject GH_TOKEN; AGENTS.md must not name it.
+  test "renders the Coding tools section for GitHub even when grant scopes are empty (App OAuth)" do
+    # GitHub Apps don't echo OAuth scopes; a connected user's grant
+    # legitimately has empty scope_set. The old "covers?(repo)" gate
+    # would falsely hide the section for every real GitHub user. The
+    # runtime injects GH_TOKEN regardless; AGENTS.md must mirror that.
     conversation.user.oauth_grants.create!(
-      provider: "github", access_token: "live", refresh_token: "rt",
-      expires_at: 1.hour.from_now, scopes: "user:email"
+      provider: "github", access_token: "ghu_live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: nil
     )
 
+    out = render(runtime_kind: "docker")
+
+    assert_match(/## Coding tools/, out)
+    assert_match(/GH_TOKEN/, out)
+  end
+
+  test "omits the Coding tools section when there's no GitHub grant at all" do
+    # No grant → runtime can't inject GH_TOKEN. The honest gate.
     out = render(runtime_kind: "docker")
 
     refute_match(/## Coding tools/, out)

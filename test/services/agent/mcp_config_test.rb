@@ -109,18 +109,38 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     assert_equal [], rendered["mcpServers"].keys
   end
 
-  test "an oauth connector whose grant lacks required scopes is dropped" do
+  test "a scope-meaningful oauth connector whose grant lacks required scopes is dropped" do
+    # Gmail (Google) uses classic OAuth — scope coverage is enforced.
+    # An incomplete grant must drop the connector from .mcp.json so
+    # the agent doesn't try gmail.send with only gmail.readonly.
+    connector = add_connector(name: "gmail", transport: :http,
+                              definition: { "url" => "https://mcp.example/" },
+                              catalog_key: "gmail")
+    connector.connector_credentials.create!(user: member)
+    member.oauth_grants.create!(
+      provider: "google", access_token: "live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "email" # missing gmail.* scopes
+    )
+
+    assert_equal [], rendered["mcpServers"].keys
+  end
+
+  test "a GitHub oauth connector with empty grant scopes is still staged (App OAuth)" do
+    # GitHub Apps don't echo OAuth scopes in their OAuth response, so
+    # grant.scopes is empty for every legitimately-connected user.
+    # Old gate ("covers?(repo, read:user)") would drop every GitHub
+    # connector from every turn forever; new gate is grant + token.
     connector = add_connector(name: "github", transport: :http,
                               definition: { "url" => "https://mcp.example/" },
                               catalog_key: "github")
     connector.connector_credentials.create!(user: member)
-    # Grant exists but only has sign-in scope — missing repo + read:user.
     member.oauth_grants.create!(
-      provider: "github", access_token: "live", refresh_token: "rt",
-      expires_at: 1.hour.from_now, scopes: "user:email"
+      provider: "github", access_token: "ghu_live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: nil
     )
 
-    assert_equal [], rendered["mcpServers"].keys
+    assert_includes rendered["mcpServers"].keys, "github"
+    assert_equal({ "Authorization" => "Bearer ghu_live" }, rendered["mcpServers"]["github"]["headers"])
   end
 
   test "an oauth credential whose catalog entry has gone missing is dropped" do

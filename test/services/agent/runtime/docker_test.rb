@@ -83,17 +83,20 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     assert_equal @user.email.split("@", 2).first, env["GIT_AUTHOR_NAME"]
   end
 
-  test "sandbox_env is empty when the user has no covering GitHub grant" do
+  test "sandbox_env is empty when the user has no GitHub grant" do
     assert_empty @runtime.sandbox_env
+  end
 
-    # Sign-in scope only — McpConfig would drop the connector; sandbox_env
-    # must also stay empty so the agent doesn't think GH_TOKEN is in env.
+  test "sandbox_env carries GH_TOKEN for a GitHub grant with empty scopes (App OAuth)" do
+    # GitHub Apps don't echo OAuth scopes; legitimate connected users
+    # have empty scope_set. Old gate (covers?(repo)) would never inject
+    # GH_TOKEN for them; new gate is grant+token presence.
     @user.oauth_grants.create!(
-      provider: "github", access_token: "live", refresh_token: "rt",
-      expires_at: 1.hour.from_now, scopes: "user:email"
+      provider: "github", access_token: "ghu_live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: nil
     )
 
-    assert_empty @runtime.sandbox_env
+    assert_equal "ghu_live", @runtime.sandbox_env["GH_TOKEN"]
   end
 
   test "run provisions the workspace and yields the session — no archive" do

@@ -146,7 +146,10 @@ module Agent
       return false if @runtime_kind == "local"
 
       grant = user.oauth_grants.find_by(provider: "github")
-      grant&.covers?(%w[repo]) || false
+      return false if grant.nil? || grant.access_token.blank?
+      return true unless OauthBroker.scope_check_meaningful?("github")
+
+      grant.covers?(%w[repo])
     end
 
     def user = @conversation.user

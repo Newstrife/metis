@@ -177,7 +177,18 @@ on file anywhere.
 
   User-to-server has GitHub-App semantics — it preserves user identity
   (commits author as the operator), but it can only access resources
-  where the App is **installed**. *Signing in alone is not enough*: a token whose App
+  where the App is **installed**. A subtle consequence: the OAuth
+  response from a GitHub App **does not carry OAuth scopes** (the
+  `scope` field is empty/omitted) — App permissions configured on the
+  App's settings page are the real gate, not OAuth scopes on the wire.
+  metis therefore can't gate "Connected" / staging / `GH_TOKEN`
+  injection on `grant.covers?(catalog_scopes)` the way it does for
+  Google or Linear — that check would always fail for GitHub.
+  `OauthBroker.scope_check_meaningful?(provider)` is the central
+  rule (false for `github`, true elsewhere); the four sites that
+  used to gate on coverage (`ConnectorCredential#oauth_ready?`,
+  `Agent::McpConfig`, `Agent::Identity`, `Runtime::Base#sandbox_env`)
+  all respect it and fall back to "token present" for GitHub. *Signing in alone is not enough*: a token whose App
   isn't installed on any repo returns a 404 for every private repo,
   including the user's own. The "Connect GitHub" flow therefore
   redirects to `https://github.com/apps/<slug>/installations/new`

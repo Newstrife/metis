@@ -103,31 +103,57 @@ class OauthBrokerTest < ActiveSupport::TestCase
     end
   end
 
-  test "bearer_for returns the access token when the grant covers the required scopes" do
-    grant(provider: "github", access_token: "live", scopes: "user:email repo")
+  test "bearer_for returns the access token when the grant covers the required scopes (Google)" do
+    grant(provider: "google", access_token: "live",
+          scopes: "email https://www.googleapis.com/auth/gmail.readonly")
 
-    assert_equal "live", OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo])
+    assert_equal "live", OauthBroker.bearer_for(
+      user: user, provider: "google",
+      required_scopes: %w[https://www.googleapis.com/auth/gmail.readonly]
+    )
   end
 
   test "bearer_for returns nil when no grant exists for the provider" do
     assert_nil OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo])
   end
 
-  test "bearer_for returns nil when the grant does not cover the required scopes" do
-    grant(provider: "github", access_token: "live", scopes: "user:email") # no `repo`
+  test "bearer_for returns nil when a scope-meaningful grant does not cover the required scopes" do
+    grant(provider: "google", access_token: "live", scopes: "email") # no gmail scope
 
-    assert_nil OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo])
+    assert_nil OauthBroker.bearer_for(
+      user: user, provider: "google",
+      required_scopes: %w[https://www.googleapis.com/auth/gmail.readonly]
+    )
+  end
+
+  test "bearer_for skips the scope check for GitHub — App OAuth response carries no scopes" do
+    # GitHub Apps don't echo OAuth scopes (App permissions are the real
+    # gate, configured server-side at the App). grant.scopes ends up
+    # empty/incomplete regardless of what we asked for, so gating on
+    # `covers?` would lock out every legitimately-connected GitHub user.
+    grant(provider: "github", access_token: "live", scopes: nil)
+
+    assert_equal "live", OauthBroker.bearer_for(
+      user: user, provider: "github", required_scopes: %w[repo]
+    )
   end
 
   test "bearer_for refreshes when the grant is past expiry" do
     grant(provider: "github", access_token: "old", refresh_token: "rt0",
-          expires_at: 10.seconds.ago, scopes: "repo")
+          expires_at: 10.seconds.ago, scopes: nil)
 
     token = with_stub(GithubApp::OauthClient, :refresh, lambda { |_rt|
-      { "access_token" => "fresh", "refresh_token" => "rt1", "expires_in" => 3600, "scope" => "repo" }
+      { "access_token" => "fresh", "refresh_token" => "rt1", "expires_in" => 3600 }
     }) { OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo]) }
 
     assert_equal "fresh", token
+  end
+
+  test "scope_check_meaningful? is false for github and true otherwise" do
+    refute OauthBroker.scope_check_meaningful?("github"),
+           "GitHub App OAuth responses don't carry scopes; coverage check is unenforceable"
+    assert OauthBroker.scope_check_meaningful?("google")
+    assert OauthBroker.scope_check_meaningful?("linear")
   end
 
   test "normalize_provider maps the omniauth strategy name to the canonical OauthGrant provider name" do
