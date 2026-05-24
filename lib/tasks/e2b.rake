@@ -8,10 +8,32 @@ namespace :e2b do
 
     # The MCP connector bridge (pi-mcp-adapter) is baked in alongside pi.
     # Keep the version in sync with bin/setup and docker/pi-runtime/Dockerfile.
+    # `gh` is installed from GitHub's apt source so the agent can act on
+    # GitHub as the operator via the per-turn GH_TOKEN env var (see
+    # app/services/agent/runtime/base.rb + docs/connectors.md). The
+    # apt setup needs root; run_cmd defaults to user `user`, so pass it.
+    install_gh = <<~SH.strip.gsub(/\s+/, " ")
+      install -m 0755 -d /etc/apt/keyrings &&
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg
+        > /etc/apt/keyrings/githubcli-archive-keyring.gpg &&
+      chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg &&
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+        > /etc/apt/sources.list.d/github-cli.list &&
+      apt-get update && apt-get install -y --no-install-recommends gh &&
+      rm -rf /var/lib/apt/lists/*
+    SH
+
     template = E2B::Template.new
                             .from_node_image
+                            .apt_install([ "curl", "gnupg" ])
+                            .run_cmd(install_gh, user: "root")
                             .npm_install(pi_package, g: true)
-                            .run_cmd("pi install npm:pi-mcp-adapter@2.6.1")
+                            # Explicit user: pi extensions install into the user's
+                            # home; running as root would write to /root/.pi and
+                            # pi at runtime (user `user`) wouldn't find them.
+                            # Also workaround for E2B builder leaving user state
+                            # unresolved after a prior `user: "root"` step.
+                            .run_cmd("pi install npm:pi-mcp-adapter@2.6.1", user: "user")
 
     # tags must be a non-null array — the E2B v3 build API rejects null.
     info = E2B::Template.build(template, name: name, tags: [], on_build_logs: ->(line) { puts line })
