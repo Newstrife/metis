@@ -30,6 +30,7 @@ Themes, roughly in dependency order:
 |---|---|
 | **Skills** | `pi --skill` wiring + a first bundled skill, then user/team-managed skills with a UI. |
 | **More connectors** | Slack, Notion, Linear, Metabase — each configuration on top of `pi-mcp-adapter`. |
+| **Dual GitHub persona** | Add an installation-token (`ghs_`) path alongside the existing user-to-server (`ghu_`) one so the agent can act as the operator (commits, PRs, comments authored as them) *or* as `metis-on-pi[bot]` (CI helpers, scheduled PR reviews, anything that shouldn't carry a person's name). Same GitHub App, two token paths; per-turn choice driven by whoever's requesting the work. Requires App private-key handling, per-installation token minting, and a `Conversation`/job-level "act as" toggle. See [`docs/connectors.md`](docs/connectors.md). |
 | **Projects** | User-managed R&D contexts — bind a GitHub repo + a Linear project, composed into a conversation ([`docs/tenancy.md`](docs/tenancy.md)). |
 | **Real teams** | Beyond team-of-one: invitations, memberships UI, shared connectors and conversations. |
 | **Web UI** | A design system in the Hotwire stack — consistent component set + design tokens. |

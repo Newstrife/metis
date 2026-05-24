@@ -166,10 +166,18 @@ on file anywhere.
 ### Per-provider notes
 
 * **GitHub**: metis is wired for a **GitHub App** (not a classic OAuth
-  App), so the user-to-server token issued at sign-in / Connect has
-  GitHub-App semantics — it preserves user identity (commits author as
-  the operator), but it can only access resources where the App is
-  **installed**. *Signing in alone is not enough*: a token whose App
+  App). Today metis uses only the App's user-to-server (`ghu_`) token
+  path — the agent acts as the operator, commits carry their handle,
+  PR comments are signed by them. The App also supports an
+  installation-token (`ghs_`) path that would act as `<app>[bot]`;
+  metis doesn't mint these today but plans to (see `PLAN.md` →
+  "Dual GitHub persona") for the cases where bot identity is the
+  right one (scheduled CI helpers, agent-authored PR reviews on
+  someone else's PR). One App, two token paths, picked per turn.
+
+  User-to-server has GitHub-App semantics — it preserves user identity
+  (commits author as the operator), but it can only access resources
+  where the App is **installed**. *Signing in alone is not enough*: a token whose App
   isn't installed on any repo returns a 404 for every private repo,
   including the user's own. The "Connect GitHub" flow therefore
   redirects to `https://github.com/apps/<slug>/installations/new`
