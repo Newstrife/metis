@@ -1,7 +1,7 @@
 class User < ApplicationRecord
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable,
-         :omniauthable, omniauth_providers: %i[github google_oauth2]
+         :omniauthable, omniauth_providers: %i[github google_oauth2 linear]
 
   has_many :memberships, dependent: :destroy
   has_many :teams, through: :memberships

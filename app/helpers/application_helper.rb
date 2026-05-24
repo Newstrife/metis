@@ -135,6 +135,8 @@ module ApplicationHelper
       GithubApp::Config.configured?
     when "google"
       GoogleApp::Config.configured?
+    when "linear"
+      LinearApp::Config.configured?
     else
       false
     end
