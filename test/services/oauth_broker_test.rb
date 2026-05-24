@@ -103,6 +103,33 @@ class OauthBrokerTest < ActiveSupport::TestCase
     end
   end
 
+  test "bearer_for returns the access token when the grant covers the required scopes" do
+    grant(provider: "github", access_token: "live", scopes: "user:email repo")
+
+    assert_equal "live", OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo])
+  end
+
+  test "bearer_for returns nil when no grant exists for the provider" do
+    assert_nil OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo])
+  end
+
+  test "bearer_for returns nil when the grant does not cover the required scopes" do
+    grant(provider: "github", access_token: "live", scopes: "user:email") # no `repo`
+
+    assert_nil OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo])
+  end
+
+  test "bearer_for refreshes when the grant is past expiry" do
+    grant(provider: "github", access_token: "old", refresh_token: "rt0",
+          expires_at: 10.seconds.ago, scopes: "repo")
+
+    token = with_stub(GithubApp::OauthClient, :refresh, lambda { |_rt|
+      { "access_token" => "fresh", "refresh_token" => "rt1", "expires_in" => 3600, "scope" => "repo" }
+    }) { OauthBroker.bearer_for(user: user, provider: "github", required_scopes: %w[repo]) }
+
+    assert_equal "fresh", token
+  end
+
   test "normalize_provider maps the omniauth strategy name to the canonical OauthGrant provider name" do
     assert_equal "github", OauthBroker.normalize_provider("github")
     assert_equal "google", OauthBroker.normalize_provider("google_oauth2")

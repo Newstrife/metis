@@ -50,7 +50,8 @@ module Agent
         workspace.stage_uploads(conversation.uploaded_files)
         workspace.stage_mcp_config(mcp_config)
         workspace.stage_identity(identity_content)
-        session = PiAgent.session(bin: "docker", args: docker_args(pi_args))
+        env = sandbox_env
+        session = PiAgent.session(bin: "docker", args: docker_args(pi_args, env: env), env: env)
         begin
           yield session
         ensure
@@ -80,7 +81,12 @@ module Agent
       # the host uid so files on the bind mount stay owned by this
       # process (which archives them); capabilities are dropped and
       # resources capped. --pull never: the image is built locally.
-      def docker_args(pi_args)
+      #
+      # Credentials in `env` are forwarded with the bare-key `--env NAME`
+      # form so docker reads the value from the parent process's env
+      # (set on the spawned `docker` client via PiAgent.session(env:))
+      # — keeping bearer tokens out of argv where `ps` could see them.
+      def docker_args(pi_args, env: {})
         [
           "run", "--rm", "-i",
           "--pull", "never",
@@ -90,12 +96,17 @@ module Agent
           *extension_mount,
           "--workdir", WORKSPACE_DIR,
           "--env", "HOME=/tmp",
+          *env_forward(env),
           "--memory", "2g", "--cpus", "2", "--pids-limit", "512",
           "--cap-drop", "ALL",
           "--security-opt", "no-new-privileges",
           image,
           "pi", *pi_args
         ]
+      end
+
+      def env_forward(env)
+        env.keys.flat_map { |name| [ "--env", name ] }
       end
 
       def extension_mount

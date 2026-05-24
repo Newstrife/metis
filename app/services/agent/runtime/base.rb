@@ -59,6 +59,46 @@ module Agent
       def runtime_info
         { "runtime" => kind }
       end
+
+      # Per-turn process environment to expose to the agent inside the
+      # sandbox — credentials projected from the operator's OauthGrants.
+      # Each entry is conditional on the operator having authorised the
+      # underlying grant; nothing here is stored and nothing reaches disk.
+      # See docs/connectors.md ("Credential pass-through to the sandbox").
+      #
+      # Today: GitHub. The agent gets `GH_TOKEN` (consumed by `git` and
+      # `gh`) plus a git author/committer identity so commits carry the
+      # operator's handle rather than an anonymous default.
+      def sandbox_env
+        env = {}
+        github = OauthBroker.bearer_for(
+          user: conversation.user, provider: "github", required_scopes: %w[repo]
+        )
+        if github
+          env["GH_TOKEN"] = github
+          author = git_identity_for(conversation.user)
+          env["GIT_AUTHOR_NAME"]     = author[:name]
+          env["GIT_AUTHOR_EMAIL"]    = author[:email]
+          env["GIT_COMMITTER_NAME"]  = author[:name]
+          env["GIT_COMMITTER_EMAIL"] = author[:email]
+        end
+        env
+      end
+
+      # True iff anything in sandbox_env is going to set up agent coding
+      # tools — Identity uses this to decide whether to render the
+      # `Coding tools` section in AGENTS.md.
+      def coding_tools_available?
+        sandbox_env.key?("GH_TOKEN")
+      end
+
+      private
+
+      def git_identity_for(user)
+        email = user.email.to_s
+        local = email.split("@", 2).first.presence || "metis-user"
+        { name: local, email: email }
+      end
     end
   end
 end

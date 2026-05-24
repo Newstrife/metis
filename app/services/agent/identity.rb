@@ -45,7 +45,7 @@ module Agent
 
         Their server config and auth headers are in `.mcp.json`,
         rendered for this turn. pi-mcp-adapter discovers it.
-
+        #{coding_tools_block}
         ## Conventions
 
         - Treat `uploads/` and `.mcp.json` as projected inputs — they
@@ -116,6 +116,48 @@ module Agent
 
     def enabled_connectors
       @conversation.team.connectors.order(:name)
+    end
+
+    # Rendered only when a sandboxed runtime is going to inject a
+    # GitHub bearer this turn (see Runtime::Base#sandbox_env). Lying
+    # — naming `GH_TOKEN` when nothing is in env — burns turns on
+    # tools the agent doesn't actually have. The gate here mirrors
+    # Runtime::Base#sandbox_env exactly.
+    def coding_tools_block
+      return "" unless coding_tools_available?
+
+      <<~MD
+
+        ## Coding tools
+
+        You have `git` and `gh` on PATH, and `GH_TOKEN` in env — it
+        authenticates as #{user.email} against GitHub. Commit author
+        and committer are set in env to the same identity, so commits
+        carry the operator's handle.
+
+        - Work on a feature branch and open a pull request via `gh pr
+          create`. Don't push directly to `main` or other protected
+          branches — the operator's repo settings reject it.
+        - Anything you want to survive into the next turn must be
+          pushed to GitHub before the turn ends. The working tree is
+          scratch — nothing under your `cwd` outside of `sessions/`
+          is preserved by the runtime#{coding_workspace_caveat}.
+      MD
+    end
+
+    def coding_tools_available?
+      return false if @runtime_kind == "local"
+
+      grant = user.oauth_grants.find_by(provider: "github")
+      grant&.covers?(%w[repo]) || false
+    end
+
+    def coding_workspace_caveat
+      # Sandboxed runtimes do archive workspace/, but the agent's
+      # mental model should be "treat the working tree as scratch" so
+      # it doesn't rely on quirks of archive layout. Leave the caveat
+      # empty for now — the rule is the rule across runtimes.
+      ""
     end
 
     def user = @conversation.user

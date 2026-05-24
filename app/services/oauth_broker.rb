@@ -57,6 +57,20 @@ module OauthBroker
       refresh!(grant)
     end
 
+    # The current bearer for `user` on `provider`, refreshed if needed,
+    # gated by `required_scopes` (the grant must cover them all). Used by
+    # the sandbox runtimes to stage per-turn credentials into the agent's
+    # environment without coupling to a Connector record — if the user
+    # has the grant and the scope, the agent gets the token. See
+    # docs/connectors.md ("Credential pass-through to the sandbox").
+    def bearer_for(user:, provider:, required_scopes: [])
+      grant = user.oauth_grants.find_by(provider: provider)
+      return nil if grant.nil?
+      return nil unless grant.covers?(required_scopes)
+
+      access_token_for(grant)
+    end
+
     # Revoke the grant on the provider's side and tear down our copy.
     # Best-effort: a network failure logs and returns rather than
     # blocking the caller (the local delete still happens).

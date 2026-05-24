@@ -57,6 +57,45 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     assert_equal [ "pi", "--mode", "rpc" ], args.last(3)
   end
 
+  test "docker_args forwards credential env vars with the bare-key form (no token in argv)" do
+    # `--env NAME` (no value) tells docker to read NAME from the parent
+    # process's env. PiAgent.session(env:) puts the value there. This
+    # keeps the bearer out of argv where `ps` could see it.
+    args = @runtime.send(:docker_args, [ "--mode", "rpc" ], env: { "GH_TOKEN" => "secret-bearer" })
+
+    gh_index = args.each_index.find { |i| args[i] == "--env" && args[i + 1] == "GH_TOKEN" }
+    assert gh_index, "expected --env GH_TOKEN in docker args"
+    refute_includes args, "GH_TOKEN=secret-bearer", "bearer must not appear inline in argv"
+    refute_includes args, "secret-bearer", "bearer must not appear inline in argv"
+  end
+
+  test "sandbox_env carries GH_TOKEN and git identity when the user has a covering GitHub grant" do
+    @user.oauth_grants.create!(
+      provider: "github", access_token: "live-bearer", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "user:email repo"
+    )
+
+    env = @runtime.sandbox_env
+
+    assert_equal "live-bearer", env["GH_TOKEN"]
+    assert_equal @user.email, env["GIT_AUTHOR_EMAIL"]
+    assert_equal @user.email, env["GIT_COMMITTER_EMAIL"]
+    assert_equal @user.email.split("@", 2).first, env["GIT_AUTHOR_NAME"]
+  end
+
+  test "sandbox_env is empty when the user has no covering GitHub grant" do
+    assert_empty @runtime.sandbox_env
+
+    # Sign-in scope only — McpConfig would drop the connector; sandbox_env
+    # must also stay empty so the agent doesn't think GH_TOKEN is in env.
+    @user.oauth_grants.create!(
+      provider: "github", access_token: "live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "user:email"
+    )
+
+    assert_empty @runtime.sandbox_env
+  end
+
   test "run provisions the workspace, yields the session, and archives after" do
     session = fake_session
     yielded = nil

@@ -18,10 +18,12 @@ module Agent
 
       # `command` is the full pi command line (a String — E2B runs it via
       # bash -lc). `on_message`/`on_stderr` are pi-agent-rb's handlers.
-      def initialize(sandbox:, command:, cwd: nil, on_message: nil, on_stderr: nil)
+      # `envs` is per-turn projected credentials (see Runtime::Base#sandbox_env).
+      def initialize(sandbox:, command:, cwd: nil, envs: {}, on_message: nil, on_stderr: nil)
         @sandbox = sandbox
         @command = command
         @cwd = cwd
+        @envs = envs
         @on_message = on_message
         @on_stderr = on_stderr
         @write_mutex = Mutex.new
@@ -33,7 +35,8 @@ module Agent
         # stdin: true is mandatory — without it E2B never opens the pipe
         # and send_stdin is a silent no-op.
         @handle = @sandbox.commands.run(
-          @command, background: true, stdin: true, cwd: @cwd&.to_s, timeout: COMMAND_TIMEOUT
+          @command, background: true, stdin: true, cwd: @cwd&.to_s,
+          envs: @envs, timeout: COMMAND_TIMEOUT
         )
         @reader = Thread.new { read_loop }
         self

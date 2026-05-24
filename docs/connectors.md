@@ -232,6 +232,43 @@ user by `(provider, uid)` first and falls back to email match, so a
 GitHub user can additionally connect Google (and vice versa) without
 forking a second account.
 
+## Credential pass-through to the sandbox
+
+Not every operator-as-agent action is an MCP call. Coding — `git clone`,
+edit, commit, `gh pr create` — happens in the agent's shell, against a
+working tree pi manages itself. That path needs the same identity-bearing
+credential the MCP connector uses, but delivered as a process env var the
+shell tools understand.
+
+So the runtimes do exactly that: at turn start, the sandbox runtimes
+(`Docker`, `E2b`) read the operator's `OauthGrant`s and project the
+relevant bearers as **per-turn process env** into the agent's process —
+not into a file, not into a Rails record. For GitHub: when the operator
+has a grant covering the `repo` scope, the sandbox process gets
+`GH_TOKEN` (consumed by `git` and `gh`) plus `GIT_AUTHOR_*` /
+`GIT_COMMITTER_*` set to the operator's identity so commits carry their
+handle. `Runtime::Base#sandbox_env` is the single point of composition.
+
+The bearer reaches the container without sitting in `docker run` argv:
+`--env GH_TOKEN` (no value) tells docker to forward the var from the
+spawned client's environment, and `PiAgent.session(env: …)` sets it
+there. `E2b` passes the same hash through `commands.run(envs: …)`. The
+token has the lifetime of one `docker run` (or one E2B command), and is
+gone with the container.
+
+The threat model worth being explicit about: this credential isolation
+is about **scope and lifetime, not about hiding bytes from the agent**.
+The agent has to use the credential to push, so hiding it from a process
+authorised to spend it would be theatre. What we actually defend is
+duration (one turn) and breadth (whatever scopes the operator granted)
+— and the audit trail is GitHub's own log, attributed to the operator,
+not a Metis-side per-repo state plane.
+
+`Runtime::Local` deliberately opts out: a dev's host already has their
+own `gh`/`git` config, and injecting `GH_TOKEN` there would clash with
+it. The sandbox runtimes are the ones with no operator at the terminal,
+so they're the ones that need the projection.
+
 ## Accepted tradeoff
 
 A service that ships only a CLI, with no MCP server, is not connectable

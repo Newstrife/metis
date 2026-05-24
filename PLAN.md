@@ -26,6 +26,7 @@ Themes, roughly in dependency order:
 |---|---|
 | **Skills** | `pi --skill` wiring + a first bundled skill, then user/team-managed skills with a UI. |
 | **More connectors** | Slack, Notion, Linear, Metabase — each configuration on top of `pi-mcp-adapter`. |
+| **Coding runtime (v2)** | Per-conversation sandbox lifetime via snapshot/restore — see [`docs/coding-runtime.md`](docs/coding-runtime.md). Replaces the per-turn ephemeral shape for sandbox runtimes so dependency installs, WIP, and untracked work survive across turns naturally. |
 | **Projects** | User-managed R&D contexts — bind a GitHub repo + a Linear project, composed into a conversation ([`docs/tenancy.md`](docs/tenancy.md)). |
 | **Real teams** | Beyond team-of-one: invitations, memberships UI, shared connectors and conversations. |
 | **Web UI** | A design system in the Hotwire stack — consistent component set + design tokens. |

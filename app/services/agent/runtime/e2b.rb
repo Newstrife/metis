@@ -62,7 +62,7 @@ module Agent
         stage_uploads(sandbox)
         stage_mcp_config(sandbox)
         stage_identity(sandbox)
-        session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args))
+        session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args, sandbox_env))
         begin
           yield session
         ensure
@@ -155,11 +155,11 @@ module Agent
         sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::Identity::FILENAME}", identity_content)
       end
 
-      def transport_factory(sandbox, pi_args)
+      def transport_factory(sandbox, pi_args, envs)
         command = Shellwords.join([ "pi", *pi_args ])
         lambda do |on_message:, on_stderr:|
           E2bTransport.new(
-            sandbox: sandbox, command: command, cwd: WORKSPACE_DIR,
+            sandbox: sandbox, command: command, cwd: WORKSPACE_DIR, envs: envs,
             on_message: on_message, on_stderr: on_stderr
           )
         end
