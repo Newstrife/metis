@@ -33,7 +33,7 @@ namespace :e2b do
                             # pi at runtime (user `user`) wouldn't find them.
                             # Also workaround for E2B builder leaving user state
                             # unresolved after a prior `user: "root"` step.
-                            .run_cmd("pi install npm:pi-mcp-adapter@2.6.1", user: "user")
+                            .run_cmd("pi install npm:pi-mcp-adapter@2.7.0", user: "user")
 
     # tags must be a non-null array — the E2B v3 build API rejects null.
     info = E2B::Template.build(template, name: name, tags: [], on_build_logs: ->(line) { puts line })

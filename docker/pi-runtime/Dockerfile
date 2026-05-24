@@ -30,4 +30,11 @@ RUN npm install --global "@earendil-works/pi-coding-agent@${PI_VERSION}"
 
 # The MCP connector bridge (pi-mcp-adapter). Keep the version in sync
 # with bin/setup and lib/tasks/e2b.rake.
-RUN pi install npm:pi-mcp-adapter@2.6.1
+#
+# Install it under the same HOME the runtime uses (`--env HOME=/tmp` in
+# Agent::Runtime::Docker#docker_args), so pi at runtime finds the
+# package + settings.json. The container runs as the host UID with no
+# /etc/passwd entry, so we chmod the tree world-rwx — the runtime user
+# must be able to read the extension and write pi's session/cache state.
+RUN HOME=/tmp pi install npm:pi-mcp-adapter@2.7.0 \
+ && chmod -R a+rwX /tmp/.pi

@@ -18,10 +18,10 @@ FileUtils.chdir APP_ROOT do
   puts "\n== Installing pi packages =="
   # The MCP connector bridge. Keep the version in sync with
   # docker/pi-runtime/Dockerfile and lib/tasks/e2b.rake.
-  if system("pi list 2>/dev/null | grep -q 'pi-mcp-adapter@2.6.1'")
+  if system("pi list 2>/dev/null | grep -q 'pi-mcp-adapter@2.7.0'")
     puts "pi-mcp-adapter already installed."
   else
-    system! "pi", "install", "npm:pi-mcp-adapter@2.6.1"
+    system! "pi", "install", "npm:pi-mcp-adapter@2.7.0"
   end
 
   # puts "\n== Copying sample files =="
