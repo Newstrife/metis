@@ -80,6 +80,13 @@ module ApplicationHelper
     older: "Older"
   }.freeze
 
+  # Display label for a recency bucket. Views can't reach the constant
+  # by bare name (lexical scope, not the include chain), so they go
+  # through this helper.
+  def conversation_time_bucket_label(bucket)
+    CONVERSATION_TIME_BUCKET_LABELS[bucket]
+  end
+
   # The recency bucket a timestamp falls into. Used by _convo_items to
   # emit an inline group header only when the bucket changes from the
   # previous row — endless-scroll passes the last page's final bucket

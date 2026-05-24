@@ -9,7 +9,7 @@
   <% if grouped %>
     <% bucket = conversation_time_bucket(conversation.updated_at) %>
     <% if bucket != prev_bucket %>
-      <div class="grp-label"><%= CONVERSATION_TIME_BUCKET_LABELS[bucket] %></div>
+      <div class="grp-label"><%= conversation_time_bucket_label(bucket) %></div>
       <% prev_bucket = bucket %>
     <% end %>
   <% end %>
