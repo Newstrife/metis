@@ -1,0 +1,8 @@
+<%# One row in the sidebar conversation list. %>
+<%= link_to conversation,
+      id: dom_id(conversation),
+      class: "convo#{' on' if conversation == @conversation}",
+      data: { conversation_filter_target: "item",
+              title: conversation.display_title } do %>
+  <span class="tt"><%= conversation.display_title %></span>
+<% end %>

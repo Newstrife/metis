@@ -1,0 +1,11 @@
+<%# One recency bucket inside the sidebar conversation list. The items
+    container has its own dom id so the endless-scroll turbo_stream
+    can append into it when the next page continues the same bucket. %>
+<div class="convo-group" id="<%= dom_id_for_bucket(label) %>">
+  <div class="grp-label"><%= label %></div>
+  <div class="convo-group-items" id="<%= dom_id_for_bucket(label) %>-items">
+    <% conversations.each do |conversation| %>
+      <%= render "conversations/convo", conversation: conversation %>
+    <% end %>
+  </div>
+</div>

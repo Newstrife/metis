@@ -60,6 +60,38 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "sidebar paginates with a sentinel when there are more than one page of conversations" do
+    sign_in @user
+    stub_const(ApplicationController, :SIDEBAR_PAGE_SIZE, 2) do
+      3.times { |i| @user.conversations.create!(title: "Convo #{i}") }
+      get conversations_path
+      assert_response :success
+      assert_select "#convos-sentinel[data-sidebar-infinite-scroll-url-value*='page=2']"
+      assert_select "#convos-list .convo", count: 2
+    end
+  end
+
+  test "sidebar omits the active sentinel when only one page exists" do
+    sign_in @user
+    @user.conversations.create!(title: "Only")
+    get conversations_path
+    assert_response :success
+    assert_select "#convos-sentinel[data-controller]", count: 0
+  end
+
+  test "endless-scroll turbo_stream returns the next page of conversations" do
+    sign_in @user
+    stub_const(ApplicationController, :SIDEBAR_PAGE_SIZE, 2) do
+      3.times { |i| @user.conversations.create!(title: "Convo #{i}") }
+      get conversations_path(page: 2),
+          headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      assert_response :success
+      assert_equal "text/vnd.turbo-stream.html", response.media_type
+      assert_match(/turbo-stream/, response.body)
+      assert_match(/Convo 0/, response.body)
+    end
+  end
+
   test "shows a conversation owned by the user" do
     sign_in @user
     conversation = @user.conversations.create!(title: "Mine")
@@ -94,6 +126,19 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :no_content
     assert_not_nil conversation.reload.cancel_requested_at
+  end
+
+  # Temporarily override a constant for the duration of the block.
+  # Lets us shrink SIDEBAR_PAGE_SIZE so the sentinel tests don't need
+  # to create dozens of conversation fixtures.
+  def stub_const(mod, name, value)
+    original = mod.const_get(name)
+    mod.send(:remove_const, name)
+    mod.const_set(name, value)
+    yield
+  ensure
+    mod.send(:remove_const, name)
+    mod.const_set(name, original)
   end
 
   test "cannot cancel another user's conversation" do

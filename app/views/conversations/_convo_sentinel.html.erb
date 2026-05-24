@@ -1,0 +1,21 @@
+<%# The endless-scroll trigger at the bottom of the sidebar conversation
+    list. Renders only while there's a next page; the Stimulus controller
+    uses an IntersectionObserver against the .convos scroll container to
+    fetch the next page as a turbo_stream and append it in place.
+
+    `prev_bucket` is the label of the last visible recency bucket. The
+    server uses it to decide whether the first group on the next page
+    should be appended into the existing bucket's items container
+    (continuity) or rendered as a brand-new bucket block. %>
+<% if pagy && pagy.next %>
+  <div id="convos-sentinel"
+       class="convos-sentinel"
+       data-controller="sidebar-infinite-scroll"
+       data-sidebar-infinite-scroll-url-value="<%= conversations_path(page: pagy.next, prev_bucket: prev_bucket) %>">
+    <span class="convos-loading" aria-hidden="true">Loading…</span>
+  </div>
+<% else %>
+  <%# Empty placeholder so turbo_stream replace targets always find an
+      element to replace, even on the final page. %>
+  <div id="convos-sentinel" hidden></div>
+<% end %>

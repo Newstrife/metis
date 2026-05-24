@@ -98,6 +98,14 @@ module ApplicationHelper
     buckets.reject { |_, list| list.empty? }
   end
 
+  # Stable dom id for a recency bucket label — the endless-scroll
+  # turbo_stream targets `#{dom_id_for_bucket(label)}-items` to append
+  # new conversations into an existing bucket without duplicating its
+  # header.
+  def dom_id_for_bucket(label)
+    "convo-group-#{label.to_s.parameterize}"
+  end
+
   # The plain "Sign in with X" / "Connect X account" authorize path
   # for a catalog app — the *sign-in* shape, with no extra scopes.
   # Returns nil if the app's provider strategy isn't wired up.

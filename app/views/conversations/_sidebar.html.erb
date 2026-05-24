@@ -1,5 +1,7 @@
 <%# The persistent shell sidebar: brand, conversation search + list, user.
-    Rendered by the "chat" layout on every conversations page. %>
+    Rendered by the "chat" layout on every conversations page. The list
+    is paginated with Pagy and loads more on scroll via the sidebar
+    infinite-scroll Stimulus controller (see _convo_sentinel.html.erb). %>
 <aside class="sidebar" data-controller="conversation-filter">
   <div class="ws">
     <div class="ws-name">Metis</div>
@@ -32,24 +34,19 @@
 
   <nav class="convos" aria-label="Conversations">
     <% groups = conversation_groups(@conversations) %>
-    <% if groups.any? %>
-      <% groups.each do |label, conversations| %>
-        <div class="convo-group">
-          <div class="grp-label"><%= label %></div>
-          <% conversations.each do |conversation| %>
-            <%= link_to conversation,
-                  class: "convo#{' on' if conversation == @conversation}",
-                  data: { conversation_filter_target: "item",
-                          title: conversation.display_title } do %>
-              <span class="tt"><%= conversation.display_title %></span>
-            <% end %>
-          <% end %>
-        </div>
+    <div id="convos-list">
+      <% if groups.any? %>
+        <% groups.each do |label, conversations| %>
+          <%= render "conversations/convo_group", label: label, conversations: conversations %>
+        <% end %>
+      <% else %>
+        <div class="convos-empty">No conversations yet — start one on the right.</div>
       <% end %>
-      <div class="convos-empty" data-conversation-filter-target="empty" hidden>No matches.</div>
-    <% else %>
-      <div class="convos-empty">No conversations yet — start one on the right.</div>
-    <% end %>
+    </div>
+    <div class="convos-empty" data-conversation-filter-target="empty" hidden>No matches.</div>
+    <%= render "conversations/convo_sentinel",
+          pagy: @sidebar_pagy,
+          prev_bucket: groups.keys.last %>
   </nav>
 
   <nav class="nav" aria-label="Navigate">
