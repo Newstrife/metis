@@ -165,10 +165,33 @@ on file anywhere.
 
 ### Per-provider notes
 
-* **GitHub**: the App must have "User-to-server token expiration"
-  active under Settings → Optional features (new Apps default to it)
-  — without it GitHub issues no refresh token. Callback URL:
-  `/users/auth/github/callback`. Connector scopes: `repo`, `read:user`.
+* **GitHub**: metis is wired for a **GitHub App** (not a classic OAuth
+  App), so the user-to-server token issued at sign-in / Connect has
+  GitHub-App semantics — it preserves user identity (commits author as
+  the operator), but it can only access resources where the App is
+  **installed**. *Signing in alone is not enough*: a token whose App
+  isn't installed on any repo returns a 404 for every private repo,
+  including the user's own. The "Connect GitHub" flow therefore
+  redirects to `https://github.com/apps/<slug>/installations/new`
+  after the OAuth callback, prompting the user to install the App on
+  the repos they want metis to act on; when they return to the
+  marketplace, the connector tile shows Connected and the agent's
+  per-turn `GH_TOKEN` (see *Credential pass-through to the sandbox*)
+  can finally reach private content.
+  - Env: `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`,
+    `GITHUB_APP_SLUG` (the part after `apps/` in the install URL;
+    without it metis skips the install redirect and the connect flow
+    ends at the marketplace, leaving the user to find the install
+    page themselves).
+  - App settings: enable **"User-to-server token expiration"**
+    (Settings → Optional features); without it GitHub issues no
+    refresh token and renewals fail when the 8-hour access token
+    lapses.
+  - Callback URL: `/users/auth/github/callback`. Connector scopes
+    requested by the catalog: `repo`, `read:user`. (For a GitHub
+    App these translate into App **permissions**, not classic OAuth
+    scopes — `x-oauth-scopes:` on App tokens is always empty; don't
+    diagnose access issues from that header.)
 * **Google**: Devise sign-in passes `access_type: offline` for a
   refresh token, `prompt: select_account` so returning users can
   pick the right account without re-consent, and

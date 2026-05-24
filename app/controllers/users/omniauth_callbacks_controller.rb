@@ -99,10 +99,40 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
 
   def finish_sign_in(target, provider)
     if user_signed_in?
-      redirect_to after_sign_in_path_for(target), notice: "Connected to #{provider.titleize}."
+      redirect_target, redirect_options = post_connect_redirect(provider) || [
+        after_sign_in_path_for(target), { notice: "Connected to #{provider.titleize}." }
+      ]
+      redirect_to redirect_target, **redirect_options
     else
       sign_in_and_redirect target, event: :authentication
     end
+  end
+
+  # GitHub is a GitHub App (not a classic OAuth App), so the user-to-
+  # server token issued by the connect flow can't see any repo until
+  # the App is installed on it. Send the user straight to the install
+  # page after a successful connect=github callback so the two-step
+  # OAuth-then-install dance is self-explanatory.
+  #
+  # nil → no override; the default "back to marketplace" redirect runs.
+  # Only kicks in when GITHUB_APP_SLUG is configured (we need it to
+  # build the URL).
+  def post_connect_redirect(provider)
+    return nil unless provider == "github"
+
+    catalog_key = (request.env["omniauth.params"] || {})["connect"].presence
+    return nil if catalog_key.blank?
+
+    install_url = GithubApp::Config.install_url
+    return nil if install_url.blank?
+
+    [
+      install_url,
+      {
+        allow_other_host: true,
+        notice: "Connected to GitHub. Install the Metis app on the repos you want it to access, then return here."
+      }
+    ]
   end
 
   def attach_identity(user, auth)

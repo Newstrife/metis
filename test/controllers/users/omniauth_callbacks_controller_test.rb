@@ -243,6 +243,61 @@ class Users::OmniauthCallbacksControllerTest < ActionDispatch::IntegrationTest
            "connector marker must not exist when grant write failed"
   end
 
+  test "GitHub connect-flow redirects to the App install URL when slug is configured" do
+    # The GitHub App's user-to-server token can't see any repo until
+    # the App is installed — sign-in alone is not enough. The
+    # marketplace Connect button therefore must hand the user off to
+    # the install page; without that step the OAuth grant looks
+    # connected but every repo lookup 404s. Connect is always invoked
+    # by an already-signed-in user (the marketplace lives behind auth).
+    user = User.create!(email: "install-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    sign_in user
+    mock_github(uid: "install-1", login: "mgc", email: user.email,
+                scope: "user:email repo read:user", connect: "github")
+
+    with_stub(GithubApp::Config, :install_url, -> { "https://github.com/apps/metis/installations/new" }) do
+      get user_github_omniauth_callback_path
+    end
+
+    assert_redirected_to "https://github.com/apps/metis/installations/new"
+    assert_match(/install the metis app/i, flash[:notice])
+  end
+
+  test "GitHub connect-flow falls back to the in-app redirect when slug is missing" do
+    # No GITHUB_APP_SLUG → no install_url → we can't send the user to
+    # install. Existing behavior wins; the user is on their own to
+    # find the install page (which is the bug the slug closes).
+    user = User.create!(email: "install2-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    sign_in user
+    mock_github(uid: "install-2", login: "mgc", email: user.email,
+                scope: "user:email repo read:user", connect: "github")
+
+    with_stub(GithubApp::Config, :install_url, -> { nil }) do
+      get user_github_omniauth_callback_path
+    end
+
+    assert_redirected_to root_path
+    assert_match(/connected to github/i, flash[:notice])
+  end
+
+  test "GitHub sign-in (no connect param) is not affected by install_url config" do
+    # The install redirect is a Connect-flow concern. First sign-in or
+    # subsequent sign-ins through the omniauth flow must continue to
+    # land where they always did, even with the slug configured.
+    user = User.create!(email: "existing-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    user.identities.create!(provider: "github", uid: "no-connect-1")
+    user.oauth_grants.create!(provider: "github", access_token: "older", refresh_token: "rt0",
+                              expires_at: 30.minutes.from_now, scopes: "user:email")
+    sign_in user
+    mock_github(uid: "no-connect-1", login: "mgc", email: user.email)
+
+    with_stub(GithubApp::Config, :install_url, -> { "https://github.com/apps/metis/installations/new" }) do
+      get user_github_omniauth_callback_path
+    end
+
+    assert_redirected_to root_path
+  end
+
   test "a signed-in password user attaches the GitHub identity to their account" do
     user = User.create!(email: "attach-#{SecureRandom.hex(4)}@example.com", password: "password123")
     sign_in user
