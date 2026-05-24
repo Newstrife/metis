@@ -18,6 +18,14 @@ Rails.application.config.x.agent.runtime =
 Rails.application.config.x.agent.e2b_template =
   ENV.fetch("METIS_E2B_TEMPLATE", "base")
 
+# Idle window after which a paused E2B sandbox is evicted (killed) by
+# EvictPausedSandboxesJob. E2B keeps paused sandboxes indefinitely
+# unless we tell it otherwise (docs/coding-runtime.md), so this knob
+# bounds how long a long-idle conversation's working tree survives —
+# the next turn provisions a fresh sandbox.
+Rails.application.config.x.agent.e2b_eviction_window =
+  ENV.fetch("METIS_E2B_EVICTION_HOURS", "24").to_i.hours
+
 # Docker image used by the :docker runtime — pi baked in. Build it with
 # the docker:image rake task.
 Rails.application.config.x.agent.docker_image =

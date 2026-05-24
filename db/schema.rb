@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_24_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_24_192655) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -75,12 +75,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_24_000000) do
     t.datetime "cancel_requested_at"
     t.jsonb "context_usage", default: {}, null: false
     t.datetime "created_at", null: false
+    t.string "e2b_sandbox_id"
     t.jsonb "runtime_state", default: {}, null: false
     t.jsonb "settings", default: {}, null: false
     t.bigint "team_id", null: false
     t.string "title"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["e2b_sandbox_id"], name: "index_conversations_on_e2b_sandbox_id"
     t.index ["team_id"], name: "index_conversations_on_team_id"
     t.index ["user_id"], name: "index_conversations_on_user_id"
   end

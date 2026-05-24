@@ -52,7 +52,6 @@ Five pieces, each named:
 | Writer | `Agent::Workspace#stage_identity` | Writes `workspace/AGENTS.md` |
 | Source | `Agent::Runtime::Base#identity_content` + `#kind` | Shared entry for every runtime |
 | Per-runtime call | `Local`, `Docker`, `E2b` during `run` | Calls the writer during prepare |
-| Archive exclusion | `Agent::SessionArchive` | `--exclude=./workspace/AGENTS.md` (E2b only — `Local` and `Docker` use a persistent workspace, no archive) |
 
 The `kind` accessor on `Runtime::Base` is reused by `runtime_info`
 (the per-turn trace persisted on the `Conversation`), so the identity
@@ -84,10 +83,8 @@ All three are:
 
 1. **Rendered fresh each turn**, from durable Rails records.
 2. **Written by the runtime during `run`** — the same call site each.
-3. **Excluded from `SessionArchive`** (`--exclude=./workspace/<name>`)
-   — only relevant for the runtimes that still archive (`E2b`);
-   `Local` and `Docker` overwrite-in-place on the persistent
-   workspace and have nothing to exclude.
+3. **Overwritten in place** on every runtime — the durable source is
+   always Rails, never the workspace copy.
 
 The pattern earns its keep when a new projected input arrives — a
 per-project brief, a skills index, a tool catalog. The five pipeline

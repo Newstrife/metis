@@ -1,20 +1,25 @@
 require "shellwords"
-require "tempfile"
 
 module Agent
   module Runtime
     # Runs pi inside an E2B secure microVM — the isolated runtime.
     #
-    # The microVM is disposable execution infrastructure, not the
-    # conversation's memory. Each turn: a fresh sandbox is created,
-    # hydrated from the conversation's durable archive (Active Storage),
-    # runs pi, has its scope captured back to the archive, and is killed.
-    # State lives outside E2B — an expired or unreachable sandbox costs
-    # nothing and loses nothing.
+    # The microVM lives across turns: first turn creates it, subsequent
+    # turns resume from the paused snapshot E2B keeps server-side. The
+    # conversation's working tree, session transcript, installed
+    # dependencies, and untracked WIP persist between turns by being
+    # *the same VM*. See docs/coding-runtime.md.
     #
     # This IS an isolation boundary: pi's shell is confined to the
     # microVM — the host, Metis's secrets, and other conversations are
-    # unreachable.
+    # unreachable. The sandbox_id is recorded on the Conversation so
+    # any worker can resume the same VM (worker fungibility — the state
+    # lives in addressable remote storage, not in a worker process).
+    #
+    # Eviction is metis's responsibility: E2B does not auto-clean paused
+    # sandboxes. EvictPausedSandboxesJob kills VMs whose conversation
+    # has been idle past config.x.agent.e2b_eviction_window; the next
+    # turn provisions a fresh one and the working tree is gone.
     #
     # pi must be present in the sandbox image (config.x.agent.e2b_template
     # — a template with pi baked in; see the e2b:template rake task).
@@ -22,11 +27,25 @@ module Agent
       SCOPE_DIR = "/home/user/metis".freeze
       SESSION_DIR = "#{SCOPE_DIR}/sessions".freeze
       WORKSPACE_DIR = "#{SCOPE_DIR}/workspace".freeze
-      # Outside SCOPE_DIR on purpose — extensions are code, not session
-      # state, and must not be captured into the conversation's archive.
+      # Outside SCOPE_DIR on purpose — extensions are code shipped from
+      # this app, restaged each turn rather than relied on to persist
+      # via pause/resume (so a pi-extensions update reaches an existing
+      # conversation on the next turn).
       EXTENSIONS_DIR = "/home/user/pi-extensions".freeze
-      REMOTE_ARCHIVE = "/tmp/pi-session.tar.gz".freeze
       SANDBOX_TIMEOUT = 600
+
+      # Kill a paused sandbox by id, swallowing the not-found case.
+      # Used by Conversation#before_destroy and the eviction job —
+      # places that hold a stored id but no live Sandbox handle.
+      def self.kill_sandbox(sandbox_id)
+        return if sandbox_id.blank?
+
+        E2B::Sandbox.kill(sandbox_id)
+      rescue E2B::NotFoundError
+        # already gone — same outcome we wanted
+      rescue E2B::E2BError => e
+        Rails.logger.warn("E2B sandbox kill failed for sandbox_id=#{sandbox_id}: #{e.message}")
+      end
 
       def session_dir
         Pathname.new(SESSION_DIR)
@@ -40,15 +59,15 @@ module Agent
       end
 
       def run(pi_args:, &block)
-        sandbox = create_sandbox
+        sandbox = acquire_sandbox
         @sandbox_id = sandbox.sandbox_id
         execute(sandbox, pi_args: pi_args, &block)
       ensure
-        terminate(sandbox)
+        pause_sandbox(sandbox) if sandbox
       end
 
       # Adds the microVM's id, so a turn can be traced to its sandbox in
-      # E2B's logs even though the sandbox itself is killed after the run.
+      # E2B's logs.
       def runtime_info
         super.merge("sandbox_id" => @sandbox_id)
       end
@@ -58,7 +77,6 @@ module Agent
       def execute(sandbox, pi_args:)
         provision(sandbox)
         stage_extensions(sandbox)
-        hydrate(sandbox)
         stage_uploads(sandbox)
         stage_mcp_config(sandbox)
         stage_identity(sandbox)
@@ -67,51 +85,67 @@ module Agent
           yield session
         ensure
           session.close
-          persist(sandbox)
         end
       end
 
-      def create_sandbox
+      # Resume the conversation's paused sandbox, or create one if there
+      # isn't a usable one. A stored id that no longer resolves (E2B-side
+      # cleanup, manual kill, ancient paused sandbox the eviction job
+      # already collected) is cleared and we fall back to fresh provision.
+      def acquire_sandbox
+        if conversation.e2b_sandbox_id.present?
+          resume_existing
+        else
+          create_fresh
+        end
+      end
+
+      def resume_existing
+        sandbox = E2B::Sandbox.connect(conversation.e2b_sandbox_id)
+        sandbox.resume(timeout: SANDBOX_TIMEOUT)
+        sandbox
+      rescue E2B::NotFoundError
+        Rails.logger.info(
+          "E2B sandbox #{conversation.e2b_sandbox_id} not found for conversation " \
+          "#{conversation.id}; provisioning fresh"
+        )
+        conversation.update_column(:e2b_sandbox_id, nil)
+        create_fresh
+      end
+
+      def create_fresh
         E2B::Sandbox.create(template: template, timeout: SANDBOX_TIMEOUT)
+      end
+
+      # Pause the sandbox so the next turn can resume it; persist the id
+      # if it changed (first turn) or was cleared. Logged-not-raised:
+      # a pause failure at end-of-turn must not crash the turn the user
+      # already saw. If pause fails we best-effort kill the VM so it
+      # doesn't leak as a running orphan, and clear the id — next turn
+      # will provision fresh.
+      def pause_sandbox(sandbox)
+        sandbox.pause
+        conversation.update_column(:e2b_sandbox_id, sandbox.sandbox_id) \
+          if conversation.e2b_sandbox_id != sandbox.sandbox_id
+      rescue StandardError => e
+        Rails.logger.warn("E2B sandbox pause failed for conversation #{conversation.id}: #{e.message}")
+        force_kill_after_pause_failure(sandbox)
+        conversation.update_column(:e2b_sandbox_id, nil)
+      end
+
+      def force_kill_after_pause_failure(sandbox)
+        sandbox.kill
+      rescue StandardError
+        # nothing more to do — log was already written by pause_sandbox
       end
 
       def provision(sandbox)
         sandbox.commands.run("mkdir -p #{SESSION_DIR} #{WORKSPACE_DIR}/uploads")
       end
 
-      # Restore the conversation's durable archive into the sandbox. No-op
-      # on the first turn (no archive yet).
-      def hydrate(sandbox)
-        Agent::SessionArchive.with_archive(conversation) do |archive_path|
-          sandbox.files.write(REMOTE_ARCHIVE, File.binread(archive_path))
-          sandbox.commands.run("tar -xzf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR}")
-        end
-      end
-
-      # Capture the sandbox's scope (session + workspace) back to durable
-      # storage. Logged, never raised — it must not crash the turn the
-      # user already saw stream.
-      def persist(sandbox)
-        # Exclude per-turn projected inputs (staged uploads, the
-        # rendered .mcp.json) — not archived state.
-        sandbox.commands.run(
-          "tar -czf #{REMOTE_ARCHIVE} -C #{SCOPE_DIR} " \
-          "--exclude=./workspace/uploads --exclude=./workspace/.mcp.json ."
-        )
-        data = sandbox.files.read(REMOTE_ARCHIVE, format: "bytes")
-        Tempfile.create([ "pi-session", ".tar.gz" ]) do |tmp|
-          tmp.binmode
-          tmp.write(data)
-          tmp.flush
-          Agent::SessionArchive.attach(conversation, tmp.path)
-        end
-      rescue StandardError => e
-        Rails.logger.error("E2B archive failed for conversation #{conversation.id}: #{e.message}")
-      end
-
       # Upload the app's pi extensions into the sandbox so `pi --extension`
-      # can load them. Written outside SCOPE_DIR — they are code, and must
-      # not be captured into the conversation's session archive.
+      # can load them. Re-staged each turn even on a resumed sandbox so
+      # an update to a bundled extension reaches in-flight conversations.
       def stage_extensions(sandbox)
         sources = Agent::Runtime.extension_sources
         return if sources.empty?
@@ -129,10 +163,10 @@ module Agent
         "#{EXTENSIONS_DIR}/#{source.parent.basename}.ts"
       end
 
-      # Project the conversation's uploaded files into uploads/. They are
-      # excluded from the archive (durable as Message attachments), so
-      # all of them are re-staged into the fresh sandbox every turn.
-      # Filenames are basenamed so a crafted name cannot escape.
+      # Project the conversation's uploaded files into uploads/. Re-
+      # staged each turn (the canonical source is the Message
+      # attachment, not the sandbox copy). Filenames are basenamed so a
+      # crafted name cannot escape the uploads dir.
       def stage_uploads(sandbox)
         conversation.uploaded_files.each do |attachment|
           name = File.basename(attachment.filename.to_s)
@@ -143,14 +177,14 @@ module Agent
       end
 
       # Write the rendered .mcp.json into the sandbox workspace — a
-      # per-turn projected input, excluded from the archive (see #persist).
+      # per-turn projected input, overwriting any prior turn's copy.
       def stage_mcp_config(sandbox)
         sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::McpConfig::FILENAME}", mcp_config)
       end
 
       # Write the rendered AGENTS.md into the sandbox workspace. Per-turn
-      # projected input, excluded from the archive. pi auto-loads it from
-      # `cwd` as ambient instructions.
+      # projected input. pi auto-loads it from `cwd` as ambient
+      # instructions.
       def stage_identity(sandbox)
         sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::Identity::FILENAME}", identity_content)
       end
@@ -163,12 +197,6 @@ module Agent
             on_message: on_message, on_stderr: on_stderr
           )
         end
-      end
-
-      def terminate(sandbox)
-        sandbox&.kill
-      rescue E2B::E2BError => e
-        Rails.logger.warn("E2B sandbox kill failed for conversation #{conversation.id}: #{e.message}")
       end
 
       def template

@@ -3,13 +3,15 @@ class Conversation < ApplicationRecord
   belongs_to :team
   has_many :messages, dependent: :destroy
 
-  # The pi session directory, archived. Durable, worker-independent
-  # storage for the agent's conversation memory (see Agent::SessionArchive).
-  has_one_attached :pi_session_archive
-
   # A conversation is owned by a team; default it to the creator's
   # personal team unless one was given (docs/tenancy.md).
   before_validation :default_team, on: :create
+
+  # E2B does not auto-clean paused sandboxes; if we forget to kill one
+  # when its conversation is destroyed, it sits on E2B's servers
+  # forever (see docs/coding-runtime.md). EvictPausedSandboxesJob is
+  # the other side of this contract — for the long-idle case.
+  before_destroy :kill_paused_e2b_sandbox
 
   scope :recent, -> { order(updated_at: :desc) }
 
@@ -53,5 +55,9 @@ class Conversation < ApplicationRecord
 
   def default_team
     self.team ||= user&.personal_team
+  end
+
+  def kill_paused_e2b_sandbox
+    Agent::Runtime::E2b.kill_sandbox(e2b_sandbox_id)
   end
 end

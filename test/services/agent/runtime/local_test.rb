@@ -74,7 +74,6 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     end
 
     assert seen_on_turn2, "turn 1's workspace files are still there on turn 2 (pi-native persistence)"
-    assert_not @conversation.reload.pi_session_archive.attached?, "Local does not archive"
   end
 
   test "run projects the conversation's uploaded files into uploads/" do

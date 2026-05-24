@@ -26,14 +26,18 @@ agent ran — so it belongs to the `Runtime`, not to one shared mechanism.
   that follows (workers all need access to the persistent workspace
   root) is the same one `Local` has always had.
 
-- **`Runtime::E2b`** — the microVM has no bind mount to a host
-  filesystem; its disk is genuinely gone after the turn. Continuity
-  therefore *still requires* externalizing state — archive the scope to
-  Active Storage after each turn, restore it before the next. The same
-  v2 shape Docker just adopted is on the roadmap (snapshot/restore via
-  E2B's native `pause`/`resume`) but is not shipped yet.
+- **`Runtime::E2b`** — the microVM has no host bind mount, but E2B
+  natively pauses and resumes a sandbox by id. First turn:
+  `Sandbox.create` → run → `pause` → save sandbox_id. Subsequent
+  turns: `Sandbox.connect(id)` → `resume` → run → `pause`. The same
+  microVM carries the working tree, transcript, and installed
+  dependencies across turns. See [`coding-runtime.md`](coding-runtime.md).
+  E2B keeps paused sandboxes indefinitely, so metis runs
+  `EvictPausedSandboxesJob` to kill long-idle ones — the next turn
+  provisions fresh.
 
-`Agent::SessionArchive` is now used by `Runtime::E2b` only.
+`Agent::SessionArchive` is gone. The tar-to-Active-Storage path is no
+longer needed by any runtime.
 
 ## Scope layout
 
@@ -47,9 +51,9 @@ agent ran — so it belongs to the `Runtime`, not to one shared mechanism.
 Some workspace contents are *projections* of durable Rails state, not
 agent-produced output: user uploads, the rendered MCP connector config,
 the agent's per-turn boot identity. Each is read straight from its
-durable source at the start of every turn, and **overwritten in place**
-on the persistent workspace (`Local`, `Docker`) or **excluded from the
-session archive** (`E2b`) — same intent expressed in two ways.
+durable source at the start of every turn and **overwritten in place**
+in the persistent workspace — host filesystem for `Local` and `Docker`,
+the resumed microVM for `E2b`.
 
 | Projected input | Source |
 |---|---|
@@ -57,9 +61,6 @@ session archive** (`E2b`) — same intent expressed in two ways.
 | `workspace/.mcp.json` | `Connector` + `ConnectorCredential` (see [`connectors.md`](connectors.md)) |
 | `workspace/AGENTS.md` | `Conversation` + `Team` + runtime (see [`agent-identity.md`](agent-identity.md)) |
 
-For `E2b`, the archive then carries only the transcript and the
-agent's own working files — archive size is independent of upload,
-connector, and identity-doc size, each of which costs once at its
-durable source, not once per turn. For `Local` and `Docker` the
-projection writes overwrite the previous turn's file in place, with
-the same end state.
+The projection writes overwrite the previous turn's copy in place
+on every runtime — durable Rails state is read once per turn at its
+canonical source, regardless of how the workspace itself persists.

@@ -71,4 +71,28 @@ class ConversationTest < ActiveSupport::TestCase
     @conversation.request_cancel!
     assert_not_nil @conversation.reload.cancel_requested_at
   end
+
+  test "destroying a conversation kills its paused E2B sandbox" do
+    # E2B keeps paused sandboxes indefinitely — without the destroy hook
+    # every deleted conversation would leave a sandbox on E2B's servers
+    # forever (docs/coding-runtime.md).
+    @conversation.update_column(:e2b_sandbox_id, "sbx-doomed")
+    killed_with = nil
+
+    with_stub(Agent::Runtime::E2b, :kill_sandbox, ->(id) { killed_with = id }) do
+      @conversation.destroy
+    end
+
+    assert_equal "sbx-doomed", killed_with
+  end
+
+  test "destroying a conversation with no sandbox is a no-op for E2B" do
+    called = false
+    with_stub(Agent::Runtime::E2b, :kill_sandbox, ->(_id) { called = true }) do
+      @conversation.destroy
+    end
+    # kill_sandbox itself is the guard against blank ids; it gets the
+    # nil and short-circuits.
+    assert called, "still invoked so the guard lives in one place"
+  end
 end

@@ -1,21 +1,21 @@
 # Coding runtime (v2)
 
-> **Status — Docker shipped, E2b on the roadmap.** `Runtime::Docker`
-> now uses the v2 shape (persistent host workspace, ephemeral
-> container); `Runtime::E2b` still uses per-turn archive as described
-> in [`session-persistence.md`](session-persistence.md). The shipped
-> Docker shape is simpler than the persistent-named-container path
-> sketched below — see "What actually shipped for Docker."
+> **Status — shipped (Docker and E2b).** Both sandbox runtimes use the
+> v2 lifetime shape. The shapes differ — Docker keeps an ephemeral
+> container with a persistent host bind mount; E2b keeps the same
+> microVM resumed via `pause`/`resume` — but in both cases the
+> conversation's working tree, transcript, and installed dependencies
+> survive between turns. `Agent::SessionArchive` is gone.
 
 ## Context
 
-The sandbox runtimes (`Docker`, `E2b`) are per-turn disposable today:
-each turn provisions a fresh container or microvm, restores the
-conversation's scope from a tar archive, runs pi, captures the scope
-back, and tears the runtime down. That shape was right for the
-chat-as-tool-use case metis grew out of — pi writes a small script,
-runs it, returns output — and it preserves the worker-fungibility the
-Rails background-job model needs.
+The sandbox runtimes (`Docker`, `E2b`) were per-turn disposable before
+this change: each turn provisioned a fresh container or microvm,
+restored the conversation's scope from a tar archive, ran pi, captured
+the scope back, and tore the runtime down. That shape was right for
+the chat-as-tool-use case metis grew out of — pi writes a small
+script, runs it, returns output — and it preserved the worker-
+fungibility the Rails background-job model needs.
 
 It is the wrong shape for multi-turn coding. The cost shows up in three
 places that compound on a real codebase:
@@ -36,45 +36,37 @@ places that compound on a real codebase:
 The natural unit of coding work is the *conversation*, not the turn.
 The sandbox should live for the conversation.
 
-## Decision: per-conversation sandbox lifetime via snapshot/restore
+## Decision: per-conversation sandbox lifetime
 
-The sandbox is provisioned once at the conversation's first turn,
-snapshotted at end-of-turn, and resumed at the next turn. Idle
-conversations have their snapshot retained for an eviction window,
-then dropped. A conversation whose snapshot has been evicted simply
-provisions fresh on its next turn — same path as today's first turn.
+The sandbox is provisioned once at the conversation's first turn and
+persists between turns; idle conversations are reaped after an
+eviction window. A conversation whose state has been evicted provisions
+fresh on its next turn — same path as the very first turn.
 
-This deliberately *is not* "long-lived sandbox pinned to a worker."
-That shape would break worker fungibility: turn N would have to land
-on whichever worker holds the live process. Snapshot/restore preserves
-the property that any worker can pick up any turn, because the
-sandbox's state lives in addressable remote storage (E2B's snapshot
-store, or a shared Docker daemon's container by name) and a fresh
-process binds to it at turn start.
+Worker fungibility is preserved because the persistent state lives in
+**addressable remote storage** (E2B's snapshot store, or the host
+filesystem at a deterministic path), not in a worker process. A turn
+doesn't pin to a worker — any worker can pick up any turn, as before.
 
 ### Per-runtime shape
 
-**`Runtime::E2b`** — native fit. `Sandbox.create` at first turn,
-`sandbox.pause()` at end-of-turn (returning the resumable id),
-`Sandbox.resume(id)` at the start of the next turn. The snapshot lives
-in E2B's storage, not ours. The id is persisted on the `Conversation`
-in place of (or alongside) `pi_session_archive`. **Not yet shipped.**
+**`Runtime::Docker`** — see "Docker: persistent host workspace" below.
 
-**`Runtime::Docker`** — see "What actually shipped for Docker" below.
+**`Runtime::E2b`** — see "E2b: pause/resume the microVM" below.
 
 **`Runtime::Local`** — unchanged. Persistence has always been pi-native
 (the scope dir lives between turns on a stable host filesystem).
-`Local` is dev-only; the new shape is for the sandbox runtimes.
+`Local` is dev-only; the v2 lifetime shape is for the sandbox runtimes.
 
-### What actually shipped for Docker
+### Docker: persistent host workspace
 
-The draft above proposed a long-lived `metis-c<id>` container with
-`docker exec` per turn, with an eviction job to reap idle containers.
-What landed is simpler: **the container stays `docker run --rm`
-ephemeral, but the conversation's workspace moves from
-`Workspace.scratch` (under `tmp/`) to `Workspace.persistent` (under
-`storage/`) — already the shape `Local` uses — and the bind mount
-into the container preserves the working tree across turns**.
+The draft of this doc originally proposed a long-lived `metis-c<id>`
+container with `docker exec` per turn and an eviction job to reap idle
+containers. What landed is simpler: **the container stays
+`docker run --rm` ephemeral, but the conversation's workspace moves
+from `Workspace.scratch` (under `tmp/`) to `Workspace.persistent`
+(under `storage/`) — already the shape `Local` uses — and the bind
+mount into the container preserves the working tree across turns**.
 
 The split, framed by what survives a turn:
 
@@ -102,14 +94,43 @@ problem for chat turns that take seconds to minutes. The persistent-
 container shape stays available as a future optimisation if that
 latency starts mattering.
 
-### What stops being needed (for Docker)
+### E2b: pause/resume the microVM
 
-- **`Agent::SessionArchive` for Docker conversations.** The bind mount
-  carries state between turns; tar-and-Active-Storage is off the hot
-  path for Docker. `SessionArchive` is retained because `E2b` still
-  uses it.
+E2B's SDK supports first-class pause/resume of a running sandbox: a
+paused VM has its full state (filesystem, in-memory daemons, anything)
+preserved server-side and can be resumed by id from any worker.
+
+- **First turn** — `Sandbox.create(template:)` → run → `sandbox.pause`
+  → save `sandbox_id` on the `Conversation`.
+- **Subsequent turns** — `Sandbox.connect(sandbox_id)` →
+  `sandbox.resume(timeout:)` → run → `sandbox.pause`.
+- **Stale id** — if `Sandbox.connect` raises `NotFoundError` (paused
+  state expired, manual kill, eviction already happened), the runtime
+  clears the id and provisions fresh. No user-visible error.
+
+**Eviction is metis's responsibility.** E2B explicitly keeps paused
+sandboxes *indefinitely* — no TTL, no auto-cleanup. Without eviction,
+every conversation a user ever opens leaves a paused sandbox on
+E2B's servers forever, paying for storage we don't use.
+`EvictPausedSandboxesJob` runs hourly (Solid Queue recurring), kills
+sandboxes whose conversation has been idle past
+`config.x.agent.e2b_eviction_window` (default 24h via
+`METIS_E2B_EVICTION_HOURS`), and clears the stored id.
+
+The other half of the eviction contract is
+`Conversation#before_destroy`, which kills the paused sandbox on
+explicit deletion. Without this, deleted conversations leak.
+
+### What stops being needed
+
+- **`Agent::SessionArchive`.** Both runtimes are off it; the class is
+  gone. The `pi_session_archive` attachment on `Conversation` goes
+  with it. Existing Active Storage blobs are orphaned by this change
+  and can be cleaned up out-of-band.
 - **`Workspace#reset!` in Docker's `run`.** There is no scratch dir to
   reset; the workspace is the durable state holder.
+- **The hydrate / persist tar round-trip in E2b's `run`.**
+  Pause/resume replaces it.
 - **The "push to survive" rule in `AGENTS.md`.** The working tree
   persists across turns; commits and pushes return to their natural
   meaning (publishing work that is ready, not a save mechanism).
@@ -136,38 +157,15 @@ latency starts mattering.
   `#sandbox_env` all keep their meaning. What changes is what `#run`
   *does* under the hood.
 
-### Lifecycle (E2b, still future)
-
-For the eventual E2b snapshot/restore shape, the lifecycle has more
-moving parts than Docker now has:
-
-1. **First turn** — `Sandbox.create`, stage projected inputs, run,
-   `sandbox.pause()`, record the snapshot id on the `Conversation`.
-2. **Subsequent turns** — `Sandbox.resume(id)`, re-stage projected
-   inputs (cheap), run, `sandbox.pause()`.
-3. **Idle** — after an eviction window, drop the snapshot. The next
-   turn provisions fresh.
-4. **Conversation deleted** — explicit teardown of any live snapshot.
-
-Eviction is best-effort. A missing snapshot at resume time falls back
-to fresh provision. Docker has none of this — its lifecycle is just
-"start a container per turn"; the persistent state lives in the host
-workspace dir, which `Conversation#destroy` already cleans up via
-`Workspace#scope_dir`.
-
 ### Migration
 
-Docker shipped with **no migration path**: existing conversations'
-`pi_session_archive` attachments are ignored on the first v2 turn.
-The user-visible loss is one-time and bounded to "the agent's prior
-working tree is gone" — pi's transcript carries the conversation
-history through Messages regardless. Old archive blobs can be GC'd
-later out-of-band.
-
-The future E2b cutover may want a one-time `SessionArchive.restore`
-into a fresh sandbox on the first v2 turn so the existing transcript
-+ working tree survive the transition. That decision belongs with
-the E2b change.
+Both runtimes shipped with **no migration path**: existing
+conversations' `pi_session_archive` attachments are ignored on the
+first v2 turn. The user-visible loss is one-time and bounded to "the
+agent's prior working tree and pi transcript are gone" — the
+conversation's message history is on `Message` rows and is
+unaffected. Orphaned Active Storage blobs from the old attachment can
+be GC'd later out-of-band.
 
 ## Out of scope for this change
 
@@ -183,12 +181,9 @@ the E2b change.
 
 ## Open
 
-- **E2b snapshot/restore.** When; whether the simpler bind-mount
-  shape Docker landed on has any analogue (E2b has no host bind
-  mount, so probably not — `pause`/`resume` is the real path).
-- **Eviction window for E2b snapshots.** A starting guess of 24h
-  self-host, longer hosted. Wants measurement once snapshot storage
-  cost is known.
+- **E2b paused-storage pricing.** Not published by E2B; the 24h
+  default eviction window is a conservative guess. Worth measuring
+  once we have meaningful usage, then tuning `METIS_E2B_EVICTION_HOURS`.
 - **Docker multi-worker.** A single-host self-host is fine; a
   multi-worker deployment needs the persistent workspace root on
   shared FS (NFS or equivalent) or per-conversation host pinning.
@@ -196,4 +191,4 @@ the E2b change.
   second host appears, not after.
 - **Workspace size cap.** Per-conversation disk budget — a runaway
   `git clone` of a huge monorepo should fail predictably, not
-  consume host disk.
+  consume host disk (Docker) or E2B quota.

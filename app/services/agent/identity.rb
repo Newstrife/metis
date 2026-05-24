@@ -72,9 +72,9 @@ module Agent
       when "local"
         "`local` — host subprocess; not a security boundary"
       when "docker"
-        "`docker` — namespace-isolated container; disposable per turn"
+        "`docker` — namespace-isolated container; fresh per turn, your workspace bind-mounted in"
       when "e2b"
-        "`e2b` — microVM; disposable per turn"
+        "`e2b` — microVM; same VM resumed each turn via pause/resume"
       else
         "`#{@runtime_kind}`"
       end

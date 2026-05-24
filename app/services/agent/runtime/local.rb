@@ -6,10 +6,8 @@ module Agent
     #
     # Persistence is pi-native. The scope lives in a persistent,
     # conversation-stable directory, and pi's own --session-dir +
-    # --continue carry continuity between turns — no archiving. That
-    # (Agent::SessionArchive) is the sandbox runtimes' mechanism, forced
-    # by their disposable environments; Local, running on a stable host
-    # filesystem, does not need it. See docs/session-persistence.md.
+    # --continue carry continuity between turns. See
+    # docs/session-persistence.md.
     class Local < Base
       def session_dir
         workspace.session_dir

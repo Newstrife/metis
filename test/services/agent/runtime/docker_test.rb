@@ -109,8 +109,6 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
 
     assert_equal session, yielded
     assert session.closed?, "session closed by the runtime"
-    refute @conversation.reload.pi_session_archive.attached?,
-           "Docker no longer archives — the persistent bind mount is the durable state holder"
   end
 
   test "files the agent writes survive into the next turn via the persistent bind mount" do
