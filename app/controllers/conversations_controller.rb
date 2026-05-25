@@ -3,7 +3,7 @@ class ConversationsController < ApplicationController
 
   layout "chat"
 
-  before_action :set_conversation, only: %i[show cancel archive unarchive]
+  before_action :set_conversation, only: %i[show cancel archive unarchive update]
   before_action :set_sidebar, only: %i[index show archived]
 
   def index
@@ -25,15 +25,24 @@ class ConversationsController < ApplicationController
       return render_composer_error(nil, error)
     end
 
-    conversation = current_user.conversations.create!(
-      title: content.presence&.truncate(80), settings: chat_settings
-    )
+    conversation = current_user.conversations.create!(settings: chat_settings)
     start_turn(conversation, content, uploads)
     redirect_to conversation
   end
 
   def show
     @messages = @conversation.messages.chronological
+  end
+
+  # PATCH /conversations/:id — title-only rename. Driven by the
+  # conversation-title Stimulus controller.
+  def update
+    title = params[:title].to_s.strip
+    return head(:unprocessable_entity) if title.blank?
+
+    @conversation.update!(title: title)
+    @conversation.broadcast_title_change!
+    head :ok
   end
 
   def cancel

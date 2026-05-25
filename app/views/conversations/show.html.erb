@@ -5,7 +5,18 @@
 
   <header class="chat-head">
     <div style="flex:1; min-width:0">
-      <h1 class="chat-title"><%= @conversation.display_title %></h1>
+      <h1 class="chat-title"
+          data-controller="conversation-title"
+          data-conversation-title-url-value="<%= conversation_path(@conversation) %>">
+        <span id="<%= dom_id(@conversation, :title) %>"
+              data-conversation-title-target="text"
+              data-action="click->conversation-title#edit"><%= @conversation.display_title %></span>
+        <input class="chat-title-input"
+               type="text"
+               data-conversation-title-target="input"
+               data-action="keydown->conversation-title#keydown blur->conversation-title#save"
+               hidden />
+      </h1>
       <div class="chat-sub">
         <span>Started <%= time_ago_in_words(@conversation.created_at) %> ago</span>
         <%= render "context_meter", conversation: @conversation %>

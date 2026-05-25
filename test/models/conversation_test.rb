@@ -1,6 +1,8 @@
 require "test_helper"
 
 class ConversationTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     @user = User.create!(email: "conv@example.com", password: "password123")
     @conversation = @user.conversations.create!
@@ -124,5 +126,45 @@ class ConversationTest < ActiveSupport::TestCase
     # kill_sandbox itself is the guard against blank ids; it gets the
     # nil and short-circuits.
     assert called, "still invoked so the guard lives in one place"
+  end
+
+  test "generate_title_async! enqueues the job when title is blank" do
+    assert_enqueued_with(job: GenerateConversationTitleJob, args: [ @conversation.id ]) do
+      @conversation.generate_title_async!
+    end
+  end
+
+  test "generate_title_async! is a no-op once a title exists" do
+    @conversation.update!(title: "Already named")
+    assert_no_enqueued_jobs only: GenerateConversationTitleJob do
+      @conversation.generate_title_async!
+    end
+  end
+
+  test "apply_generated_title! writes the cleaned title and bumps updated_at" do
+    @conversation.messages.create!(role: :user, content: "first", streaming_status: :done)
+    travel 1.minute do
+      assert_changes -> { @conversation.reload.updated_at } do
+        @conversation.apply_generated_title!("  Rails 8 Setup  ")
+      end
+    end
+    assert_equal "Rails 8 Setup", @conversation.title
+  end
+
+  test "apply_generated_title! truncates oversized titles to TITLE_MAX" do
+    @conversation.messages.create!(role: :user, content: "first", streaming_status: :done)
+    @conversation.apply_generated_title!("A" * 200)
+    assert_equal Conversation::TITLE_MAX, @conversation.title.length
+  end
+
+  test "apply_generated_title! falls back to the first user message when LLM returned nothing" do
+    @conversation.messages.create!(role: :user, content: "How do I do X?", streaming_status: :done)
+    @conversation.apply_generated_title!(nil)
+    assert_equal "How do I do X?", @conversation.title
+  end
+
+  test "apply_generated_title! is a no-op when both the LLM and fallback are empty" do
+    @conversation.apply_generated_title!(nil)
+    assert_nil @conversation.title
   end
 end

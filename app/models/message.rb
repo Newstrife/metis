@@ -24,6 +24,12 @@ class Message < ApplicationRecord
 
   scope :chronological, -> { order(:created_at) }
 
+  # Once an assistant turn finishes, the conversation has enough context
+  # (first user msg + first assistant reply) for a good title. Gating on
+  # title.blank? makes this fire at most once and respects a user rename
+  # that happened before this callback runs.
+  after_commit :enqueue_title_generation, on: %i[create update]
+
   def attachments?
     images.attached? || files.attached?
   end
@@ -33,5 +39,12 @@ class Message < ApplicationRecord
     return unless started_at && finished_at
 
     finished_at - started_at
+  end
+
+  private
+
+  def enqueue_title_generation
+    return unless assistant? && done? && saved_change_to_streaming_status?
+    conversation.generate_title_async!
   end
 end

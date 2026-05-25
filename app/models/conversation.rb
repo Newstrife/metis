@@ -34,8 +34,41 @@ class Conversation < ApplicationRecord
     update!(archived_at: nil)
   end
 
+  TITLE_MAX = 60
+
   def display_title
     title.presence || "Untitled conversation"
+  end
+
+  # No-op once a title exists, so the caller (Message after_commit) can
+  # fire on every assistant turn without worrying about double-writes.
+  def generate_title_async!
+    return if title.present?
+    GenerateConversationTitleJob.perform_later(id)
+  end
+
+  # Persist a title chosen by the LLM (or fall back to a truncation of
+  # the first user message). Called by the job, which already provided
+  # the LLM call and sanitization; this method is the single place that
+  # writes `title` and pushes the change to the UI.
+  def apply_generated_title!(raw)
+    cleaned = raw.to_s.strip.truncate(TITLE_MAX, omission: "").presence ||
+              messages.where(role: :user).order(:created_at).first&.content.to_s
+                       .strip.truncate(TITLE_MAX, omission: "")
+    return if cleaned.blank?
+    update!(title: cleaned)
+    broadcast_title_change!
+  end
+
+  def broadcast_title_change!
+    html = ERB::Util.html_escape(display_title)
+    [ :sidebar_title, :title ].each do |key|
+      Turbo::StreamsChannel.broadcast_update_to(
+        self,
+        target: ActionView::RecordIdentifier.dom_id(self, key),
+        html: html
+      )
+    end
   end
 
   # The model in use, preferring the one pi actually resolved (captured
