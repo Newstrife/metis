@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. `AGENTS.md` at the repo root is a symlink to this file, so pi / codex sessions on this repo see the same context (loaded once — context-file loaders dedupe by resolved path).
 
 ## Read first
 

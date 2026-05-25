@@ -119,7 +119,7 @@ One turn flows from the browser down to pi and streams back up, live:
 
    Persistence
       ├─ PostgreSQL       conversations & messages
-      └─ Active Storage   Agent::SessionArchive · durable pi session
+      └─ Workspace fs     Docker bind mount · E2b pause/resume · Local host
 ```
 
 The core is the **Agent service layer** (`app/services/agent/`): an
