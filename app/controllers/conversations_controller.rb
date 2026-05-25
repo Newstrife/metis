@@ -3,7 +3,7 @@ class ConversationsController < ApplicationController
 
   layout "chat"
 
-  before_action :set_conversation, only: %i[show cancel archive unarchive]
+  before_action :set_conversation, only: %i[show cancel archive unarchive update]
   before_action :set_sidebar, only: %i[index show archived]
 
   def index
@@ -28,15 +28,24 @@ class ConversationsController < ApplicationController
       return render_composer_error(nil, error)
     end
 
-    conversation = current_user.conversations.create!(
-      title: content.presence&.truncate(80), settings: chat_settings
-    )
+    conversation = current_user.conversations.create!(settings: chat_settings)
     start_turn(conversation, content, uploads)
     redirect_to conversation
   end
 
   def show
     @messages = @conversation.messages.chronological
+  end
+
+  # PATCH /conversations/:id — updates the title only. Used by the
+  # conversation-title Stimulus controller for inline renaming.
+  def update
+    title = params[:title].to_s.strip
+    return head(:unprocessable_entity) if title.blank?
+
+    @conversation.update!(title: title)
+    broadcast_title_update(@conversation)
+    head :ok
   end
 
   # Request that the in-flight turn stop. ChatJob picks this up and
@@ -90,5 +99,21 @@ class ConversationsController < ApplicationController
   def chat_settings
     model = params[:model].presence || current_user.preferred_model.presence
     { "provider" => model && Agent::Catalog.provider_for(model), "model" => model }.compact
+  end
+
+  # Pushes the updated title to both the sidebar row and the open
+  # conversation header. Both targets live on the conversation's
+  # Turbo Stream channel, which the show view subscribes to.
+  def broadcast_title_update(conversation)
+    Turbo::StreamsChannel.broadcast_update_to(
+      conversation,
+      target: dom_id(conversation, :sidebar_title),
+      html: ERB::Util.html_escape(conversation.display_title)
+    )
+    Turbo::StreamsChannel.broadcast_update_to(
+      conversation,
+      target: dom_id(conversation, :title),
+      html: ERB::Util.html_escape(conversation.display_title)
+    )
   end
 end

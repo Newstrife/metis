@@ -44,12 +44,13 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "gpt-5.5", settings["model"]
   end
 
-  test "derives the conversation title from the first message" do
+  test "new conversation title starts blank and enqueues title generation" do
     sign_in @user
-    post conversations_path,
-         params: { content: "Help me debug a Rails test", provider: "anthropic", model: "claude-opus-4-7" }
-
-    assert_equal "Help me debug a Rails test", @user.conversations.last.title
+    assert_enqueued_with(job: GenerateConversationTitleJob) do
+      post conversations_path,
+           params: { content: "Help me debug a Rails test", provider: "anthropic", model: "claude-opus-4-7" }
+    end
+    assert_nil @user.conversations.last.title
   end
 
   test "rejects starting a chat with no message" do
@@ -100,7 +101,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     conversation = @user.conversations.create!(title: "Mine")
     get conversation_path(conversation)
     assert_response :success
-    assert_select "h1", text: "Mine"
+    assert_select "h1 span", text: "Mine"
   end
 
   test "shows the runtime a conversation ran on in the context meter" do
@@ -129,6 +130,41 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :no_content
     assert_not_nil conversation.reload.cancel_requested_at
+  end
+
+  test "can rename a conversation" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Old Title")
+    patch conversation_path(conversation),
+          params: { title: "New Title" },
+          as: :json
+
+    assert_response :ok
+    assert_equal "New Title", conversation.reload.title
+  end
+
+  test "cannot rename a conversation to blank" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Keep Me")
+    patch conversation_path(conversation),
+          params: { title: "   " },
+          as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal "Keep Me", conversation.reload.title
+  end
+
+  test "cannot rename another user's conversation" do
+    other = User.create!(email: "rename-other@example.com", password: "password123")
+    conversation = other.conversations.create!(title: "Theirs")
+    sign_in @user
+
+    patch conversation_path(conversation),
+          params: { title: "Mine Now" },
+          as: :json
+
+    assert_response :not_found
+    assert_equal "Theirs", conversation.reload.title
   end
 
   # Temporarily override a constant for the duration of the block.
