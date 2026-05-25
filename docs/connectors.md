@@ -27,10 +27,10 @@ vendors it nor loads it explicitly.
 The adapter reads its server list from an on-disk `.mcp.json`, so metis
 **stages a `.mcp.json` per run** into the pi workspace — non-secret
 server definitions and inline credentials, both rendered from the
-`Connector` model. That file is a per-turn projected input, excluded
-from the session archive, so the secrets never become durable. A fresh
-sandbox carries no other MCP config on disk, so the staged file is the
-only source.
+`Connector` model. That file is a per-turn projected input, re-rendered each turn from
+the durable `Connector` records, so the secrets never become durable
+on disk. A fresh sandbox carries no other MCP config, so the staged
+file is the only source.
 
 ## Why not skill + CLI
 

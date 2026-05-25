@@ -12,10 +12,9 @@ flag, or pi extension.
 ## Decision: a projected input, rendered from durable Rails state
 
 `AGENTS.md` is rendered fresh each turn from the `Conversation`,
-`Team`, runtime, and the team's `Connector`s; written into
-`workspace/AGENTS.md`; and excluded from the session archive. The
-Rails records are the durable source. The file is a runtime view of
-them.
+`Team`, runtime, and the team's `Connector`s, and written into
+`workspace/AGENTS.md`. The Rails records are the durable source; the
+file is a runtime view of them.
 
 This is the same shape as `.mcp.json` (`Agent::McpConfig`) and
 `workspace/uploads/` — see [*The projected-input pattern*](#the-projected-input-pattern)
@@ -25,18 +24,20 @@ below.
 
 Deliberately scoped to runtime identity and behavior, not product guardrails:
 
+Sections appear in the rendered file in this order:
+
 - **Identity** — *"You are Metis."* (pi is the harness loading the
   file, but the rendered prompt deliberately doesn't name it — to the
   agent, and to the operator it serves, the thing on the other side
   of the chat is Metis.)
+- **Soul** — the behavioral contract for the runtime agent: direct,
+  resourceful, judgment-bearing, privacy-preserving, careful with
+  external actions, and clear about what changed.
 - **This turn** — operator email, team name, runtime kind and its
   isolation posture, workspace persistence model, uploads location.
 - **Connectors** — each enabled connector with how the agent acts on
   it (*as you (OAuth)*, *team-shared credential*, *no credential —
   server visible but may reject*).
-- **Soul** — the behavioral contract for the runtime agent: direct,
-  resourceful, judgment-bearing, privacy-preserving, careful with
-  external actions, and clear about what changed.
 - **Conventions** — projected inputs rewrite each turn; sandbox
   boundary; identity-bearing connectors carry the operator's handle,
   not a bot's.

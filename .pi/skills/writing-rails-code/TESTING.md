@@ -1,101 +1,107 @@
-# Testing Patterns (Minitest + Mocha)
+# Testing Patterns (Minitest)
 
-## Test Structure
+Metis uses **plain Minitest** — no RSpec, no Mocha. Tests live under
+`test/` mirroring `app/`. Run with `bin/rails test`.
+
+## Test structure
 
 ```ruby
 require "test_helper"
 
-class MyServiceTest < ActiveSupport::TestCase
-  def setup
-    @project = projects(:acme_api)  # Fixture reference
+class ConversationTest < ActiveSupport::TestCase
+  setup do
+    @user = User.create!(email: "conv@example.com", password: "password123")
+    @conversation = @user.conversations.create!
   end
 
-  test "descriptive name of what is tested" do
-    assert_equal "expected", actual
+  test "a conversation defaults its team to the creator's personal team" do
+    assert_equal @user.personal_team, @conversation.team
   end
 end
 ```
 
-## Fixtures
+## No fixtures — build records directly
 
-All test data lives in `test/fixtures/*.yml`. Reference with `model_name(:fixture_key)`.
+`test/fixtures/*.yml` is intentionally empty (`# Fixtures cleared —
+tests build records directly.`). Construct what each test needs in
+its `setup` block.
 
-```yaml
-# test/fixtures/projects.yml
-acme_api:
-  owner: acme
-  name: api
-  default_branch: main
-  auto_review: true
-```
+This avoids shared mutable state across tests and stops fixture drift
+from masking failures. Cost: a few extra `.create!` calls per test —
+worth it.
 
-## Credential Stubbing
+## Stubbing — `with_stub`
 
-`test_helper.rb` stubs credentials globally:
+`test_helper.rb` defines `with_stub(target, method_name, replacement)`
+because Minitest 6 dropped `Object#stub`. Use it to swap an external
+boundary for the duration of one block:
 
 ```ruby
-setup do
-  Rails.application.credentials.stubs(:themis).returns(OpenStruct.new)
-
-  # GitHub App is stubbed "configured" so the :github channel behaves as
-  # enabled without requiring a real RSA private key in test credentials.
-  GithubApp::Config.stubs(:configured?).returns(true)
-  GithubApp::Config.stubs(:app_slug).returns("themis-ai-agent")
-  GithubApp::TokenService.stubs(:installation_token).returns("ghs_test_installation_token")
+test "destroying a conversation kills its paused e2b sandbox" do
+  killed_with = nil
+  with_stub(Agent::Runtime::E2b, :kill_sandbox, ->(id) { killed_with = id }) do
+    @conversation.update!(e2b_sandbox_id: "sbx_abc")
+    @conversation.destroy
+  end
+  assert_equal "sbx_abc", killed_with
 end
 ```
 
-To test with Linear credentials, re-stub in your test:
+For something `with_stub` doesn't cover (swapping a lookup method on
+a different shape, mocking a per-instance call), reach for
+`define_singleton_method` directly with an `ensure` to restore — see
+`ChatJobTest#with_adapter` for the pattern.
+
+## Active Record encryption
+
+`Message#content` and `#reasoning` are encrypted. The three encryption
+keys are set in `config/environments/test.rb` to literal test strings
+— individual tests don't stub credentials, the env loads the keys.
+
+## OmniAuth tests
+
+`test_helper.rb` enables `OmniAuth.config.test_mode = true` globally.
+Per-test mocks:
 
 ```ruby
-test "with linear credentials" do
-  creds = OpenStruct.new(linear_api_key: "test-linear-key")
-  Rails.application.credentials.stubs(:themis).returns(creds)
+test "github callback signs the user in" do
+  OmniAuth.config.add_mock(
+    :github,
+    uid: "42",
+    info:  { email: "u@example.com" },
+    extra: { raw_info: { email_verified: true } }
+  )
+  post user_github_omniauth_authorize_path
+  follow_redirect!
   # ...
+ensure
+  OmniAuth.config.mock_auth[:github] = nil
 end
 ```
 
-## Mocha Mocking Patterns
+## Job tests
 
-### Simple mock with expectations
-
-```ruby
-git_mock = mock("GitService")
-git_mock.expects(:push).with("branch-name").once
-git_mock.expects(:staged_changes?).returns(true)
-```
-
-### Sequences for ordered calls
+Include `ActiveJob::TestHelper` for enqueue assertions:
 
 ```ruby
-seq = sequence("ordered_calls")
-mock.expects(:first_call).in_sequence(seq)
-mock.expects(:second_call).in_sequence(seq)
-```
-
-### Stubbing class methods
-
-```ruby
-GithubAPIService.any_instance.stubs(:get_pull_request).returns({ title: "PR" })
-```
-
-## Job Testing
-
-Use `include ActiveJob::TestHelper` for job assertions:
-
-```ruby
-class MyJobTest < ActiveSupport::TestCase
+class MessagesControllerTest < ActionDispatch::IntegrationTest
   include ActiveJob::TestHelper
 
-  test "enqueues downstream job" do
-    assert_enqueued_with(job: DownstreamJob) do
-      MyJob.perform_now(args)
+  test "creating a message enqueues a ChatJob" do
+    assert_enqueued_with(job: ChatJob) do
+      post conversation_messages_path(@conversation), params: { content: "hi" }
     end
   end
 end
 ```
 
-## Common Assertions
+`ChatJobTest` itself runs jobs synchronously (`ChatJob.perform_now`)
+behind a `FakeAdapter` that replays a canned `Agent::UiEvent`
+stream. New agent-streaming tests should follow that shape rather than
+mocking individual `pi-agent-rb` calls — the FakeAdapter exercises the
+job's real branching logic.
+
+## Common assertions
 
 ```ruby
 assert obj.valid?
@@ -103,16 +109,28 @@ assert_not obj.valid?
 assert_equal expected, actual
 assert_nil value
 assert_includes collection, item
-assert_not_includes collection, item
 assert_raises(ErrorClass) { dangerous_call }
-assert_difference("Model.count", 1) { create_action }
-assert_no_difference("Model.count") { failed_action }
+assert_difference("Conversation.count", 1) { create_action }
+assert_no_difference("Message.count") { failed_action }
+assert_enqueued_with(job: ChatJob) { trigger }
 ```
 
-## Running Tests
+## Parallelization — single-process until 500 tests
+
+`test_helper.rb` sets `parallelize(workers: :number_of_processors,
+threshold: 500)`. Below the threshold, the suite runs single-process
+on purpose: parallel workers share the filesystem but not DB id
+sequences, which races per-record scratch paths
+(`Agent::Workspace`). Don't lower the threshold "to speed things up"
+— it breaks.
+
+## Running tests
 
 ```bash
-bin/rails test                           # All tests
-bin/rails test test/models/              # Directory
-bin/rails test test/models/project_test.rb:42  # Single test by line
+bin/rails test                                    # full suite
+bin/rails test test/models                        # one directory
+bin/rails test test/jobs/chat_job_test.rb         # one file
+bin/rails test test/jobs/chat_job_test.rb:42      # one test by line
 ```
+
+Run `bin/rubocop` and the relevant tests before committing.

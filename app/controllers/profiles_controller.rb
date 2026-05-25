@@ -1,7 +1,3 @@
-# The user's profile/settings page (FLA-13). Display name, timezone,
-# language, and default model live on `users` directly; the form
-# submits via Turbo so the sidebar (which renders the avatar +
-# display name) updates in place without a full reload.
 class ProfilesController < ApplicationController
   layout "settings"
 
@@ -28,17 +24,8 @@ class ProfilesController < ApplicationController
     end
   end
 
-  # Called once from the chat layout when a fresh user has no timezone
-  # yet \u2014 the browser sends back its IANA zone so first-paint timestamps
-  # match the user's wall clock without making them open the settings
-  # page. No-op if the user already picked one.
-  #
-  # The model's inclusion validator and `time_zone_select` only know
-  # Rails-friendly names ("Berlin"), but the browser sends IANA names
-  # ("Europe/Berlin"). We canonicalize to the Rails-friendly form
-  # before persisting, so a subsequent profile save doesn't
-  # validation-fail on a field the user didn't touch, and the selector
-  # has a matching option.
+  # Browser sends IANA ("Europe/Berlin"); the model validator + time_zone_select
+  # only know Rails-friendly names ("Berlin"), so canonicalize before persisting.
   def detect_timezone
     canonical = canonical_zone_name(params[:timezone].to_s)
     if current_user.timezone.blank? && canonical
@@ -53,13 +40,8 @@ class ProfilesController < ApplicationController
     params.require(:user).permit(:display_name, :timezone, :language, :preferred_model)
   end
 
-  # Map any zone string (IANA or Rails-friendly) to the Rails-friendly
-  # name in ActiveSupport::TimeZone::MAPPING \u2014 the one the model
-  # validator accepts. TimeZone[] resolves either form to a zone, but
-  # `zone.name` preserves the input string; the canonical form lives
-  # in MAPPING (Rails-friendly => IANA). Resolve through tzinfo's IANA
-  # identifier and invert, so "Berlin" / "Europe/Berlin" both land on
-  # "Berlin". Returns nil for unknown zones.
+  # IANA or Rails-friendly \u2192 Rails-friendly (the form the model validator accepts),
+  # via MAPPING inverted on tzinfo's identifier. nil for unknown zones.
   def canonical_zone_name(submitted)
     zone = ActiveSupport::TimeZone[submitted]
     return nil unless zone

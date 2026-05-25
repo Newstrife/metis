@@ -1,19 +1,6 @@
 module Agent
-  # Renders the `AGENTS.md` that boots the agent every turn — pi
-  # auto-loads it from its working directory as ambient instructions
-  # (the workspace `cwd`). The file shapes the agent's sense of place:
-  # who it is, who it's serving, where it's running, and what's wired
-  # up around it.
-  #
-  # This is a per-turn projected input — same lifecycle as `.mcp.json`:
-  # rendered fresh each turn, written to `workspace/AGENTS.md`, and
-  # excluded from the session archive. The Conversation, Team,
-  # Connector, and Runtime records are the durable source.
-  #
-  # Deliberately scoped to **environment context**, not Metis-the-
-  # product's contributor guardrails (VISION.md "what we won't build").
-  # The agent is here to serve a user task — telling it "no SPA" would
-  # leak Metis's product constraints into the user's work.
+  # Renders the per-turn `AGENTS.md` that boots the agent. See
+  # `docs/agent-identity.md` for the design.
   class Identity
     FILENAME = "AGENTS.md".freeze
 
