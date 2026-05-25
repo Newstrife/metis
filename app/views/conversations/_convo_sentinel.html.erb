@@ -1,0 +1,19 @@
+<%# locals: (pagy:, last_bucket: nil)
+
+    Endless-scroll trigger at the bottom of #convos-list. The enclosing
+    `.convos` scroll container carries `data-controller="infinite-scroll"`;
+    this element is its `sentinel` target. The controller observes it
+    against `.convos`'s scroll viewport and fetches `data-url` when it
+    intersects.
+
+    `last_bucket` is the symbol of the last visible recency bucket;
+    the server sends it back via the next sentinel's URL so the next
+    page knows whether its first row needs a fresh group header. %>
+<% if pagy&.next %>
+  <div id="convos-sentinel"
+       class="convos-sentinel"
+       data-infinite-scroll-target="sentinel"
+       data-url="<%= conversations_path(page: pagy.next, last_bucket: last_bucket) %>">
+    <span class="convos-loading" aria-hidden="true">Loading…</span>
+  </div>
+<% end %>

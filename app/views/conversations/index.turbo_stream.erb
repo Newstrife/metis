@@ -1,0 +1,19 @@
+<%# Endless-scroll response for the sidebar conversation list.
+    Inserts the next page's rows *before* the sentinel and either
+    swaps the sentinel for a fresh one (more pages) or removes it
+    (last page). The flat _convo_items walker handles cross-page
+    group continuity via `last_bucket`. %>
+<%= turbo_stream.before "convos-sentinel",
+      partial: "conversations/convo_items",
+      locals: { conversations: @conversations,
+                last_bucket: params[:last_bucket],
+                grouped: true } %>
+
+<% if @sidebar_pagy.next %>
+  <%= turbo_stream.replace "convos-sentinel",
+        partial: "conversations/convo_sentinel",
+        locals: { pagy: @sidebar_pagy,
+                  last_bucket: conversation_time_bucket(@conversations.last.updated_at) } %>
+<% else %>
+  <%= turbo_stream.remove "convos-sentinel" %>
+<% end %>

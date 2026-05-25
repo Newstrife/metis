@@ -68,6 +68,11 @@ body.app-shell { overflow:hidden; }
 }
 /* the Turbo cable element is invisible — never a grid/flex item */
 turbo-cable-stream-source { display:none; }
+/* The #main turbo-frame wraps the right pane so sidebar clicks swap
+   only this region. `display:contents` keeps the frame transparent
+   to layout, so the inner `<main>` (or `<turbo-frame>` from index/
+   show) is the actual grid item in `.app` and inherits its sizing. */
+turbo-frame#main { display:contents; }
 
 /* ───────────── sidebar ───────────── */
 .sidebar { background:var(--side); display:flex; flex-direction:column; min-height:0; }
@@ -114,6 +119,13 @@ turbo-cable-stream-source { display:none; }
 .convo:hover { background:var(--card); color:var(--ink); box-shadow:var(--sh-sm); }
 .convo.on { background:var(--card); color:var(--ink); font-weight:600; box-shadow:var(--sh-md); }
 .convos-empty { padding:18px 10px; color:var(--ink-3); font-size:13px; }
+.convos-sentinel {
+  display:flex; justify-content:center; align-items:center;
+  padding:10px; min-height:24px;
+}
+.convos-loading {
+  color:var(--faint); font-size:12px; letter-spacing:.04em;
+}
 
 .user {
   display:flex; align-items:center; gap:10px; padding:8px; margin:4px 8px 8px;

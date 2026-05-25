@@ -36,7 +36,16 @@
   <body class="app-shell">
     <div class="app">
       <%= render "conversations/sidebar" %>
-      <%= yield %>
+      <%# Sidebar conversation links target this frame, so picking a
+          conversation swaps only the main pane and the sidebar keeps
+          its scroll/paginated state. `advance` updates the URL so
+          back/forward and refresh still work. Forms that need a full
+          page reload (e.g. creating a new conversation, since the
+          sidebar must pick up the new row) break out with
+          `data-turbo-frame="_top"`. %>
+      <turbo-frame id="main" data-turbo-action="advance">
+        <%= yield %>
+      </turbo-frame>
     </div>
 
     <% if notice || alert %>

@@ -31,6 +31,9 @@ gem "omniauth-rails_csrf_protection"
 # Render Markdown message content to HTML (GFM-compliant, native tables)
 gem "commonmarker"
 
+# Pagination — used for endless scrolling of the sidebar conversation list
+gem "pagy", "~> 43.5"
+
 # Ruby client for the pi coding agent (drives `pi --mode rpc`)
 gem "pi-agent-rb", path: "../pi-agent-rb", require: "pi_agent"
 
