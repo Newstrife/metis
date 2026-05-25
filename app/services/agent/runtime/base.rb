@@ -85,13 +85,6 @@ module Agent
         env
       end
 
-      # True iff anything in sandbox_env is going to set up agent coding
-      # tools — Identity uses this to decide whether to render the
-      # `Coding tools` section in AGENTS.md.
-      def coding_tools_available?
-        sandbox_env.key?("GH_TOKEN")
-      end
-
       private
 
       def git_identity_for(user)

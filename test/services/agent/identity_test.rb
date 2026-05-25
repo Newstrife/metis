@@ -106,10 +106,23 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/workspace\//, out)
   end
 
-  test "renders the Coding tools section when a GitHub grant covers `repo`" do
-    # The same gate Runtime::Base#sandbox_env uses to inject GH_TOKEN —
-    # the identity prompt must mirror it exactly so AGENTS.md never names
-    # GH_TOKEN as available when the runtime won't have injected it.
+  test "tells the agent that git commit author / committer carry the operator's identity" do
+    # Non-obvious git gotcha worth surfacing: the runtime silently sets
+    # GIT_AUTHOR_* / GIT_COMMITTER_* env vars (Runtime::Base#sandbox_env)
+    # when a GitHub identity is wired. Without this bullet, the agent
+    # could commit thinking it's acting as a bot.
+    out = render
+
+    assert_match(/commit author/i, out)
+    assert_match(/operator's identity/i, out)
+  end
+
+  test "no longer renders a Tools / Coding tools section — capability inventory was making the agent self-narrow" do
+    # Listing git/gh/GH_TOKEN in AGENTS.md was inventory framing — to
+    # the model it read as "you are a coding agent." Removed; the
+    # runtime still injects the env (Runtime::Base#sandbox_env),
+    # agent discovers via env. Re-adding an h2/h3 "Tools" or "Coding
+    # tools" section means re-introducing the self-narrowing bug.
     conversation.user.oauth_grants.create!(
       provider: "github", access_token: "live", refresh_token: "rt",
       expires_at: 1.hour.from_now, scopes: "user:email repo"
@@ -117,53 +130,8 @@ class Agent::IdentityTest < ActiveSupport::TestCase
 
     out = render(runtime_kind: "docker")
 
-    assert_match(/## Coding tools/, out)
-    assert_match(/GH_TOKEN/, out)
-    assert_match(/gh pr\s+create/, out)
-    assert_match(/main/i, out)
-    # The v2 positive framing — the working tree persists. The old
-    # "push to survive" rule is gone; if it reappears here, AGENTS.md
-    # and the runtime have drifted.
-    assert_match(/working tree persists/i, out)
-    refute_match(/scratch/i, out, "AGENTS.md must not describe the working tree as scratch")
-  end
-
-  test "renders the Coding tools section for GitHub even when grant scopes are empty (App OAuth)" do
-    # GitHub Apps don't echo OAuth scopes; a connected user's grant
-    # legitimately has empty scope_set. The old "covers?(repo)" gate
-    # would falsely hide the section for every real GitHub user. The
-    # runtime injects GH_TOKEN regardless; AGENTS.md must mirror that.
-    conversation.user.oauth_grants.create!(
-      provider: "github", access_token: "ghu_live", refresh_token: "rt",
-      expires_at: 1.hour.from_now, scopes: nil
-    )
-
-    out = render(runtime_kind: "docker")
-
-    assert_match(/## Coding tools/, out)
-    assert_match(/GH_TOKEN/, out)
-  end
-
-  test "omits the Coding tools section when there's no GitHub grant at all" do
-    # No grant → runtime can't inject GH_TOKEN. The honest gate.
-    out = render(runtime_kind: "docker")
-
     refute_match(/## Coding tools/, out)
-    refute_match(/GH_TOKEN/, out)
-  end
-
-  test "omits the Coding tools section in the Local runtime even with a covering grant" do
-    # Local is dev-only — the operator's host has its own gh/git config
-    # and Runtime::Local deliberately doesn't inject GH_TOKEN. AGENTS.md
-    # must not promise tools the runtime isn't going to wire.
-    conversation.user.oauth_grants.create!(
-      provider: "github", access_token: "live", refresh_token: "rt",
-      expires_at: 1.hour.from_now, scopes: "user:email repo"
-    )
-
-    out = render(runtime_kind: "local")
-
-    refute_match(/## Coding tools/, out)
+    refute_match(/### Tools this turn/, out)
     refute_match(/GH_TOKEN/, out)
   end
 end
