@@ -19,5 +19,15 @@
     </div>
   </div>
 
+  <button type="button" class="scroll-to-bottom"
+          data-chat-target="scrollButton"
+          data-action="click->chat#jumpToBottom"
+          title="Scroll to latest" aria-label="Scroll to latest">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 6l4 4 4-4"/>
+    </svg>
+  </button>
+
   <%= render "composer", conversation: @conversation %>
 </main>
