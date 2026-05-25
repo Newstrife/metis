@@ -11,7 +11,14 @@ Rails.application.routes.draw do
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   resources :conversations, only: %i[index create show] do
-    post :cancel, on: :member
+    collection do
+      get :archived
+    end
+    member do
+      post :cancel
+      post :archive
+      post :unarchive
+    end
     resources :messages, only: :create
   end
 

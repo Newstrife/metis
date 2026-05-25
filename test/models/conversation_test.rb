@@ -86,6 +86,36 @@ class ConversationTest < ActiveSupport::TestCase
     assert_equal "sbx-doomed", killed_with
   end
 
+  test "archive! stamps archived_at and unarchive! clears it" do
+    refute @conversation.archived?
+    assert Conversation.active.exists?(@conversation.id)
+    refute Conversation.archived.exists?(@conversation.id)
+
+    @conversation.archive!
+    assert @conversation.archived?
+    assert_not_nil @conversation.archived_at
+    refute Conversation.active.exists?(@conversation.id)
+    assert Conversation.archived.exists?(@conversation.id)
+
+    @conversation.unarchive!
+    refute @conversation.archived?
+    assert_nil @conversation.archived_at
+  end
+
+  test "archive! is idempotent and does not move archived_at on a second call" do
+    @conversation.archive!
+    first_stamp = @conversation.archived_at
+    travel 1.minute do
+      @conversation.archive!
+      assert_equal first_stamp, @conversation.reload.archived_at
+    end
+  end
+
+  test "unarchive! is a no-op when the conversation is not archived" do
+    assert_nothing_raised { @conversation.unarchive! }
+    refute @conversation.archived?
+  end
+
   test "destroying a conversation with no sandbox is a no-op for E2B" do
     called = false
     with_stub(Agent::Runtime::E2b, :kill_sandbox, ->(_id) { called = true }) do
