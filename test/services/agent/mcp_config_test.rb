@@ -143,6 +143,25 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     assert_equal({ "Authorization" => "Bearer ghu_live" }, rendered["mcpServers"]["github"]["headers"])
   end
 
+  test "cli-transport connectors are never staged in .mcp.json" do
+    # The Google connectors (gmail/google_calendar/google_drive) are
+    # reached through the gws CLI, not an MCP server. Even with a
+    # valid OAuth grant on file they must not show up in mcpServers.
+    connector = add_connector(name: "gmail", transport: :cli,
+                              catalog_key: "gmail", definition: {})
+    connector.connector_credentials.create!(user: member)
+    member.oauth_grants.create!(
+      provider: "google", access_token: "ya29.live", refresh_token: "rt",
+      expires_at: 1.hour.from_now,
+      scopes: "https://www.googleapis.com/auth/gmail.readonly " \
+              "https://www.googleapis.com/auth/gmail.labels " \
+              "https://www.googleapis.com/auth/gmail.modify " \
+              "https://www.googleapis.com/auth/gmail.compose"
+    )
+
+    assert_equal({ "mcpServers" => {} }, rendered)
+  end
+
   test "an oauth credential whose catalog entry has gone missing is dropped" do
     connector = add_connector(name: "ghost", transport: :http,
                               definition: { "url" => "https://mcp.example/" },

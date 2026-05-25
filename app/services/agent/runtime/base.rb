@@ -66,9 +66,14 @@ module Agent
       # underlying grant; nothing here is stored and nothing reaches disk.
       # See docs/connectors.md ("Credential pass-through to the sandbox").
       #
-      # Today: GitHub. The agent gets `GH_TOKEN` (consumed by `git` and
-      # `gh`) plus a git author/committer identity so commits carry the
-      # operator's handle rather than an anonymous default.
+      # Today: GitHub and Google. The agent gets `GH_TOKEN` (consumed by
+      # `git` and `gh`) plus a git author/committer identity so commits
+      # carry the operator's handle rather than an anonymous default; and
+      # `GOOGLE_WORKSPACE_CLI_TOKEN` (consumed by the `gws` CLI shipped in
+      # the runtime image and driven by the gws-* skills) so Gmail /
+      # Calendar / Drive calls act as the operator. `gws` also needs
+      # `GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND=file` so it doesn't try to
+      # talk to a desktop keyring in the headless sandbox.
       def sandbox_env
         env = {}
         github = OauthBroker.bearer_for(
@@ -82,6 +87,13 @@ module Agent
           env["GIT_COMMITTER_NAME"]  = author[:name]
           env["GIT_COMMITTER_EMAIL"] = author[:email]
         end
+
+        google = OauthBroker.bearer_for(user: conversation.user, provider: "google")
+        if google
+          env["GOOGLE_WORKSPACE_CLI_TOKEN"] = google
+          env["GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND"] = "file"
+        end
+
         env
       end
 

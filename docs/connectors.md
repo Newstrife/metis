@@ -219,52 +219,56 @@ on file anywhere.
   `prompt: consent`. Refresh responses omit `refresh_token`;
   `OauthGrant#absorb!` preserves the prior one.
 
-### Google connectors — self-hosted Workspace MCP
+### Google connectors — `gws` CLI, no MCP server
 
-We **don't** use Google's hosted `gmailmcp.googleapis.com` because
-it gates tool execution at the OAuth-client level — every call from
-a non-allowlisted client (including ours) returns "caller does not
-have permission" regardless of OAuth scopes. Instead each Google
-catalog entry (Gmail, Google Calendar, …) points at a single
-self-hosted instance of
-[`chagel/google_workspace_mcp`](https://github.com/chagel/google_workspace_mcp),
-run in external-OAuth mode so it validates the bearer metis sends
-against Google's userinfo API per request. One server, many
-connectors: the bearer's scopes decide which tools each connector
-can call.
+The Google connectors (Gmail, Google Calendar, Google Drive) do
+**not** stage an MCP server. They are `transport: cli` catalog
+entries: the agent reaches Google through
+[`gws`](https://github.com/googleworkspace/cli), the Google
+Workspace CLI, which is baked into the runtime images alongside pi.
 
-The catalog URL comes from `WORKSPACE_MCP_URL` via ERB
-(`config/connector_catalog.yml`), so the same code targets a local
-dev server (`http://localhost:10299/mcp/`) or a hosted instance.
+The per-turn token flow:
 
-`bin/dev` boots the server alongside Rails via Procfile.dev's
-`workspace_mcp` entry (`bin/workspace-mcp`). The launcher defaults
-to `uvx --from git+https://github.com/chagel/google_workspace_mcp
-workspace-mcp` — uv pulls + caches the package on first run, no
-local checkout needed. (Requires uv: https://docs.astral.sh/uv.)
+1. The user connects Gmail / Calendar / Drive through the standard
+   Google OAuth consent screen. The token + granted scopes union
+   into the user's single `OauthGrant` for `google`, exactly as
+   they would for a hosted-MCP connector. A `ConnectorCredential`
+   marker is recorded against a `Connector` row whose `transport`
+   is `cli` and whose `definition` is empty.
+2. At the start of each turn, `Runtime::Base#sandbox_env` resolves
+   the user's `google` grant through `OauthBroker.bearer_for` and
+   exports the access token as `GOOGLE_WORKSPACE_CLI_TOKEN` (plus
+   `GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND=file` so `gws` doesn't
+   reach for a desktop keyring in the headless sandbox). This is
+   the same pattern as `GH_TOKEN` for GitHub.
+3. `Agent::McpConfig` skips `cli`-transport connectors so they
+   never land in `.mcp.json`. The shipped `gws-*` skills in
+   `.pi/skills/` tell the agent how to drive `gws gmail`,
+   `gws calendar`, `gws drive`, etc. The bearer's scopes decide
+   what calls succeed.
 
-Three escape hatches via env vars:
+Why CLI instead of an MCP server: the previous setup ran a
+self-hosted `google_workspace_mcp` in `MCP_ENABLE_OAUTH21=true` /
+`EXTERNAL_OAUTH21_PROVIDER=true` mode, which depends on Google's
+MCP Developer Preview program. That program only accepts verified
+Workspace business accounts — personal `@gmail.com` developers are
+rejected — and approval is per GCP project. Switching to the
+CLI+skills pattern removes that distribution blocker; the OAuth
+side is plain sensitive-scope verification, available from any
+project. See `FLA-19` for the full rationale and the VISION.md
+tradeoff it forces.
 
-- `WORKSPACE_MCP_SOURCE` — pin a tag or commit, e.g.
-  `git+https://github.com/chagel/google_workspace_mcp@v1.2.3`.
-- `WORKSPACE_MCP_PROJECT` — point at a local source checkout when
-  you're developing the MCP server itself.
-- `WORKSPACE_MCP_PORT` — change the listen port (matches WORKSPACE_MCP_URL).
+The runtime images install `gws` via `npm install -g
+@googleworkspace/cli`, which downloads the matching pre-built
+binary from the project's GitHub Releases. Shipped skills live
+under `.pi/skills/gws-*` and were pulled from
+`https://github.com/googleworkspace/cli/tree/main/skills` — a
+curated subset: `gws-shared`, plus the Gmail, Calendar, and Drive
+skill families.
 
-The launcher reads `GOOGLE_OAUTH_CLIENT_ID` /
-`GOOGLE_OAUTH_CLIENT_SECRET` from the environment (same vars the
-Devise initializer uses), exports `MCP_ENABLE_OAUTH21=true` +
-`EXTERNAL_OAUTH21_PROVIDER=true`, passes
-`--permissions gmail:drafts calendar:full` so both tool families
-register, and auto-restarts on crash with exponential backoff.
-
-The server picks which tools to expose based on the scopes the
-bearer was granted. Each catalog entry asks Google for the scopes
-its tools need: Gmail uses readonly + labels + modify + compose
-(workspace-mcp's `gmail:drafts` tier); Google Calendar uses
-`calendar` + `calendar.events` (the `calendar:full` tier). Expand
-an entry's `oauth_scopes` to unlock more tools — e.g. add
-`gmail.send` to enable the send-message tool.
+Expand a connector's `oauth_scopes` to unlock more `gws` surface
+on that service — e.g. add `gmail.send` if you want the agent to
+send mail without going through a draft.
 
 ## Identities, not a single provider per user
 

@@ -12,7 +12,7 @@
 
   <div class="field">
     <%= f.label :transport %>
-    <%= f.select :transport, Connector.transports.keys, {},
+    <%= f.select :transport, Connector.transports.keys.excluding("cli"), {},
           data: { connector_form_target: "transport", action: "connector-form#switch" } %>
   </div>
 

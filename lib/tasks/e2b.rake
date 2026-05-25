@@ -28,6 +28,15 @@ namespace :e2b do
                             .apt_install([ "curl", "gnupg" ])
                             .run_cmd(install_gh, user: "root")
                             .npm_install(pi_package, g: true)
+                            # The Google Workspace CLI (gws) — how the agent
+                            # reaches Gmail, Calendar, and Drive. Reads its
+                            # bearer from GOOGLE_WORKSPACE_CLI_TOKEN, which
+                            # Agent::Runtime::Base#sandbox_env exports per
+                            # turn from the user's Google OauthGrant. The
+                            # `gws-*` skills shipped in .pi/skills/ guide the
+                            # agent. npm fetches the matching prebuilt
+                            # binary from the project's GitHub Releases.
+                            .npm_install("@googleworkspace/cli", g: true)
                             # Explicit user: pi extensions install into the user's
                             # home; running as root would write to /root/.pi and
                             # pi at runtime (user `user`) wouldn't find them.

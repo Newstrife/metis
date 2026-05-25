@@ -123,8 +123,9 @@ class ConnectorCredentialTest < ActiveSupport::TestCase
   end
 
   def gmail_connector
-    Connector.create!(team: connector.team, name: "gmail", transport: :http,
-                      definition: { "url" => "https://mcp.example/" },
-                      catalog_key: "gmail")
+    # Gmail is now a cli-transport connector (gws CLI authorised via
+    # GOOGLE_WORKSPACE_CLI_TOKEN), so no MCP server definition.
+    Connector.create!(team: connector.team, name: "gmail", transport: :cli,
+                      definition: {}, catalog_key: "gmail")
   end
 end
