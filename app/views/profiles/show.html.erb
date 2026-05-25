@@ -1,0 +1,9 @@
+<% content_for :title, "Profile" %>
+
+<main class="chat profile-page">
+  <%= render "header" %>
+
+  <%= turbo_frame_tag "profile_form" do %>
+    <%= render "form", user: @user %>
+  <% end %>
+</main>

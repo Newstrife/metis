@@ -4,7 +4,7 @@
     `.convos` (the scroll container) watches the sentinel target at the
     bottom and fetches the next page as a turbo_stream when it scrolls
     into view. %>
-<aside class="sidebar" data-controller="conversation-filter">
+<aside id="sidebar" class="sidebar" data-controller="conversation-filter">
   <div class="ws">
     <div class="ws-name">Metis</div>
     <div style="flex:1"></div>
@@ -53,34 +53,21 @@
     <div class="convos-empty" data-conversation-filter-target="empty" hidden>No matches.</div>
   </nav>
 
-  <nav class="nav" aria-label="Navigate">
-    <div class="grp-label">Navigate</div>
-    <%= link_to archived_conversations_path,
-          class: "nav-item#{' on' if action_name == 'archived'}",
-          data: { turbo_frame: "main" } do %>
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-        <path d="M2 4h12v2H2zM3 6v7h10V6M6.5 9h3" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span>Archived</span>
-    <% end %>
-    <%= link_to connectors_path,
-          class: "nav-item#{' on' if controller_name == 'connectors'}" do %>
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-        <path d="M5.5 2v3.2M10.5 2v3.2M4 5.2h8v2.3a4 4 0 01-8 0V5.2zM8 11.5V14"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span>Connectors</span>
-    <% end %>
-  </nav>
-
+  <%# The user card doubles as the only entry point to settings — the
+      avatar/name area links into the settings shell, with a small
+      cog on the right as the visual hint. Sign-out lives inside
+      settings, not here. %>
   <div class="user">
-    <div class="avatar" aria-hidden="true"><%= current_user.email.first.upcase %></div>
-    <div class="who"><div class="nm"><%= current_user.email %></div></div>
-    <%= button_to destroy_user_session_path, method: :delete,
-          class: "signout", title: "Sign out", form: { data: { turbo: false } } do %>
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-        <path d="M6 14H3.5A1.5 1.5 0 012 12.5v-9A1.5 1.5 0 013.5 2H6M10.5 11l3-3-3-3M13.5 8H6"
-              stroke-linecap="round" stroke-linejoin="round"/>
+    <%= link_to profile_path, class: "user-link", title: "Open settings",
+          data: { turbo_frame: "_top" } do %>
+      <div class="avatar" aria-hidden="true"><%= current_user.initials %></div>
+      <div class="who"><div class="nm"><%= current_user.display_label %></div></div>
+    <% end %>
+    <%= link_to profile_path, class: "user-action", title: "Settings",
+          data: { turbo_frame: "_top" } do %>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 4l4 4-4 4"/>
       </svg>
     <% end %>
   </div>

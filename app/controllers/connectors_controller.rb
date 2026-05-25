@@ -2,9 +2,8 @@
 # apps, the connect flow, and per-connector management. v1 scopes to the
 # user's personal team; a team switcher arrives with shared teams.
 class ConnectorsController < ApplicationController
-  layout "chat"
+  layout "settings"
 
-  before_action :set_sidebar
   before_action :set_connector, only: %i[edit update destroy]
 
   # The marketplace: catalog apps as tiles, plus the team's custom

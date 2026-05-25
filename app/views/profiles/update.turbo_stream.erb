@@ -1,0 +1,16 @@
+<%# Replace the form frame in place; on success also refresh the page
+    header so the H1 (display_label) and avatar initials pick up the
+    new value without a full reload. The settings sidebar shows only
+    nav + avatar/handle, which both come from current_user — so we
+    re-render it too so the user's name in the bottom-left updates. %>
+<%= turbo_stream.replace "profile_form" do %>
+  <%= render "form", user: @user %>
+<% end %>
+<% if @user.errors.empty? %>
+  <%= turbo_stream.replace "profile_header" do %>
+    <%= render "header" %>
+  <% end %>
+  <%= turbo_stream.replace "sidebar" do %>
+    <%= render "settings/sidebar" %>
+  <% end %>
+<% end %>

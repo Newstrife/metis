@@ -25,6 +25,67 @@ class UserTest < ActiveSupport::TestCase
     assert_difference("Membership.count", -1) { user.destroy }
   end
 
+  test "display_label falls back to email when display_name is blank" do
+    user = create_user
+    assert_equal user.email, user.display_label
+
+    user.update!(display_name: "Mike Chen")
+    assert_equal "Mike Chen", user.display_label
+  end
+
+  test "initials are derived from display name when set, email otherwise" do
+    user = User.new(email: "alex.kim@example.com")
+    assert_equal "AK", user.initials
+
+    user.display_name = "Mike Chen"
+    assert_equal "MC", user.initials
+
+    user.display_name = "q"
+    assert_equal "Q", user.initials
+  end
+
+  test "profile_update context requires a display name" do
+    user = create_user
+    user.display_name = ""
+    refute user.valid?(:profile_update)
+    assert_includes user.errors[:display_name], "can't be blank"
+  end
+
+  test "normalizes profile string fields: trims whitespace, blanks become nil" do
+    user = User.create!(
+      email: "u-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      display_name: "  Mike  ", timezone: "  Tokyo  ",
+      language: "  en  ", preferred_model: "  "
+    )
+    assert_equal "Mike", user.display_name
+    assert_equal "Tokyo", user.timezone
+    assert_equal "en", user.language
+    assert_nil user.preferred_model
+  end
+
+  test "timezone must be a known Rails-friendly zone name" do
+    user = create_user
+    user.timezone = "Mars/Olympus"
+    refute user.valid?
+
+    # The validator is `inclusion: ActiveSupport::TimeZone.all.map(&:name)`
+    # — i.e. the curated Rails-friendly names rendered by
+    # `time_zone_select`. IANA names like "America/Los_Angeles" arrive
+    # only via ProfilesController#detect_timezone, which canonicalizes
+    # before persisting.
+    user.timezone = "Pacific Time (US & Canada)"
+    assert user.valid?
+  end
+
+  test "preferred_model must be in the catalog" do
+    user = create_user
+    user.preferred_model = "no-such-model"
+    refute user.valid?
+
+    user.preferred_model = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    assert user.valid?
+  end
+
   test "placeholder_email? matches the metis synth suffix and GitHub's noreply, anchored" do
     assert User.placeholder_email?("90943+chagel@users.noreply.github.com")
     assert User.placeholder_email?("42+mgc@github.users.noreply.metis")
