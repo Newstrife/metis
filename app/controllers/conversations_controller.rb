@@ -3,8 +3,8 @@ class ConversationsController < ApplicationController
 
   layout "chat"
 
-  before_action :set_conversation, only: %i[show cancel]
-  before_action :set_sidebar, only: %i[index show]
+  before_action :set_conversation, only: %i[show cancel archive unarchive]
+  before_action :set_sidebar, only: %i[index show archived]
 
   def index
     respond_to do |format|
@@ -45,6 +45,35 @@ class ConversationsController < ApplicationController
   def cancel
     @conversation.request_cancel!
     head :no_content
+  end
+
+  # The "Archived" view: same chrome as the main sidebar, but the right
+  # pane lists every archived conversation with an unarchive action.
+  # The sidebar itself still shows the *active* list — archived items
+  # are deliberately not mixed in.
+  def archived
+    @archived_conversations = current_user.conversations.archived.recent
+  end
+
+  # Soft-archive. If the user archived the conversation they had open,
+  # bounce them to the new-chat root so they aren't staring at a row
+  # that no longer belongs in the active sidebar.
+  # Sidebar and header buttons both submit with `turbo_frame: "_top"`,
+  # so the redirect causes a full top-level visit — the sidebar
+  # re-renders without the archived row, and the user lands on a fresh
+  # inbox/new-chat. The id is stashed in flash so the toast can offer an
+  # Undo (see app/views/layouts/chat.html.erb).
+  def archive
+    @conversation.archive!
+    flash[:notice] = "Conversation archived."
+    flash[:undo_archive_id] = @conversation.id
+    redirect_to root_path
+  end
+
+  def unarchive
+    @conversation.unarchive!
+    flash[:notice] = "Conversation restored."
+    redirect_to @conversation
   end
 
   private

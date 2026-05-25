@@ -55,6 +55,14 @@
 
   <nav class="nav" aria-label="Navigate">
     <div class="grp-label">Navigate</div>
+    <%= link_to archived_conversations_path,
+          class: "nav-item#{' on' if action_name == 'archived'}",
+          data: { turbo_frame: "main" } do %>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M2 4h12v2H2zM3 6v7h10V6M6.5 9h3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Archived</span>
+    <% end %>
     <%= link_to connectors_path,
           class: "nav-item#{' on' if controller_name == 'connectors'}" do %>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">

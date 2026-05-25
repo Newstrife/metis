@@ -50,7 +50,18 @@
 
     <% if notice || alert %>
       <div class="flash-toast">
-        <% if notice %><div class="flash notice"><%= notice %></div><% end %>
+        <% if notice %>
+          <div class="flash notice">
+            <%= notice %>
+            <% if flash[:undo_archive_id] %>
+              <%= button_to "Undo",
+                    unarchive_conversation_path(flash[:undo_archive_id]),
+                    method: :post,
+                    class: "flash-undo",
+                    form: { data: { turbo_frame: "_top" } } %>
+            <% end %>
+          </div>
+        <% end %>
         <% if alert %><div class="flash alert"><%= alert %></div><% end %>
       </div>
     <% end %>

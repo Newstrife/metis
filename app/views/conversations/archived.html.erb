@@ -1,0 +1,37 @@
+<% content_for :title, "Archived conversations" %>
+
+<main class="chat">
+  <header class="chat-head">
+    <div style="flex:1; min-width:0">
+      <h1 class="chat-title">Archived conversations</h1>
+      <div class="chat-sub">
+        <span><%= pluralize(@archived_conversations.size, "archived conversation") %></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="stream">
+    <div class="thread archived-list">
+      <% if @archived_conversations.any? %>
+        <% @archived_conversations.each do |conversation| %>
+          <div id="<%= dom_id(conversation, :archived) %>" class="archived-row">
+            <%= link_to conversation.display_title,
+                  conversation_path(conversation),
+                  class: "archived-title",
+                  data: { turbo_frame: "_top" } %>
+            <span class="archived-meta">
+              Archived <%= time_ago_in_words(conversation.archived_at) %> ago
+            </span>
+            <%= button_to "Restore",
+                  unarchive_conversation_path(conversation),
+                  method: :post,
+                  class: "archived-restore",
+                  form: { data: { turbo_frame: "_top" } } %>
+          </div>
+        <% end %>
+      <% else %>
+        <div class="convos-empty">No archived conversations.</div>
+      <% end %>
+    </div>
+  </div>
+</main>

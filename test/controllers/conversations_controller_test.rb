@@ -144,6 +144,74 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     mod.const_set(name, original)
   end
 
+  test "sidebar hides archived conversations" do
+    sign_in @user
+    @user.conversations.create!(title: "Visible")
+    archived = @user.conversations.create!(title: "Hidden")
+    archived.archive!
+
+    get conversations_path
+    assert_response :success
+    assert_select "#convos-list .convo .tt", text: "Visible"
+    assert_select "#convos-list .convo .tt", text: "Hidden", count: 0
+  end
+
+  test "archive marks a conversation as archived and redirects to root" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Tidy")
+
+    post archive_conversation_path(conversation)
+
+    assert_redirected_to root_path
+    assert conversation.reload.archived?
+    assert_equal conversation.id, flash[:undo_archive_id]
+  end
+
+  test "archive is reversible via unarchive" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Back")
+    conversation.archive!
+
+    post unarchive_conversation_path(conversation)
+
+    refute conversation.reload.archived?
+    assert_match(/restored/i, flash[:notice])
+  end
+
+  test "archived view lists only archived conversations" do
+    sign_in @user
+    @user.conversations.create!(title: "Live")
+    archived = @user.conversations.create!(title: "Done")
+    archived.archive!
+
+    get archived_conversations_path
+
+    assert_response :success
+    assert_select ".archived-row", count: 1
+    assert_select ".archived-row .archived-title", text: "Done"
+  end
+
+  test "showing an archived conversation still works (so it can be restored)" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Frozen")
+    conversation.archive!
+
+    get conversation_path(conversation)
+    assert_response :success
+    assert_select ".chat-archived-badge"
+  end
+
+  test "cannot archive another user's conversation" do
+    other = User.create!(email: "archive-other@example.com", password: "password123")
+    conversation = other.conversations.create!(title: "Theirs")
+    sign_in @user
+
+    post archive_conversation_path(conversation)
+
+    assert_response :not_found
+    refute conversation.reload.archived?
+  end
+
   test "cannot cancel another user's conversation" do
     other = User.create!(email: "cancel-other@example.com", password: "password123")
     conversation = other.conversations.create!(title: "Theirs")

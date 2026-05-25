@@ -8,9 +8,25 @@
       <h1 class="chat-title"><%= @conversation.display_title %></h1>
       <div class="chat-sub">
         <span>Started <%= time_ago_in_words(@conversation.created_at) %> ago</span>
+        <% if @conversation.archived? %>
+          <span class="chat-archived-badge">Archived</span>
+        <% end %>
         <%= render "context_meter", conversation: @conversation %>
       </div>
     </div>
+    <% if @conversation.archived? %>
+      <%= button_to "Restore",
+            unarchive_conversation_path(@conversation),
+            method: :post,
+            class: "chat-archive-btn",
+            form: { data: { turbo_frame: "_top" } } %>
+    <% else %>
+      <%= button_to "Archive",
+            archive_conversation_path(@conversation),
+            method: :post,
+            class: "chat-archive-btn",
+            form: { data: { turbo_frame: "_top" } } %>
+    <% end %>
   </header>
 
   <div class="stream" data-chat-target="scroll">

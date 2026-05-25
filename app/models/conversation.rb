@@ -14,6 +14,25 @@ class Conversation < ApplicationRecord
   before_destroy :kill_paused_e2b_sandbox
 
   scope :recent, -> { order(updated_at: :desc) }
+  scope :active, -> { where(archived_at: nil) }
+  scope :archived, -> { where.not(archived_at: nil) }
+
+  def archived?
+    archived_at.present?
+  end
+
+  # Soft-archive: hides the conversation from the active sidebar but
+  # preserves all messages, attachments, and runtime state. Fully
+  # reversible via #unarchive!. No-op if already archived.
+  def archive!
+    return if archived?
+    update!(archived_at: Time.current)
+  end
+
+  def unarchive!
+    return unless archived?
+    update!(archived_at: nil)
+  end
 
   def display_title
     title.presence || "Untitled conversation"

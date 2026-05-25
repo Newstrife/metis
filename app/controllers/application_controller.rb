@@ -27,7 +27,7 @@ class ApplicationController < ActionController::Base
   def set_sidebar
     @sidebar_pagy, @conversations = pagy(
       :countless,
-      current_user.conversations.recent,
+      current_user.conversations.active.recent,
       limit: SIDEBAR_PAGE_SIZE
     )
   end
