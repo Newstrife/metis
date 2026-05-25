@@ -33,18 +33,27 @@ export default class extends Controller {
   // ── private ──────────────────────────────────────────────────────────────
 
   _handleStreamRender(event) {
-    const stream = event.detail?.newStream
+    const stream = event.detail?.newStream || event.target
     if (stream?.getAttribute("target") !== "composer_actions") return
 
-    requestAnimationFrame(() => this._focusIfIdle())
+    // Intercept the render to focus *after* the DOM has updated.
+    // requestAnimationFrame here would fire too early (before the stream mutates the DOM).
+    const fallbackRender = event.detail.render
+    event.detail.render = async (streamElement) => {
+      await fallbackRender(streamElement)
+      this._focusIfIdle()
+    }
   }
 
   _focusIfIdle() {
     if (window.matchMedia("(pointer: coarse)").matches) return
-    if (this._streaming(this.element.closest("form"))) return
+    if (this._streaming(this.element.form)) return
 
     const active = document.activeElement
     if (active && active !== document.body && active !== this.element) return
+
+    // Don't steal focus if the user has highlighted text to copy/read
+    if (!window.getSelection()?.isCollapsed) return
 
     this.element.focus()
   }
