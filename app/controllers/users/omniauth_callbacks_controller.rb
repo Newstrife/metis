@@ -1,21 +1,6 @@
-# Receives OAuth callbacks for two flows on the same omniauth URL:
-#
-# * **Sign in** (`POST /users/auth/<provider>`) — base scopes only,
-#   creates/updates the user, records the OauthGrant. No connector
-#   side-effects.
-# * **Connect a connector** (`POST /users/auth/<provider>?connect=<key>
-#   &scope=<base+connector>&prompt=consent&include_granted_scopes=true`)
-#   — sent by the marketplace "Connect" button. Records the grant
-#   (now carrying the connector's scopes) AND creates a per-member
-#   ConnectorCredential marker on the team's Connector.
-#
-# The dispatch on `omniauth.params["connect"]` is what splits the two
-# paths — sign-in carries no `connect`, connect-flow carries the
-# catalog key. See docs/connectors.md.
+# Sign-in vs connect-a-connector both land here; omniauth.params["connect"]
+# (catalog key) splits them. See docs/connectors.md.
 class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
-  # Raised when a signed-in user tries to link an identity already
-  # claimed by another Metis user. The controller turns this into a
-  # specific alert, not the generic "Sign-in failed."
   class IdentityAlreadyLinked < StandardError; end
 
   def github
@@ -37,9 +22,7 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
   private
 
   def handle(provider)
-    # Capture sign-in state up front — Devise's omniauth controller
-    # mutates the warden session during processing, so user_signed_in?
-    # read inside a rescue is unreliable.
+    # Capture up front — Devise mutates warden session during processing.
     was_signed_in = user_signed_in?
     return_path   = was_signed_in ? root_path : new_user_session_path
 
@@ -48,11 +31,8 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
 
     target = was_signed_in ? attach_identity(current_user, auth) : User.from_omniauth(auth)
     grant_recorded = record_grant(target, auth, provider)
-    # Only mark the connector as wired when the grant write that
-    # backs it actually landed — otherwise the marketplace tile would
-    # show "Connected" for a connector McpConfig drops every turn
-    # (no grant → no bearer), and the user would have no in-app path
-    # to re-trigger the OAuth flow.
+    # Skip activation when the grant write failed — otherwise the tile shows
+    # "Connected" for a connector McpConfig drops every turn (no bearer).
     activate_connector_if_requested(target, params, auth) if grant_recorded
     finish_sign_in(target, provider)
   rescue IdentityAlreadyLinked
@@ -66,9 +46,6 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     redirect_to new_user_session_path, alert: "Sign-in failed."
   end
 
-  # True if the grant landed; false if it raised (logged + sign-in
-  # still proceeds, but the caller skips connector activation so the
-  # UI doesn't show a marker without a backing grant).
   def record_grant(target, auth, provider)
     OmniauthConnector.record_grant(target, auth, provider: provider)
     true
@@ -89,8 +66,7 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
 
     OmniauthConnector.activate_connector(target, app, auth)
   rescue StandardError => error
-    # Connector activation failure is non-fatal for the same reason as
-    # grant write failure — the sign-in half succeeded.
+    # Non-fatal: sign-in half already succeeded.
     Rails.logger.error(
       "Omniauth connector activation failed for user #{target&.id} app=#{params['connect']}: " \
       "#{error.class}: #{error.message}"
@@ -108,15 +84,8 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     end
   end
 
-  # GitHub is a GitHub App (not a classic OAuth App), so the user-to-
-  # server token issued by the connect flow can't see any repo until
-  # the App is installed on it. Send the user straight to the install
-  # page after a successful connect=github callback so the two-step
-  # OAuth-then-install dance is self-explanatory.
-  #
-  # nil → no override; the default "back to marketplace" redirect runs.
-  # Only kicks in when GITHUB_APP_SLUG is configured (we need it to
-  # build the URL).
+  # GitHub App tokens can't see a repo until the App is installed there, so
+  # bounce to the install page after connect=github. nil → default redirect.
   def post_connect_redirect(provider)
     return nil unless provider == "github"
 
@@ -139,12 +108,7 @@ class Users::OmniauthCallbacksController < Devise::OmniauthCallbacksController
     user.identities.find_or_create_by!(provider: auth.provider, uid: auth.uid.to_s)
     user
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique
-    # The (provider, uid) is owned by a different user — the scoped
-    # find_or_create_by missed it, and either the model's uniqueness
-    # validation (RecordInvalid) or the DB index (RecordNotUnique)
-    # rejected the insert. Identity's only validation that can fail
-    # here is the unique (provider, uid), so we treat both as the
-    # same "already linked elsewhere" condition.
+    # (provider, uid) is owned by another user; both errors mean the same thing.
     raise IdentityAlreadyLinked
   end
 end

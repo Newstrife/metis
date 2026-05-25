@@ -146,3 +146,23 @@ pi's recommended skill+CLI path) is a load-bearing decision documented in
   workers share the filesystem and race on per-conversation scratch paths.
 - Background jobs run on Solid Queue (in production); Solid Cache/Cable back
   Rails cache and Action Cable.
+
+## Code style
+
+- **Comments — default to none.** Write one only when the *why* isn't
+  obvious from the code: a hidden constraint, an external-API quirk, a
+  public-API contract another file consumes, a magic constant, or a
+  ticketed `TODO(FLA-123)`. Don't restate the code, justify the design,
+  narrate sibling files, or label sections (`# === helpers ===`).
+  Sentence case, single `#`, ≤2 lines. **Earn-its-place test:** delete
+  the comment, re-read the code — if no information is lost, it was
+  noise.
+- **Models**: ordering is validations → associations → scopes → methods.
+  Use `store_accessor` for jsonb-backed flexible fields. Scopes for
+  every common query — no inline `where` chains in controllers or jobs.
+- **Controllers**: strong params for every create/update; delegate
+  business logic to services or model methods; `respond_to` with both
+  `turbo_stream` and `html` for dual-format actions.
+- **Jobs**: rescue, mark the tracking record `failed`, and broadcast —
+  don't let the UI hang on a silent error. (`ChatJob` is the canonical
+  example.)

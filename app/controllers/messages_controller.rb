@@ -20,8 +20,7 @@ class MessagesController < ApplicationController
       format.html { redirect_to @conversation }
     end
   rescue ActiveRecord::RecordNotUnique
-    # The in-progress-turn index caught a race the pre-check missed.
-    head(:conflict)
+    head(:conflict) # in-progress-turn index caught a race
   end
 
   private
