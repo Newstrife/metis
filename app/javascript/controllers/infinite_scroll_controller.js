@@ -2,12 +2,15 @@ import { Controller } from "@hotwired/stimulus"
 
 // Generic endless-scroll controller.
 //
-// Attach to the scrollable list container; mark a child as
-// `data-infinite-scroll-target="sentinel"` with `data-url="…"`. When
-// the sentinel intersects the list's viewport (a bit earlier, via
-// rootMargin), we fetch the next page as a turbo_stream and let Turbo
-// apply it. The response is expected to append new items *before* the
-// sentinel and either replace it (more pages) or remove it (last page).
+// Attach to the actual scroll container (the element with
+// `overflow:auto`/`scroll`) — not just any wrapping div — so
+// IntersectionObserver's `root` clips the sentinel correctly. Mark a
+// descendant as `data-infinite-scroll-target="sentinel"` with
+// `data-url="…"`. When the sentinel intersects the container's
+// viewport (a bit earlier, via rootMargin), we fetch the next page as
+// a turbo_stream and let Turbo apply it. The response is expected to
+// append new items *before* the sentinel and either replace it (more
+// pages) or remove it (last page).
 //
 // State lives on the controller, not the sentinel — Stimulus's target
 // callbacks re-wire the observer whenever the sentinel is swapped in or

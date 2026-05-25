@@ -1,8 +1,9 @@
 <%# The persistent shell sidebar: brand, conversation search + list, user.
     Rendered by the "chat" layout on every conversations page. The list
     is paginated with Pagy; the infinite-scroll Stimulus controller on
-    #convos-list watches the sentinel target at the bottom and fetches
-    the next page as a turbo_stream when it scrolls into view. %>
+    `.convos` (the scroll container) watches the sentinel target at the
+    bottom and fetches the next page as a turbo_stream when it scrolls
+    into view. %>
 <aside class="sidebar" data-controller="conversation-filter">
   <div class="ws">
     <div class="ws-name">Metis</div>
@@ -17,7 +18,8 @@
         <path d="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5L3.4 3.4" stroke-linecap="round"/>
       </svg>
     </button>
-    <%= link_to conversations_path, class: "ico-btn", title: "New chat" do %>
+    <%= link_to conversations_path, class: "ico-btn", title: "New chat",
+          data: { turbo_frame: "main" } do %>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
         <path d="M8 3v10M3 8h10" stroke-linecap="round"/>
       </svg>
@@ -33,8 +35,9 @@
            data-action="input->conversation-filter#filter">
   </div>
 
-  <nav class="convos" aria-label="Conversations" data-turbo-prefetch="false">
-    <div id="convos-list" data-controller="infinite-scroll">
+  <nav class="convos" aria-label="Conversations" data-turbo-prefetch="false"
+       data-controller="infinite-scroll active-link">
+    <div id="convos-list">
       <% if @conversations.any? %>
         <%= render "conversations/convo_items",
               conversations: @conversations,

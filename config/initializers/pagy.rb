@@ -7,5 +7,3 @@
 # Per-page limits are passed explicitly at the call site
 # (see ApplicationController#set_sidebar).
 require "pagy"
-
-Pagy::OPTIONS.freeze

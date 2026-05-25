@@ -68,6 +68,11 @@ body.app-shell { overflow:hidden; }
 }
 /* the Turbo cable element is invisible — never a grid/flex item */
 turbo-cable-stream-source { display:none; }
+/* The #main turbo-frame wraps the right pane so sidebar clicks swap
+   only this region. `display:contents` keeps the frame transparent
+   to layout, so the inner `<main>` (or `<turbo-frame>` from index/
+   show) is the actual grid item in `.app` and inherits its sizing. */
+turbo-frame#main { display:contents; }
 
 /* ───────────── sidebar ───────────── */
 .sidebar { background:var(--side); display:flex; flex-direction:column; min-height:0; }

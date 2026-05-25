@@ -1,8 +1,12 @@
-<%# One row in the sidebar conversation list. %>
+<%# One row in the sidebar conversation list. Targets the #main
+    turbo-frame so picking a conversation swaps only the right pane —
+    the sidebar (and its scroll/pagination state) stays put. %>
 <%= link_to conversation,
       id: dom_id(conversation),
       class: "convo#{' on' if conversation == @conversation}",
       data: { conversation_filter_target: "item",
+              active_link_target: "link",
+              turbo_frame: "main",
               title: conversation.display_title } do %>
   <span class="tt"><%= conversation.display_title %></span>
 <% end %>

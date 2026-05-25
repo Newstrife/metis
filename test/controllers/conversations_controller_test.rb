@@ -66,7 +66,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
       3.times { |i| @user.conversations.create!(title: "Convo #{i}") }
       get conversations_path
       assert_response :success
-      assert_select "#convos-list[data-controller='infinite-scroll']"
+      assert_select "nav.convos[data-controller~='infinite-scroll']"
       assert_select "#convos-sentinel[data-infinite-scroll-target='sentinel'][data-url*='page=2']"
       assert_select "#convos-list .convo", count: 2
     end
