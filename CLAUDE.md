@@ -93,10 +93,11 @@ There is **no archive**. `Agent::SessionArchive` was removed (commits
 `349a0cb`, `c08eb79`); don't reintroduce a tar-to-Active-Storage path.
 
 Per-turn projected inputs — `workspace/uploads/` (from `Message`
-attachments), the rendered `workspace/.mcp.json`, and the rendered
-`workspace/AGENTS.md` (per-turn boot identity, see `docs/agent-identity.md`)
-— are re-staged each turn even on a resumed sandbox, so they never become
-durable state. Pause/restage failures are logged, never raised — a
+attachments), the rendered `workspace/.mcp.json`, the rendered
+`workspace/AGENTS.md` (per-turn boot identity, see `docs/agent-identity.md`),
+and the repo's `.pi/skills/` tree copied into `workspace/.pi/skills/` (pi
+auto-discovers skills there) — are re-staged each turn even on a resumed
+sandbox, so they never become durable state. Pause/restage failures are logged, never raised — a
 storage failure must not crash a turn the user already saw stream.
 
 ### Credentials

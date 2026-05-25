@@ -80,6 +80,7 @@ module Agent
         stage_uploads(sandbox)
         stage_mcp_config(sandbox)
         stage_identity(sandbox)
+        stage_skills(sandbox)
         session = PiAgent.session(transport_factory: transport_factory(sandbox, pi_args, sandbox_env))
         begin
           yield session
@@ -187,6 +188,25 @@ module Agent
       # instructions.
       def stage_identity(sandbox)
         sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::Identity::FILENAME}", identity_content)
+      end
+
+      # Project the repo's .pi/skills/ tree into the sandbox workspace.
+      # pi auto-discovers skills from .pi/skills/ relative to cwd.
+      # Per-turn projected input — the prior turn's tree is wiped first
+      # so a deleted skill in the repo disappears from the sandbox.
+      def stage_skills(sandbox)
+        source = Agent::Workspace::SKILLS_SOURCE
+        return unless source.directory?
+
+        dest_root = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}"
+        sandbox.commands.run("rm -rf #{Shellwords.escape(dest_root)}")
+        Dir.glob(source.join("**/*"), File::FNM_DOTMATCH).each do |path|
+          next if File.directory?(path)
+          next if File.basename(path).match?(/\A\.{1,2}\z/)
+
+          rel = Pathname.new(path).relative_path_from(source).to_s
+          sandbox.files.write("#{dest_root}/#{rel}", File.binread(path))
+        end
       end
 
       def transport_factory(sandbox, pi_args, envs)

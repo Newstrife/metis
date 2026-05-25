@@ -60,6 +60,7 @@ the resumed microVM for `E2b`.
 | `workspace/uploads/*` | `Message` attachments (Active Storage) |
 | `workspace/.mcp.json` | `Connector` + `ConnectorCredential` (see [`connectors.md`](connectors.md)) |
 | `workspace/AGENTS.md` | `Conversation` + `Team` + runtime (see [`agent-identity.md`](agent-identity.md)) |
+| `workspace/.pi/skills/*` | The repo's `.pi/skills/` tree — pi auto-discovers skills from `.pi/skills/` relative to `cwd` |
 
 The projection writes overwrite the previous turn's copy in place
 on every runtime — durable Rails state is read once per turn at its

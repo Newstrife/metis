@@ -54,6 +54,7 @@ module Agent
         workspace.stage_uploads(conversation.uploaded_files)
         workspace.stage_mcp_config(mcp_config)
         workspace.stage_identity(identity_content)
+        workspace.stage_skills
         env = sandbox_env
         session = PiAgent.session(bin: "docker", args: docker_args(pi_args, env: env), env: env)
         begin

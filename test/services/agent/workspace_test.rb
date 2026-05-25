@@ -90,4 +90,70 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
 
     assert_equal "# Hello, pi", File.read(workspace.workspace_dir.join("AGENTS.md"))
   end
+
+  test "stage_skills copies the repo's .pi/skills tree into workspace/.pi/skills" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("alpha/scripts"))
+      File.write(source.join("alpha/SKILL.md"), "alpha")
+      File.write(source.join("alpha/scripts/run.sh"), "#!/bin/sh\n")
+
+      workspace.stage_skills
+    end
+
+    dest = workspace.workspace_dir.join(".pi/skills")
+    assert_equal "alpha", File.read(dest.join("alpha/SKILL.md"))
+    assert_equal "#!/bin/sh\n", File.read(dest.join("alpha/scripts/run.sh"))
+  end
+
+  test "stage_skills overwrites the prior turn's tree so deleted skills disappear" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    FileUtils.mkdir_p(workspace.workspace_dir.join(".pi/skills/stale"))
+    File.write(workspace.workspace_dir.join(".pi/skills/stale/SKILL.md"), "stale")
+
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("fresh"))
+      File.write(source.join("fresh/SKILL.md"), "fresh")
+
+      workspace.stage_skills
+    end
+
+    refute File.exist?(workspace.workspace_dir.join(".pi/skills/stale/SKILL.md"))
+    assert_equal "fresh", File.read(workspace.workspace_dir.join(".pi/skills/fresh/SKILL.md"))
+  end
+
+  test "stage_skills is a no-op when the repo has no .pi/skills tree" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    with_skills_source(create: false) do
+      workspace.stage_skills
+    end
+
+    refute File.exist?(workspace.workspace_dir.join(".pi/skills"))
+  end
+
+  private
+
+  # Point SKILLS_SOURCE at a tmp dir for the block. `create: false` skips
+  # creating it, simulating an absent .pi/skills tree.
+  def with_skills_source(create: true)
+    Dir.mktmpdir do |tmp|
+      source = Pathname.new(tmp).join("skills")
+      FileUtils.mkdir_p(source) if create
+      # Re-define the frozen constant for the duration of the test.
+      original = Agent::Workspace::SKILLS_SOURCE
+      Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
+      Agent::Workspace.const_set(:SKILLS_SOURCE, source)
+      begin
+        yield source
+      ensure
+        Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
+        Agent::Workspace.const_set(:SKILLS_SOURCE, original)
+      end
+    end
+  end
 end

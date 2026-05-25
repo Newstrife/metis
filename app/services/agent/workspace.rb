@@ -14,6 +14,9 @@ module Agent
   #                       the conversation's Connectors, never archived
   #   workspace/AGENTS.md Agent boot identity — rendered each turn (see
   #                       Agent::Identity), never archived, pi auto-loads
+  #   workspace/.pi/skills/  Project skills — projected each turn from
+  #                          the repo's .pi/skills/ tree (see
+  #                          stage_skills), never archived, pi auto-discovers
   #
   # Two roots, because persistence is a per-runtime concern:
   #   Workspace.scratch    — under tmp/, for a runtime that re-hydrates
@@ -24,6 +27,8 @@ module Agent
   class Workspace
     SCRATCH_ROOT = Rails.root.join("tmp/agent").freeze
     PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
+    SKILLS_SOURCE = Rails.root.join(".pi/skills").freeze
+    SKILLS_SUBPATH = ".pi/skills".freeze
 
     def self.scratch(conversation)
       new(conversation, SCRATCH_ROOT)
@@ -85,6 +90,20 @@ module Agent
     # fresh each turn, never archived. See Agent::Identity.
     def stage_identity(content)
       File.write(workspace_dir.join(Identity::FILENAME), content)
+    end
+
+    # Project the repo's .pi/skills/ tree into workspace/.pi/skills/.
+    # pi auto-discovers skills there relative to cwd. Per-turn projected
+    # input — the repo is the canonical source; the destination is
+    # cleared first so a deleted skill disappears from the workspace.
+    # No-op when the source dir is absent.
+    def stage_skills
+      return unless SKILLS_SOURCE.directory?
+
+      dest = workspace_dir.join(SKILLS_SUBPATH)
+      FileUtils.rm_rf(dest)
+      FileUtils.mkdir_p(dest.dirname)
+      FileUtils.cp_r(SKILLS_SOURCE, dest)
     end
   end
 end
