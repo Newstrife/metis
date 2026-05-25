@@ -80,6 +80,44 @@ module ApplicationHelper
     older: "Older"
   }.freeze
 
+  LANGUAGE_LABELS = {
+    "en" => "English"
+  }.freeze
+
+  # Timezone <option>s for the profile select. Each label carries the
+  # UTC offset — "(GMT+08:00) Beijing" — so a user can scan by offset
+  # instead of memorising city names. The value is still the
+  # Rails-friendly `tz.name`, which is what the model validator and
+  # `ProfilesController#detect_timezone` agree on.
+  def timezone_options
+    ActiveSupport::TimeZone.all.map do |tz|
+      [ "(GMT#{tz.formatted_offset}) #{tz.name}", tz.name ]
+    end
+  end
+
+  # Attributes for the chat-layout `<body>` tag. The timezone-detect
+  # Stimulus controller is only wired up for a signed-in user who
+  # hasn't picked a timezone yet — keeping the conditional in Ruby
+  # avoids embedding ERB inside the `<body>` opening tag, which leaves
+  # stray whitespace before the closing `>`.
+  def chat_body_attrs
+    attrs = { class: "app-shell" }
+    if user_signed_in? && current_user.timezone.blank?
+      attrs[:data] = {
+        controller: "timezone-detect",
+        timezone_detect_url_value: detect_timezone_profile_path
+      }
+    end
+    attrs
+  end
+
+  # Human label for an `I18n.locale` code, used by the profile form's
+  # language picker. Falls back to the bare code so an unknown locale
+  # is still selectable rather than blank.
+  def language_label(code)
+    LANGUAGE_LABELS[code.to_s] || code.to_s.upcase
+  end
+
   # Display label for a recency bucket. Views can't reach the constant
   # by bare name (lexical scope, not the include chain), so they go
   # through this helper.

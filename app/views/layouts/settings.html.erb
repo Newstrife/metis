@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <%= render "layouts/head" %>
+
+  <body class="app-shell">
+    <div class="app">
+      <%= render "settings/sidebar" %>
+      <%# Mirror the chat layout: sidebar nav swaps the right pane
+          inside the same turbo-frame, so navigating between sections
+          keeps the settings sidebar mounted. %>
+      <turbo-frame id="main" data-turbo-action="advance">
+        <%= yield %>
+      </turbo-frame>
+    </div>
+
+    <% if notice || alert %>
+      <div class="flash-toast">
+        <% if notice %><div class="flash notice"><%= notice %></div><% end %>
+        <% if alert %><div class="flash alert"><%= alert %></div><% end %>
+      </div>
+    <% end %>
+  </body>
+</html>

@@ -55,8 +55,12 @@ class ConversationsController < ApplicationController
 
   # The model picked in the new-chat composer, with its provider derived
   # from the catalog — stored on the conversation for the Pi adapter.
+  # The composer's model picker wins; the user's profile default backs
+  # it up when the picker submits blank (e.g. an out-of-catalog value
+  # was scrubbed). Deployment defaults still kick in at the adapter
+  # layer when both are unset.
   def chat_settings
-    model = params[:model].presence
+    model = params[:model].presence || current_user.preferred_model.presence
     { "provider" => model && Agent::Catalog.provider_for(model), "model" => model }.compact
   end
 end

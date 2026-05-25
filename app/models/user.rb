@@ -12,6 +12,48 @@ class User < ApplicationRecord
 
   after_create :create_personal_team
 
+  # Locales the UI is translated into. v1 ships English only; the
+  # selector is here so future locales drop in without a schema or
+  # controller change.
+  AVAILABLE_LANGUAGES = %w[en].freeze
+
+  # Trim whitespace and treat empty strings as nil for every profile
+  # field — keeps a stray space in the form from sneaking past the
+  # inclusion/length validators below and causing surprises downstream
+  # (a display_name like " " is technically "present" but reads blank).
+  normalizes :display_name, :timezone, :language, :preferred_model,
+             with: ->(value) { value.is_a?(String) ? value.strip.presence : value }
+
+  # Profile fields are validated only when the user submits the profile
+  # form (context :profile_update). Sign-up still works without them,
+  # and OAuth-created users don't carry a display name at all.
+  validates :display_name, presence: true, length: { maximum: 80 },
+            on: :profile_update
+  validates :timezone,
+            inclusion: { in: ->(_) { ActiveSupport::TimeZone.all.map(&:name) } },
+            allow_blank: true
+  validates :language, inclusion: { in: AVAILABLE_LANGUAGES }, allow_blank: true
+  validate :preferred_model_known
+
+  # What to show in the UI for this user — the display name they picked,
+  # otherwise the email we have on file (the noreply synth is ugly but
+  # at least stable).
+  def display_label
+    display_name.presence || email
+  end
+
+  # Two-letter (or one-letter) initials for the avatar fallback. Built
+  # from display name when set, otherwise from the local part of the
+  # email — splits on whitespace and the usual email separators.
+  def initials
+    source = display_name.presence || email.to_s.split("@", 2).first
+    return "?" if source.blank?
+
+    parts = source.split(/[\s@._\-+]+/).reject(&:blank?)
+    letters = parts.first(2).map { |part| part[0] }.join
+    (letters.presence || source[0]).upcase
+  end
+
   # The team-of-one created at signup — owner of this user's personal
   # resources (docs/tenancy.md).
   def personal_team
@@ -128,6 +170,13 @@ class User < ApplicationRecord
   end
 
   private
+
+  def preferred_model_known
+    return if preferred_model.blank?
+    return if Agent::Catalog.provider_for(preferred_model)
+
+    errors.add(:preferred_model, "is not an available model")
+  end
 
   # Every user gets a personal team (a team of one) at signup.
   def create_personal_team
