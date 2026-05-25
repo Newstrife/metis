@@ -49,8 +49,11 @@ export default class extends Controller {
     if (window.matchMedia("(pointer: coarse)").matches) return
     if (this._streaming(this.element.form)) return
 
+    // Only treat focus on another *editable* element as a reason to bail —
+    // a clicked link/button (e.g. sidebar "New chat") is not the user
+    // typing somewhere else, so we should still grab focus.
     const active = document.activeElement
-    if (active && active !== document.body && active !== this.element) return
+    if (active && active !== this.element && active.matches?.("input, textarea, select, [contenteditable=true]")) return
 
     // Don't steal focus if the user has highlighted text to copy/read
     if (!window.getSelection()?.isCollapsed) return
