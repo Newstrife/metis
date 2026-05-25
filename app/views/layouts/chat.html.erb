@@ -33,11 +33,7 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="app-shell"
-        <% if user_signed_in? && current_user.timezone.blank? %>
-        data-controller="timezone-detect"
-        data-timezone-detect-url-value="<%= detect_timezone_profile_path %>"
-        <% end %>>
+  <%= tag.body(**chat_body_attrs) do %>
     <div class="app">
       <%= render "conversations/sidebar" %>
       <%# Sidebar conversation links target this frame, so picking a
@@ -58,5 +54,5 @@
         <% if alert %><div class="flash alert"><%= alert %></div><% end %>
       </div>
     <% end %>
-  </body>
+  <% end %>
 </html>

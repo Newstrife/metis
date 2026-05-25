@@ -25,12 +25,18 @@ class ApplicationController < ActionController::Base
     I18n.with_locale(locale, &block)
   end
 
-  # Render timestamps in the signed-in user's IANA timezone. Unset
-  # falls through to the app default — the per-request scope keeps
-  # background jobs unaffected.
+  # Render timestamps in the signed-in user's IANA timezone. Unset, or
+  # set to a string Rails doesn't know, falls through to the app
+  # default — the per-request scope keeps background jobs unaffected.
+  #
+  # The TimeZone[] guard matters: `Time.use_zone` raises on an unknown
+  # identifier, and ProfilesController#detect_timezone bypasses model
+  # validation via `update_column` (plus any future backfill could
+  # drop a stale string here), so a bad value would 500 the whole
+  # chat shell on every request. Better to silently fall back.
   def with_user_timezone(&block)
     zone = current_user&.timezone.presence
-    return yield unless zone
+    return yield unless zone && ActiveSupport::TimeZone[zone]
 
     Time.use_zone(zone, &block)
   end

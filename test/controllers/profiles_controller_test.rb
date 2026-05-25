@@ -16,9 +16,14 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
 
   test "update saves valid preferences" do
     model_id = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    # Submit a Rails-friendly zone name — the form's `time_zone_select`
+    # only renders Rails-friendly names, so that's what the inclusion
+    # validator accepts. (IANA names like "America/Los_Angeles" arrive
+    # only via #detect_timezone, which normalizes through TimeZone#name
+    # before persisting.)
     patch profile_path, params: { user: {
       display_name: "Mike",
-      timezone: "America/Los_Angeles",
+      timezone: "Pacific Time (US & Canada)",
       language: "en",
       preferred_model: model_id
     } }
@@ -26,7 +31,7 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
 
     @user.reload
     assert_equal "Mike", @user.display_name
-    assert_equal "America/Los_Angeles", @user.timezone
+    assert_equal "Pacific Time (US & Canada)", @user.timezone
     assert_equal "en", @user.language
     assert_equal model_id, @user.preferred_model
   end
@@ -57,11 +62,23 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert_match "profile_form", response.body
   end
 
-  test "detect_timezone sets the user's timezone when blank" do
+  # IANA→Rails-friendly normalization: the browser sends "Europe/Berlin"
+  # but the model validation and time_zone_select only know "Berlin".
+  # Without normalization the selector silently shows blank after
+  # auto-detect AND the next profile save validation-fails on a field
+  # the user didn't touch.
+  test "detect_timezone canonicalizes IANA names to Rails-friendly names" do
     assert_nil @user.timezone
     post detect_timezone_profile_path, params: { timezone: "Europe/Berlin" }
     assert_response :no_content
-    assert_equal "Europe/Berlin", @user.reload.timezone
+    assert_equal "Berlin", @user.reload.timezone
+  end
+
+  test "detect_timezone accepts a Rails-friendly name directly" do
+    assert_nil @user.timezone
+    post detect_timezone_profile_path, params: { timezone: "Tokyo" }
+    assert_response :no_content
+    assert_equal "Tokyo", @user.reload.timezone
   end
 
   test "detect_timezone is a no-op once a timezone is set" do

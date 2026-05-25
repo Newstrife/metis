@@ -84,6 +84,22 @@ module ApplicationHelper
     "en" => "English"
   }.freeze
 
+  # Attributes for the chat-layout `<body>` tag. The timezone-detect
+  # Stimulus controller is only wired up for a signed-in user who
+  # hasn't picked a timezone yet — keeping the conditional in Ruby
+  # avoids embedding ERB inside the `<body>` opening tag, which leaves
+  # stray whitespace before the closing `>`.
+  def chat_body_attrs
+    attrs = { class: "app-shell" }
+    if user_signed_in? && current_user.timezone.blank?
+      attrs[:data] = {
+        controller: "timezone-detect",
+        timezone_detect_url_value: detect_timezone_profile_path
+      }
+    end
+    attrs
+  end
+
   # Human label for an `I18n.locale` code, used by the profile form's
   # language picker. Falls back to the bare code so an unknown locale
   # is still selectable rather than blank.

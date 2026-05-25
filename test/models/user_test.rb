@@ -51,12 +51,17 @@ class UserTest < ActiveSupport::TestCase
     assert_includes user.errors[:display_name], "can't be blank"
   end
 
-  test "timezone must be a real IANA zone" do
+  test "timezone must be a known Rails-friendly zone name" do
     user = create_user
     user.timezone = "Mars/Olympus"
     refute user.valid?
 
-    user.timezone = "America/Los_Angeles"
+    # The validator is `inclusion: ActiveSupport::TimeZone.all.map(&:name)`
+    # — i.e. the curated Rails-friendly names rendered by
+    # `time_zone_select`. IANA names like "America/Los_Angeles" arrive
+    # only via ProfilesController#detect_timezone, which canonicalizes
+    # before persisting.
+    user.timezone = "Pacific Time (US & Canada)"
     assert user.valid?
   end
 
