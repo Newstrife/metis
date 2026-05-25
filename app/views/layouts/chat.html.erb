@@ -18,8 +18,6 @@
     </div>
 
     <% if notice || alert %>
-      <%# Auto-dismisses after `delay-value` ms; hover pauses the timer
-          so a slow reader (or someone reaching for Undo) isn't rushed. %>
       <div class="flash-toast"
            data-controller="flash"
            data-flash-delay-value="<%= flash[:undo_archive_id] ? 6000 : 3500 %>"

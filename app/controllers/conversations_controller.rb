@@ -9,12 +9,8 @@ class ConversationsController < ApplicationController
   def index
     respond_to do |format|
       format.html
-      # Endless-scroll fetch from the sidebar: only the incremental
-      # page's groups are sent back, plus a refreshed sentinel. See
-      # app/javascript/controllers/infinite_scroll_controller.js.
-      # Guarded by `page` so Turbo Drive form redirects (which advertise
-      # turbo-stream in their Accept header) get a full HTML page back
-      # instead of a stream meant to append into an existing sidebar.
+      # Guarded so Turbo Drive form redirects (Accept: turbo-stream, html)
+      # don't get served the infinite-scroll stream instead of the page.
       format.turbo_stream if params[:page].present?
     end
   end

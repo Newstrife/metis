@@ -11,10 +11,6 @@
         <%= render "context_meter", conversation: @conversation %>
       </div>
     </div>
-    <%# Conversation actions. Icon-only — labels live in `title` /
-        `aria-label`. Add new actions as additional `.chat-action`
-        buttons inside this row. Restore lives in the archived banner
-        below, not here. %>
     <div class="chat-actions">
       <% unless @conversation.archived? %>
         <%= button_to archive_conversation_path(@conversation),
