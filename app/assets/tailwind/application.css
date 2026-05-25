@@ -244,6 +244,15 @@ turbo-frame#main { display:contents; }
   display:flex; align-items:flex-start; gap:18px;
 }
 .chat-title { font-family:var(--fd); font-weight:600; font-size:19px; letter-spacing:-.015em; }
+.chat-title [data-conversation-title-target="text"] { cursor:text; }
+.chat-title-input {
+  width:100%; box-sizing:border-box;
+  font:inherit; letter-spacing:inherit; color:inherit;
+  background:transparent; border:1px solid var(--line);
+  border-radius:6px; padding:2px 6px; margin:-3px -7px;
+  outline:none;
+}
+.chat-title-input:focus { border-color:var(--gold); }
 .chat-sub {
   display:flex; align-items:center; gap:9px; flex-wrap:wrap;
   margin-top:7px; font-family:var(--fm); font-size:11px; color:var(--ink-3);
