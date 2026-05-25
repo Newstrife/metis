@@ -1,30 +1,12 @@
 <%# One row in the sidebar conversation list. Targets the #main
     turbo-frame so picking a conversation swaps only the right pane —
     the sidebar (and its scroll/pagination state) stays put. %>
-<div id="<%= dom_id(conversation) %>"
-     class="convo-row"
-     data-conversation-filter-target="item"
-     data-title="<%= conversation.display_title %>">
-  <%= link_to conversation,
-        class: "convo#{' on' if conversation == @conversation}",
-        data: { active_link_target: "link",
-                turbo_frame: "main",
-                title: conversation.display_title } do %>
-    <span class="tt"><%= conversation.display_title %></span>
-  <% end %>
-  <%# Inline archive action — acts as the sidebar context menu for v1.
-      Posts via Turbo so only the row is removed; the toast carries
-      Undo. Keep `turbo_frame: "_top"` so when the user archives the
-      conversation they currently have open the redirect to root
-      still takes effect on the main frame. %>
-  <%= button_to archive_conversation_path(conversation),
-        method: :post,
-        class: "convo-archive",
-        title: "Archive conversation",
-        form: { data: { turbo_frame: "_top" } } do %>
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-      <path d="M2 4h12v2H2zM3 6v7h10V6M6.5 9h3" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span class="sr-only">Archive</span>
-  <% end %>
-</div>
+<%= link_to conversation,
+      id: dom_id(conversation),
+      class: "convo#{' on' if conversation == @conversation}",
+      data: { conversation_filter_target: "item",
+              active_link_target: "link",
+              turbo_frame: "main",
+              title: conversation.display_title } do %>
+  <span class="tt"><%= conversation.display_title %></span>
+<% end %>

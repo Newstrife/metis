@@ -198,7 +198,8 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
 
     get conversation_path(conversation)
     assert_response :success
-    assert_select ".chat-archived-badge"
+    assert_select ".archived-banner"
+    assert_select ".archived-banner-action", text: "Restore"
   end
 
   test "cannot archive another user's conversation" do

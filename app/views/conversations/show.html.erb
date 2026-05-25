@@ -8,26 +8,48 @@
       <h1 class="chat-title"><%= @conversation.display_title %></h1>
       <div class="chat-sub">
         <span>Started <%= time_ago_in_words(@conversation.created_at) %> ago</span>
-        <% if @conversation.archived? %>
-          <span class="chat-archived-badge">Archived</span>
-        <% end %>
         <%= render "context_meter", conversation: @conversation %>
       </div>
     </div>
-    <% if @conversation.archived? %>
+    <%# Conversation actions. Icon-only — labels live in `title` /
+        `aria-label`. Add new actions as additional `.chat-action`
+        buttons inside this row. Restore lives in the archived banner
+        below, not here. %>
+    <div class="chat-actions">
+      <% unless @conversation.archived? %>
+        <%= button_to archive_conversation_path(@conversation),
+              method: :post,
+              class: "chat-action",
+              title: "Archive conversation",
+              aria: { label: "Archive conversation" },
+              form: { data: { turbo_frame: "_top" } } do %>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="3.25" width="12" height="3" rx="1"/>
+            <path d="M3 6.25v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-6.5"/>
+            <path d="M6.5 9h3"/>
+          </svg>
+        <% end %>
+      <% end %>
+    </div>
+  </header>
+
+  <% if @conversation.archived? %>
+    <div class="archived-banner" role="status">
+      <svg class="archived-banner-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="3.25" width="12" height="3" rx="1"/>
+        <path d="M3 6.25v6.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-6.5"/>
+        <path d="M6.5 9h3"/>
+      </svg>
+      <span class="archived-banner-text">This conversation is archived. Restore it to keep chatting.</span>
       <%= button_to "Restore",
             unarchive_conversation_path(@conversation),
             method: :post,
-            class: "chat-archive-btn",
+            class: "archived-banner-action",
             form: { data: { turbo_frame: "_top" } } %>
-    <% else %>
-      <%= button_to "Archive",
-            archive_conversation_path(@conversation),
-            method: :post,
-            class: "chat-archive-btn",
-            form: { data: { turbo_frame: "_top" } } %>
-    <% end %>
-  </header>
+    </div>
+  <% end %>
 
   <div class="stream" data-chat-target="scroll">
     <div id="messages" class="thread" data-chat-target="messages">

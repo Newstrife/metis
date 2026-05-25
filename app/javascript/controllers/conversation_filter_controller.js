@@ -14,9 +14,10 @@ export default class extends Controller {
       item.hidden = !match
     })
 
-    // The list is flat: `.grp-label` divs interleaved with `.convo-row`
-    // wrappers (and a trailing sentinel). Walk the list once and hide a
-    // header iff every row between it and the next header is hidden.
+    // The list is flat: `.grp-label` divs interleaved with `.convo`
+    // links (and a trailing sentinel). Walk the list once and hide a
+    // header iff every `.convo` between it and the next header is
+    // hidden.
     const list = this.element.querySelector("#convos-list")
     if (list) {
       let currentHeader = null
@@ -27,7 +28,7 @@ export default class extends Controller {
           flush()
           currentHeader = child
           anyVisible = false
-        } else if (child.classList.contains("convo-row") && !child.hidden) {
+        } else if (child.classList.contains("convo") && !child.hidden) {
           anyVisible = true
         }
       }
