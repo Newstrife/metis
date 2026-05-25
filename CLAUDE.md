@@ -81,18 +81,23 @@ pi keeps a conversation's state in a scope directory (`Agent::Workspace`):
 `workspace/uploads/` (staged user uploads). How that scope survives between
 turns is a **per-runtime concern** — see `docs/session-persistence.md`:
 
-- `Runtime::Local` keeps the scope in a persistent directory and relies on
-  pi's own `--continue`; no archiving.
-- `Runtime::Docker` / `Runtime::E2b` run in disposable environments, so the
-  scope is archived to Active Storage (`Agent::SessionArchive`) after each
-  turn and restored before the next.
+- `Runtime::Local` keeps the scope in a persistent host directory and
+  relies on pi's own `--continue`.
+- `Runtime::Docker` bind-mounts a persistent host directory into a
+  disposable `--rm` container; the host filesystem is the durable source.
+- `Runtime::E2b` uses E2B's native `pause`/`resume` by sandbox id —
+  first turn creates and pauses, later turns resume the same microVM.
+  `EvictPausedSandboxesJob` reaps long-idle sandboxes.
 
-Uploaded files are projected into `workspace/uploads/` each turn from their
-durable `Message` attachments, and excluded from the archive. The same
-shape carries the rendered `workspace/.mcp.json` and the rendered
-`workspace/AGENTS.md` (the agent's per-turn boot identity — see
-`docs/agent-identity.md`). Archive failures are logged, never raised —
-a storage failure must not crash a turn the user already saw stream.
+There is **no archive**. `Agent::SessionArchive` was removed (commits
+`349a0cb`, `c08eb79`); don't reintroduce a tar-to-Active-Storage path.
+
+Per-turn projected inputs — `workspace/uploads/` (from `Message`
+attachments), the rendered `workspace/.mcp.json`, and the rendered
+`workspace/AGENTS.md` (per-turn boot identity, see `docs/agent-identity.md`)
+— are re-staged each turn even on a resumed sandbox, so they never become
+durable state. Pause/restage failures are logged, never raised — a
+storage failure must not crash a turn the user already saw stream.
 
 ### Credentials
 
@@ -105,8 +110,35 @@ development, loaded by foreman) matched to the chosen provider. Provider API
 keys are a shared, deployment-level resource — there are no per-user keys. All
 unset → pi uses its own config.
 
+### Connectors (MCP)
+
+The agent reaches external systems (GitHub, Google, Linear, …) through
+**MCP servers**, bridged into pi by the `pi-mcp-adapter` extension —
+installed into each pi environment at setup/image-build time, not loaded
+by Rails. See `docs/connectors.md`.
+
+- `Connector` + `ConnectorCredential` + `OauthGrant` model the
+  per-team-and-user authorization state; `ConnectorsController` is the
+  install/auth UI.
+- `Agent::McpConfig` renders a `.mcp.json` per turn into the workspace
+  from the team's enabled connectors. It is a projected input, never
+  durable.
+- OAuth flows live under `app/services/oauth_broker/`,
+  `omniauth_connector.rb`, and the per-provider apps
+  (`{github,google,linear}_app/`). Provider API keys for the LLM are
+  separate from connector OAuth tokens — don't conflate them.
+
+pi ships no MCP support of its own; the bridge-via-extension choice (vs.
+pi's recommended skill+CLI path) is a load-bearing decision documented in
+`docs/connectors.md` and `VISION.md`. Don't replace it with CLI wrappers.
+
 ## Conventions
 
+- **Tenancy is `Team`-only.** Every ownable resource (`Conversation`,
+  `Connector`, future projects/skills) has `belongs_to :team`. A user's
+  personal account is a team of one. Authorization is always
+  `resource.team.members.include?(user)` — no `User`-vs-`Team` branch,
+  no polymorphic `owner`. See `docs/tenancy.md`.
 - Models use integer enums: `Conversation#backend`, `Message#role`,
   `Message#streaming_status`.
 - Test parallelization is disabled below 500 tests on purpose — parallel
