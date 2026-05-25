@@ -84,6 +84,17 @@ module ApplicationHelper
     "en" => "English"
   }.freeze
 
+  # Timezone <option>s for the profile select. Each label carries the
+  # UTC offset — "(GMT+08:00) Beijing" — so a user can scan by offset
+  # instead of memorising city names. The value is still the
+  # Rails-friendly `tz.name`, which is what the model validator and
+  # `ProfilesController#detect_timezone` agree on.
+  def timezone_options
+    ActiveSupport::TimeZone.all.map do |tz|
+      [ "(GMT#{tz.formatted_offset}) #{tz.name}", tz.name ]
+    end
+  end
+
   # Attributes for the chat-layout `<body>` tag. The timezone-detect
   # Stimulus controller is only wired up for a signed-in user who
   # hasn't picked a timezone yet — keeping the conditional in Ruby

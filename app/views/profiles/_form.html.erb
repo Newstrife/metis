@@ -26,9 +26,9 @@
 
   <div class="form-row">
     <%= form.label :timezone, "Timezone" %>
-    <%= form.time_zone_select :timezone, ActiveSupport::TimeZone.all,
+    <%= form.select :timezone, timezone_options,
           { include_blank: "Use browser default" },
-          { autocomplete: "off" } %>
+          autocomplete: "off" %>
     <p class="form-hint">Timestamps throughout the app render in this zone.</p>
   </div>
 

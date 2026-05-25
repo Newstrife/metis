@@ -17,6 +17,13 @@ class User < ApplicationRecord
   # controller change.
   AVAILABLE_LANGUAGES = %w[en].freeze
 
+  # Trim whitespace and treat empty strings as nil for every profile
+  # field — keeps a stray space in the form from sneaking past the
+  # inclusion/length validators below and causing surprises downstream
+  # (a display_name like " " is technically "present" but reads blank).
+  normalizes :display_name, :timezone, :language, :preferred_model,
+             with: ->(value) { value.is_a?(String) ? value.strip.presence : value }
+
   # Profile fields are validated only when the user submits the profile
   # form (context :profile_update). Sign-up still works without them,
   # and OAuth-created users don't carry a display name at all.

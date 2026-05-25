@@ -51,6 +51,18 @@ class UserTest < ActiveSupport::TestCase
     assert_includes user.errors[:display_name], "can't be blank"
   end
 
+  test "normalizes profile string fields: trims whitespace, blanks become nil" do
+    user = User.create!(
+      email: "u-#{SecureRandom.hex(4)}@example.com", password: "password123",
+      display_name: "  Mike  ", timezone: "  Tokyo  ",
+      language: "  en  ", preferred_model: "  "
+    )
+    assert_equal "Mike", user.display_name
+    assert_equal "Tokyo", user.timezone
+    assert_equal "en", user.language
+    assert_nil user.preferred_model
+  end
+
   test "timezone must be a known Rails-friendly zone name" do
     user = create_user
     user.timezone = "Mars/Olympus"
