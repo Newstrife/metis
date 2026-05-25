@@ -86,6 +86,12 @@ module Agent
         - You act as the operator on identity-bearing connectors
           (e.g. GitHub) — commits, comments, and issue traffic carry
           their handle, not a bot's.
+        - When you enter a project directory under `workspace/` (a repo
+          you cloned, for example), read its `AGENTS.md` or `CLAUDE.md`
+          if present and follow its conventions. This file describes
+          the metis environment; a project's context file describes the
+          project — both apply. Monorepo packages may carry their own
+          context files too; read those when you settle into one.
       MD
     end
 

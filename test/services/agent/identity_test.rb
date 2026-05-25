@@ -95,6 +95,17 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/projected inputs/i, out)
   end
 
+  test "tells the agent to honor project AGENTS.md/CLAUDE.md when entering a subdirectory" do
+    # pi only parent-walks context files from cwd at session start, so a
+    # project at workspace/foo/AGENTS.md is never auto-loaded. The standing
+    # instruction here is what makes the agent read it as a tool call so
+    # the project's conventions land in the conversation.
+    out = render
+
+    assert_match(/AGENTS\.md.*CLAUDE\.md|CLAUDE\.md.*AGENTS\.md/, out)
+    assert_match(/workspace\//, out)
+  end
+
   test "renders the Coding tools section when a GitHub grant covers `repo`" do
     # The same gate Runtime::Base#sandbox_env uses to inject GH_TOKEN —
     # the identity prompt must mirror it exactly so AGENTS.md never names
