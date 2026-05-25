@@ -23,7 +23,7 @@ below.
 
 ## What goes in the file
 
-Deliberately scoped to **environment context**, not product guardrails:
+Deliberately scoped to runtime identity and behavior, not product guardrails:
 
 - **Identity** — *"You are pi, running inside Metis."*
 - **This turn** — operator email, team name, runtime kind and its
@@ -31,6 +31,9 @@ Deliberately scoped to **environment context**, not product guardrails:
 - **Connectors** — each enabled connector with how the agent acts on
   it (*as you (OAuth)*, *team-shared credential*, *no credential —
   server visible but may reject*).
+- **Soul** — the behavioral contract for the runtime agent: direct,
+  resourceful, judgment-bearing, privacy-preserving, careful with
+  external actions, and clear about what changed.
 - **Conventions** — projected inputs rewrite each turn; sandbox
   boundary; identity-bearing connectors carry the operator's handle,
   not a bot's.
@@ -99,8 +102,8 @@ project's soul, for different audiences:
   and the AI sessions working on the metis codebase). Identity *plus*
   the rules we hold to and the "won't build" guardrails.
 - **`workspace/AGENTS.md`** — for the **runtime agent** (pi serving a
-  user task). Identity *plus* environment context. No platform
-  guardrails.
+  user task). Identity, environment context, and the runtime agent's
+  behavioral soul. No platform guardrails.
 
 The two reinforce each other but answer different questions. Don't
 merge them.

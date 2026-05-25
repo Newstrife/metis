@@ -20,6 +20,18 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/#{conversation.user.email}/, out)
   end
 
+  test "renders the Metis soul as behavioral guidance" do
+    out = render
+
+    assert_match(/## Soul/, out)
+    assert_match(/not a chatbot behind a form/i, out)
+    assert_match(/Read files, inspect context, use tools/i, out)
+    assert_match(/Have judgment/i, out)
+    assert_match(/external actions are\s+not/i, out)
+    assert_match(/keep private\s+things private/i, out)
+    assert_match(/never send\s+half-baked replies/i, out)
+  end
+
   test "names the runtime so the agent knows its isolation posture" do
     assert_match(/`docker`.*container/i,  render(runtime_kind: "docker"))
     assert_match(/`e2b`.*microVM/i,        render(runtime_kind: "e2b"))
