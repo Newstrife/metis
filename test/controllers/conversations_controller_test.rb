@@ -44,12 +44,11 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "gpt-5.5", settings["model"]
   end
 
-  test "new conversation title starts blank and enqueues title generation" do
+  test "new conversation starts with a blank title" do
     sign_in @user
-    assert_enqueued_with(job: GenerateConversationTitleJob) do
-      post conversations_path,
-           params: { content: "Help me debug a Rails test", provider: "anthropic", model: "claude-opus-4-7" }
-    end
+    post conversations_path,
+         params: { content: "Help me debug a Rails test", provider: "anthropic", model: "claude-opus-4-7" }
+
     assert_nil @user.conversations.last.title
   end
 

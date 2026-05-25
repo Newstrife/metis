@@ -44,7 +44,7 @@ class ConversationsController < ApplicationController
     return head(:unprocessable_entity) if title.blank?
 
     @conversation.update!(title: title)
-    broadcast_title_update(@conversation)
+    @conversation.broadcast_title_change!
     head :ok
   end
 
@@ -99,21 +99,5 @@ class ConversationsController < ApplicationController
   def chat_settings
     model = params[:model].presence || current_user.preferred_model.presence
     { "provider" => model && Agent::Catalog.provider_for(model), "model" => model }.compact
-  end
-
-  # Pushes the updated title to both the sidebar row and the open
-  # conversation header. Both targets live on the conversation's
-  # Turbo Stream channel, which the show view subscribes to.
-  def broadcast_title_update(conversation)
-    Turbo::StreamsChannel.broadcast_update_to(
-      conversation,
-      target: dom_id(conversation, :sidebar_title),
-      html: ERB::Util.html_escape(conversation.display_title)
-    )
-    Turbo::StreamsChannel.broadcast_update_to(
-      conversation,
-      target: dom_id(conversation, :title),
-      html: ERB::Util.html_escape(conversation.display_title)
-    )
   end
 end

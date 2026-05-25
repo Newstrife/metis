@@ -1,16 +1,13 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Handles click-to-edit for conversation titles in both the sidebar row
-// and the conversation header. Enter or blur saves via PATCH; Escape
-// reverts. The DOM is updated optimistically on save and rolled back on
-// network error.
+// Click-to-edit for the conversation title in the header. Enter saves,
+// Escape or blur-without-change cancels. The DOM is updated only after
+// the server confirms — no rollback path, no flicker.
 export default class extends Controller {
   static targets = ["text", "input"]
   static values  = { url: String }
 
-  edit(event) {
-    event.preventDefault()
-    event.stopPropagation()
+  edit() {
     this._previous = this.textTarget.textContent.trim()
     this.inputTarget.value = this._previous
     this.textTarget.hidden = true
@@ -19,52 +16,41 @@ export default class extends Controller {
   }
 
   keydown(event) {
-    if (event.key === "Enter")  { event.preventDefault(); this.inputTarget.blur() }
-    if (event.key === "Escape") { this._reverting = true; this.inputTarget.blur() }
+    if (event.key === "Enter")  { event.preventDefault(); this.save() }
+    if (event.key === "Escape") { event.preventDefault(); this.cancel() }
+  }
+
+  cancel() {
+    this.inputTarget.hidden = true
+    this.textTarget.hidden  = false
   }
 
   async save() {
-    // Escape sets _reverting before triggering blur — revert and bail.
-    if (this._reverting) {
-      this._reverting = false
-      this.textTarget.textContent = this._previous
-      this._close()
-      return
-    }
+    // Cancel hides the input, which fires blur → save. Bail to avoid
+    // saving the in-progress value the user wanted to discard.
+    if (this.inputTarget.hidden) return
 
     const value = this.inputTarget.value.trim()
-
-    // Unchanged or blank — just close without saving.
-    if (!value || value === this._previous) {
-      this._close()
-      return
-    }
-
-    // Optimistic update: show the new title immediately.
-    this.textTarget.textContent = value
-    this._close()
+    if (!value || value === this._previous) { this.cancel(); return }
 
     try {
       const resp = await fetch(this.urlValue, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content
+          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content,
+          "Accept": "application/json"
         },
         body: JSON.stringify({ title: value })
       })
       if (resp.ok) {
+        this.textTarget.textContent = value
         this._previous = value
-      } else {
-        this.textTarget.textContent = this._previous
       }
     } catch {
-      this.textTarget.textContent = this._previous
+      // Server didn't accept it — leave the displayed title alone.
+    } finally {
+      this.cancel()
     }
-  }
-
-  _close() {
-    this.inputTarget.hidden = true
-    this.textTarget.hidden  = false
   }
 }

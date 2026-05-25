@@ -32,12 +32,6 @@ module Composing
       )
     end
     ChatJob.perform_later(conversation.id, user_message.id, assistant_message.id)
-    # Fire title generation only for the very first user message; the
-    # title.blank? guard also prevents re-triggering if the user renamed
-    # the conversation before a prior job completed.
-    if conversation.title.blank? && conversation.messages.where(role: :user).count == 1
-      GenerateConversationTitleJob.perform_later(conversation.id)
-    end
     [ user_message, assistant_message ]
   end
 

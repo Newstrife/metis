@@ -1,44 +1,86 @@
 module Agent
-  # Generates a short conversation title by calling the deployment's
-  # configured LLM provider directly — no pi subprocess, no adapter
-  # overhead. A single cheap/fast model call is enough for this task.
+  # Generates a short conversation title by calling the LLM provider
+  # directly — no pi subprocess, no adapter overhead. A single
+  # cheap/fast model call is enough.
   #
-  # Returns a String on success, nil on any failure (misconfigured key,
-  # network error, unexpected response shape). The caller is responsible
-  # for providing a fallback.
+  # Returns a sanitized String on success, nil on any failure
+  # (misconfigured key, network error, unexpected response shape, empty
+  # output). The caller (Conversation#apply_generated_title!) provides
+  # the fallback.
   class TitleGenerator
     PROMPT = <<~PROMPT.strip
-      Summarize the following message as a concise conversation title.
-      Rules: 60 characters maximum, no trailing punctuation, no quotes, plain text only.
-      Return just the title, nothing else.
+      Generate a short, casual title for this conversation.
+      Rules: 10 words maximum, no quotes, no markdown, no trailing punctuation.
+      Match the language the user wrote in. Return only the title.
     PROMPT
 
-    # The fastest/cheapest model to use per provider for this one-shot call.
+    # Cheapest/fastest model per provider for this one-shot call.
     TITLE_MODELS = {
       "anthropic" => "claude-haiku-4-5",
       "openai"    => "gpt-4o-mini",
       "google"    => "gemini-2.5-flash"
     }.freeze
 
-    def self.call(message_content)
-      new.call(message_content)
+    CONTEXT_MESSAGES = 4
+    CONTEXT_PER_MESSAGE_CHARS = 500
+
+    def self.call(conversation)
+      new(conversation).call
     end
 
-    def call(message_content)
-      return nil if message_content.blank?
+    def initialize(conversation)
+      @conversation = conversation
+    end
 
-      provider = Rails.application.config.x.agent.provider.presence ||
-                 Agent::Catalog.default_provider
+    def call
+      context = build_context
+      return nil if context.blank?
+
+      provider = pick_provider
       api_key  = Rails.application.config.x.agent.api_keys.to_h[provider]
-      return nil if api_key.blank?
+      return nil if provider.blank? || api_key.blank?
 
-      generate(provider, api_key, message_content.to_s.truncate(500))
+      sanitize(generate(provider, api_key, context))
     rescue => e
       Rails.logger.warn("Agent::TitleGenerator failed (#{e.class}): #{e.message}")
       nil
     end
 
     private
+
+    # Prefer the conversation's chosen provider (its API key is already
+    # validated for the running turn). Fall back to the deployment
+    # default if the conversation hasn't picked one.
+    def pick_provider
+      @conversation.settings["provider"].presence ||
+        Rails.application.config.x.agent.provider.presence ||
+        Agent::Catalog.default_provider
+    end
+
+    def build_context
+      @conversation.messages
+                   .where(role: %i[user assistant])
+                   .order(:created_at)
+                   .limit(CONTEXT_MESSAGES)
+                   .filter_map { |m|
+                     body = m.content.to_s.strip
+                     next if body.blank?
+                     "#{m.role.capitalize}: #{body.truncate(CONTEXT_PER_MESSAGE_CHARS)}"
+                   }
+                   .join("\n\n")
+    end
+
+    # LLMs ignore "no quotes/no markdown" rules surprisingly often.
+    # Strip the common wrappers, take the first line, and reject
+    # anything obviously not a title.
+    def sanitize(raw)
+      return nil if raw.blank?
+      title = raw.strip
+      title = title.split("\n").first.to_s.strip
+      title = title.gsub(/\A["'`*#\s]+|["'`*\s]+\z/, "")
+      return nil if title.length < 3 || title.length > 150
+      title
+    end
 
     def generate(provider, api_key, content)
       case provider
@@ -59,7 +101,7 @@ module Agent
         "x-api-key"         => api_key,
         "anthropic-version" => "2023-06-01"
       })
-      resp.dig("content", 0, "text")&.strip.presence
+      resp.dig("content", 0, "text")
     end
 
     def openai(api_key, content)
@@ -70,14 +112,14 @@ module Agent
         messages: [ { role: "user", content: "#{PROMPT}\n\n#{content}" } ]
       }
       resp = post(uri, body, { "Authorization" => "Bearer #{api_key}" })
-      resp.dig("choices", 0, "message", "content")&.strip.presence
+      resp.dig("choices", 0, "message", "content")
     end
 
     def google(api_key, content)
       uri  = URI("https://generativelanguage.googleapis.com/v1beta/models/#{TITLE_MODELS['google']}:generateContent?key=#{api_key}")
       body = { contents: [ { parts: [ { text: "#{PROMPT}\n\n#{content}" } ] } ] }
       resp = post(uri, body, {})
-      resp.dig("candidates", 0, "content", "parts", 0, "text")&.strip.presence
+      resp.dig("candidates", 0, "content", "parts", 0, "text")
     end
 
     def post(uri, body, extra_headers)
@@ -87,6 +129,7 @@ module Agent
       req.body = body.to_json
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
+      http.open_timeout = 5
       http.read_timeout = 10
       JSON.parse(http.request(req).body)
     end
