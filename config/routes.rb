@@ -17,6 +17,10 @@ Rails.application.routes.draw do
 
   resources :connectors, except: :show
 
+  resource :profile, only: %i[show update]
+  post "profile/detect_timezone", to: "profiles#detect_timezone",
+                                  as: :detect_timezone_profile
+
   # Defines the root path route ("/")
   root "conversations#index"
 end

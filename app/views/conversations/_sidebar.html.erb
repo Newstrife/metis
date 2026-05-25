@@ -4,7 +4,7 @@
     `.convos` (the scroll container) watches the sentinel target at the
     bottom and fetches the next page as a turbo_stream when it scrolls
     into view. %>
-<aside class="sidebar" data-controller="conversation-filter">
+<aside id="sidebar" class="sidebar" data-controller="conversation-filter">
   <div class="ws">
     <div class="ws-name">Metis</div>
     <div style="flex:1"></div>
@@ -63,11 +63,21 @@
       </svg>
       <span>Connectors</span>
     <% end %>
+    <%= link_to profile_path,
+          class: "nav-item#{' on' if controller_name == 'profiles'}" do %>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="8" cy="5.5" r="2.5"/>
+        <path d="M3 14c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5" stroke-linecap="round"/>
+      </svg>
+      <span>Profile</span>
+    <% end %>
   </nav>
 
   <div class="user">
-    <div class="avatar" aria-hidden="true"><%= current_user.email.first.upcase %></div>
-    <div class="who"><div class="nm"><%= current_user.email %></div></div>
+    <%= link_to profile_path, class: "user-link", title: "Edit profile" do %>
+      <div class="avatar" aria-hidden="true"><%= current_user.initials %></div>
+      <div class="who"><div class="nm"><%= current_user.display_label %></div></div>
+    <% end %>
     <%= button_to destroy_user_session_path, method: :delete,
           class: "signout", title: "Sign out", form: { data: { turbo: false } } do %>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">

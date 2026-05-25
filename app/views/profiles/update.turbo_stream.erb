@@ -1,0 +1,10 @@
+<%# Replace the form frame in place; also refresh the sidebar so the
+    avatar + display name pick up the new value without a reload. %>
+<%= turbo_stream.replace "profile_form" do %>
+  <%= render "form", user: @user %>
+<% end %>
+<% if @user.errors.empty? %>
+  <%= turbo_stream.replace "sidebar" do %>
+    <%= render "conversations/sidebar" %>
+  <% end %>
+<% end %>

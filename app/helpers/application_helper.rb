@@ -80,6 +80,17 @@ module ApplicationHelper
     older: "Older"
   }.freeze
 
+  LANGUAGE_LABELS = {
+    "en" => "English"
+  }.freeze
+
+  # Human label for an `I18n.locale` code, used by the profile form's
+  # language picker. Falls back to the bare code so an unknown locale
+  # is still selectable rather than blank.
+  def language_label(code)
+    LANGUAGE_LABELS[code.to_s] || code.to_s.upcase
+  end
+
   # Display label for a recency bucket. Views can't reach the constant
   # by bare name (lexical scope, not the include chain), so they go
   # through this helper.

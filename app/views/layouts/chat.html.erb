@@ -33,7 +33,11 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="app-shell">
+  <body class="app-shell"
+        <% if user_signed_in? && current_user.timezone.blank? %>
+        data-controller="timezone-detect"
+        data-timezone-detect-url-value="<%= detect_timezone_profile_path %>"
+        <% end %>>
     <div class="app">
       <%= render "conversations/sidebar" %>
       <%# Sidebar conversation links target this frame, so picking a

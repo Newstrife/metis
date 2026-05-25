@@ -25,6 +25,50 @@ class UserTest < ActiveSupport::TestCase
     assert_difference("Membership.count", -1) { user.destroy }
   end
 
+  test "display_label falls back to email when display_name is blank" do
+    user = create_user
+    assert_equal user.email, user.display_label
+
+    user.update!(display_name: "Mike Chen")
+    assert_equal "Mike Chen", user.display_label
+  end
+
+  test "initials are derived from display name when set, email otherwise" do
+    user = User.new(email: "alex.kim@example.com")
+    assert_equal "AK", user.initials
+
+    user.display_name = "Mike Chen"
+    assert_equal "MC", user.initials
+
+    user.display_name = "q"
+    assert_equal "Q", user.initials
+  end
+
+  test "profile_update context requires a display name" do
+    user = create_user
+    user.display_name = ""
+    refute user.valid?(:profile_update)
+    assert_includes user.errors[:display_name], "can't be blank"
+  end
+
+  test "timezone must be a real IANA zone" do
+    user = create_user
+    user.timezone = "Mars/Olympus"
+    refute user.valid?
+
+    user.timezone = "America/Los_Angeles"
+    assert user.valid?
+  end
+
+  test "preferred_model must be in the catalog" do
+    user = create_user
+    user.preferred_model = "no-such-model"
+    refute user.valid?
+
+    user.preferred_model = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    assert user.valid?
+  end
+
   test "placeholder_email? matches the metis synth suffix and GitHub's noreply, anchored" do
     assert User.placeholder_email?("90943+chagel@users.noreply.github.com")
     assert User.placeholder_email?("42+mgc@github.users.noreply.metis")
