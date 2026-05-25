@@ -6,15 +6,12 @@ import { Controller } from "@hotwired/stimulus"
 //    Enter is ignored mid-IME-composition (so confirming a
 //    Chinese/Japanese candidate doesn't send) and while a turn streams.
 //
-// 2. Auto-focus — the textarea is focused on:
-//    a. Initial page load and Turbo Drive navigations (via connect())
-//    b. After the assistant finishes streaming (detected via
-//       turbo:before-stream-render targeting composer_actions)
-//    Focus is skipped on touch-primary devices (phones/tablets) to avoid
-//    popping the virtual keyboard unexpectedly.
+// 2. Auto-focus — on initial load, Turbo Drive navigation, and after a
+//    streaming turn ends. Skipped on touch-primary devices and when the
+//    user is focused on something else (so we don't steal a selection).
 export default class extends Controller {
   connect() {
-    this._focusUnlessMobile()
+    this._focusIfIdle()
     this._streamRenderHandler = this._handleStreamRender.bind(this)
     document.addEventListener("turbo:before-stream-render", this._streamRenderHandler)
   }
@@ -28,31 +25,31 @@ export default class extends Controller {
 
     event.preventDefault()
     const form = this.element.form
-    // A Stop button in the composer means a turn is already streaming.
-    if (form.querySelector(".send.stop")) return
+    if (this._streaming(form)) return
 
     form.requestSubmit()
   }
 
   // ── private ──────────────────────────────────────────────────────────────
 
-  _focusUnlessMobile() {
-    // Avoid popping the virtual keyboard on touch-primary devices.
-    if (window.matchMedia("(pointer: coarse)").matches) return
-    this.element.focus()
-  }
-
   _handleStreamRender(event) {
-    // Only care about updates to composer_actions (ChatJob swaps Stop→Send
-    // when a streaming turn ends).
     const stream = event.detail?.newStream
     if (stream?.getAttribute("target") !== "composer_actions") return
 
-    // Schedule after Turbo has applied the DOM update so we can confirm the
-    // stop button is gone before stealing focus.
-    requestAnimationFrame(() => {
-      const form = this.element.closest("form")
-      if (!form?.querySelector(".send.stop")) this._focusUnlessMobile()
-    })
+    requestAnimationFrame(() => this._focusIfIdle())
+  }
+
+  _focusIfIdle() {
+    if (window.matchMedia("(pointer: coarse)").matches) return
+    if (this._streaming(this.element.closest("form"))) return
+
+    const active = document.activeElement
+    if (active && active !== document.body && active !== this.element) return
+
+    this.element.focus()
+  }
+
+  _streaming(form) {
+    return form?.querySelector("#composer_actions")?.dataset.composerState === "streaming"
   }
 }

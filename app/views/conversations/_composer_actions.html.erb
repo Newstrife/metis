@@ -1,7 +1,8 @@
 <%# The composer's submit control: Send/Start while idle, Stop while a
     turn streams. Stop submits the hidden cancel_turn form. ChatJob
     swaps this back to Send when the turn ends. %>
-<div id="composer_actions" class="composer-actions">
+<div id="composer_actions" class="composer-actions"
+     data-composer-state="<%= conversation&.turn_in_progress? ? "streaming" : "idle" %>">
   <% if conversation&.turn_in_progress? %>
     <button type="submit" form="cancel_turn" class="send stop" title="Stop" aria-label="Stop">
       <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
