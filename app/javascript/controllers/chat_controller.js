@@ -58,14 +58,18 @@ export default class extends Controller {
     if (this._isNearBottom()) {
       this.userScrolledUp = false
       this._hideScrollButton()
-    } else {
+    } else if (!this.userScrolledUp) {
+      // First transition past the threshold: surface the button as a
+      // "jump to latest" affordance, no new-content emphasis yet.
       this.userScrolledUp = true
+      this._showScrollButton()
     }
   }
 
   _onMutation() {
     if (this.userScrolledUp) {
       this._showScrollButton()
+      this.scrollButtonTarget?.classList.add("has-new")
     } else {
       this.scrollToBottom()
     }
@@ -76,6 +80,8 @@ export default class extends Controller {
   }
 
   _hideScrollButton() {
-    if (this.hasScrollButtonTarget) this.scrollButtonTarget.classList.remove("visible")
+    if (!this.hasScrollButtonTarget) return
+    this.scrollButtonTarget.classList.remove("visible")
+    this.scrollButtonTarget.classList.remove("has-new")
   }
 }
