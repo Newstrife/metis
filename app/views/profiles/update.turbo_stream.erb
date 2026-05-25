@@ -1,9 +1,13 @@
-<%# Replace the form frame in place; also refresh the sidebar so the
-    avatar + display name pick up the new value without a reload. %>
+<%# Replace the form frame in place; on success also refresh the page
+    header (H1 + email) and the sidebar so the avatar + display name
+    pick up the new value without a full reload. %>
 <%= turbo_stream.replace "profile_form" do %>
   <%= render "form", user: @user %>
 <% end %>
 <% if @user.errors.empty? %>
+  <%= turbo_stream.replace "profile_header" do %>
+    <%= render "header" %>
+  <% end %>
   <%= turbo_stream.replace "sidebar" do %>
     <%= render "conversations/sidebar" %>
   <% end %>
