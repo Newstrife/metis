@@ -443,6 +443,19 @@ turbo-frame#main { display:contents; }
 .nav-item svg { width:16px; height:16px; flex:none; color:var(--ink-3); }
 .nav-item:hover svg,.nav-item.on svg { color:var(--ink); }
 
+/* settings shell — same .app grid + .sidebar styles, plus back link
+   and the section nav that fills the slot the conversations list
+   occupies in the chat shell. */
+.settings-back {
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:var(--fd); font-weight:600; font-size:14px;
+  color:var(--ink-2); text-decoration:none; padding:6px 8px;
+  border-radius:9px; transition:background-color .13s,color .13s;
+}
+.settings-back:hover { background:var(--card); color:var(--ink); }
+.settings-back svg { width:15px; height:15px; }
+.settings-nav { flex:1; padding:14px 8px 4px; display:flex; flex-direction:column; gap:2px; }
+
 /* ───────────── pane — settings-style pages ───────────── */
 .pane {
   background:var(--canvas); border-radius:18px; box-shadow:var(--sh-lg);

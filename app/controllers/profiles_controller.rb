@@ -3,20 +3,12 @@
 # submits via Turbo so the sidebar (which renders the avatar +
 # display name) updates in place without a full reload.
 class ProfilesController < ApplicationController
-  layout "chat"
-
-  before_action :set_sidebar, only: %i[show update]
+  layout "settings"
 
   def show
     @user = current_user
   end
 
-  # `set_sidebar` runs unconditionally because three of the four
-  # response paths render the sidebar partial: the turbo-stream success
-  # (refreshes the avatar + display name), and both `render :show` and
-  # `render :update` failure paths (the chat layout includes the
-  # sidebar). Only the HTML success branch redirects without it; the
-  # asymmetry isn't worth the cost of guessing right in each branch.
   def update
     @user = current_user
     @user.assign_attributes(profile_params)

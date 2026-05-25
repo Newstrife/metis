@@ -27,7 +27,7 @@
   <div class="form-row">
     <%= form.label :timezone, "Timezone" %>
     <%= form.select :timezone, timezone_options,
-          { include_blank: "Use browser default" },
+          { include_blank: "Default" },
           autocomplete: "off" %>
     <p class="form-hint">Timestamps throughout the app render in this zone.</p>
   </div>
@@ -36,7 +36,7 @@
     <%= form.label :language, "Language" %>
     <%= form.select :language,
           User::AVAILABLE_LANGUAGES.map { |code| [ language_label(code), code ] },
-          include_blank: "App default" %>
+          include_blank: "Default" %>
     <p class="form-hint">More locales arrive as translations land.</p>
   </div>
 
@@ -44,8 +44,8 @@
     <%= form.label :preferred_model, "Default model" %>
     <%= form.select :preferred_model,
           grouped_options_for_select(Agent::Catalog.grouped_model_options, user.preferred_model),
-          include_blank: "Use deployment default" %>
-    <p class="form-hint">Used for new conversations \u2014 still overridable per chat.</p>
+          include_blank: "Default" %>
+    <p class="form-hint">Used for new conversations — still overridable per chat.</p>
   </div>
 
   <div class="form-actions">

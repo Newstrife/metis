@@ -15,11 +15,18 @@ Rails.application.routes.draw do
     resources :messages, only: :create
   end
 
-  resources :connectors, except: :show
-
-  resource :profile, only: %i[show update]
-  post "profile/detect_timezone", to: "profiles#detect_timezone",
-                                  as: :detect_timezone_profile
+  # Account settings live behind a single /settings shell — profile,
+  # connectors, and future sections (api keys, notifications, …) share
+  # the same two-column layout. Helpers (`profile_path`,
+  # `connectors_path`, …) keep their names; only URLs move under
+  # /settings.
+  scope "/settings", as: nil do
+    resource :profile, only: %i[show update]
+    post "profile/detect_timezone", to: "profiles#detect_timezone",
+                                    as: :detect_timezone_profile
+    resources :connectors, except: :show
+  end
+  get "/settings", to: redirect("/settings/profile")
 
   # Defines the root path route ("/")
   root "conversations#index"
