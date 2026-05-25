@@ -25,7 +25,10 @@ below.
 
 Deliberately scoped to runtime identity and behavior, not product guardrails:
 
-- **Identity** — *"You are pi, running inside Metis."*
+- **Identity** — *"You are Metis."* (pi is the harness loading the
+  file, but the rendered prompt deliberately doesn't name it — to the
+  agent, and to the operator it serves, the thing on the other side
+  of the chat is Metis.)
 - **This turn** — operator email, team name, runtime kind and its
   isolation posture, workspace persistence model, uploads location.
 - **Connectors** — each enabled connector with how the agent acts on
@@ -101,9 +104,10 @@ project's soul, for different audiences:
 - **[`../VISION.md`](../VISION.md)** — for **contributors** (humans
   and the AI sessions working on the metis codebase). Identity *plus*
   the rules we hold to and the "won't build" guardrails.
-- **`workspace/AGENTS.md`** — for the **runtime agent** (pi serving a
-  user task). Identity, environment context, and the runtime agent's
-  behavioral soul. No platform guardrails.
+- **`workspace/AGENTS.md`** — for the **runtime agent** (Metis, served
+  by pi as the harness, doing a user's task). Identity, environment
+  context, and the runtime agent's behavioral soul. No platform
+  guardrails.
 
 The two reinforce each other but answer different questions. Don't
 merge them.

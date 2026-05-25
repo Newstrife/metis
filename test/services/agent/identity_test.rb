@@ -12,11 +12,11 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     Agent::Identity.new(conversation, runtime_kind).content
   end
 
-  test "anchors the agent — pi inside Metis, sandboxed, operator-served" do
+  test "anchors the agent — Metis as identity, human-served" do
     out = render
 
-    assert_match(/You are pi, running inside Metis/, out)
-    assert_match(/multi-user agent platform/i, out)
+    assert_match(/You are Metis/, out)
+    assert_match(/human/i, out)
     assert_match(/#{conversation.user.email}/, out)
   end
 
