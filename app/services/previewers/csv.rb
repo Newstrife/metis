@@ -24,8 +24,8 @@ module Previewers
     def take_rows(limit)
       rows = []
       blob.open do |file|
-        ::CSV.foreach(file) do |row|
-          rows << row
+        ::CSV.foreach(file.path, encoding: "utf-8") do |row|
+          rows << row.map { |cell| cell.is_a?(String) ? cell.scrub : cell }
           break if limit && rows.size >= limit
         end
       end

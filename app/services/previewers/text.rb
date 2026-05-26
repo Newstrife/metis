@@ -25,8 +25,8 @@ module Previewers
     def head_lines(limit: INLINE_LINE_LIMIT)
       lines = []
       blob.open do |file|
-        file.each_line do |line|
-          lines << line
+        File.foreach(file.path, encoding: "utf-8") do |line|
+          lines << line.scrub
           break if lines.size >= limit
         end
       end
@@ -38,6 +38,8 @@ module Previewers
         blob.filename.to_s.match?(/\.(md|markdown)\z/i)
     end
 
-    def full_content = blob.download.force_encoding("UTF-8")
+    # blob.download returns ASCII-8BIT; scrub replaces invalid byte
+    # sequences with U+FFFD instead of raising mid-render.
+    def full_content = blob.download.force_encoding("UTF-8").scrub
   end
 end
