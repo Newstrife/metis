@@ -381,19 +381,94 @@ turbo-frame#main { display:contents; }
 .att-size { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
 
 /* artifacts */
-.msg-artifacts { display:flex; flex-wrap:wrap; gap:8px; }
+.msg-artifacts { display:flex; flex-wrap:wrap; gap:10px; }
 .msg-artifacts:not(:empty) { margin-top:10px; }
-.art-image-link { display:block; }
-.art-image { display:block; max-height:170px; border-radius:10px; border:1px solid var(--line); }
-.art-file {
-  display:flex; align-items:center; gap:8px; text-decoration:none;
-  background:var(--bg); border:1px solid var(--line); border-radius:10px;
-  padding:8px 11px; transition:border-color .13s;
+.art-card {
+  display:flex; flex-direction:column;
+  width:300px; max-width:100%;
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  overflow:hidden; transition:border-color .13s;
 }
-.art-file:hover { border-color:var(--line-2); }
-.art-file svg { width:16px; height:16px; color:var(--ink-3); flex:none; }
-.art-name { font-size:13px; font-weight:500; color:var(--ink); }
-.art-size { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
+.art-card:hover { border-color:var(--line-2); }
+.art-card-body { background:var(--canvas); display:flex; align-items:stretch; }
+.art-card-body--image { padding:0; justify-content:center; }
+.art-card-body--image .art-image {
+  display:block; max-width:100%; max-height:170px;
+}
+.art-card-body--icon { padding:18px; justify-content:center; color:var(--ink-3); }
+.art-card-body--icon svg { width:36px; height:36px; }
+.art-card-body--text, .art-card-body--csv {
+  max-height:140px; overflow:hidden; padding:10px 12px;
+  border-bottom:1px solid var(--line);
+}
+.art-text-preview {
+  margin:0; font-family:var(--fm); font-size:12px; line-height:1.4;
+  color:var(--ink-2); white-space:pre-wrap; word-break:break-word;
+}
+.art-csv { font-size:11px; line-height:1.5; border-collapse:collapse; width:100%; }
+.art-csv th, .art-csv td {
+  padding:3px 6px; border-bottom:1px solid var(--line);
+  text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:120px;
+}
+.art-csv th { font-weight:600; color:var(--ink); background:var(--card); }
+.art-csv td { color:var(--ink-2); }
+.art-card-foot {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 11px;
+}
+.art-card-foot .art-name {
+  flex:1; min-width:0; font-size:13px; font-weight:500; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.art-card-foot .art-size { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
+.art-actions { display:flex; gap:6px; }
+.art-action {
+  font-size:12px; padding:4px 9px; border-radius:7px;
+  text-decoration:none; color:var(--ink); border:1px solid var(--line);
+  background:var(--card); transition:border-color .13s, background .13s;
+}
+.art-action:hover { border-color:var(--line-2); background:var(--canvas); }
+.art-action--ghost { color:var(--ink-3); border-color:transparent; background:transparent; }
+.art-action--ghost:hover { color:var(--ink); background:var(--canvas); }
+
+/* preview page (standalone tab) */
+.preview-shell { background:var(--bg); min-height:100vh; color:var(--ink); font-family:var(--fb); }
+.preview-header {
+  display:flex; align-items:center; gap:14px;
+  padding:14px 22px; border-bottom:1px solid var(--line); background:var(--card);
+}
+.preview-back { font-size:13px; color:var(--ink-3); text-decoration:none; }
+.preview-back:hover { color:var(--ink); }
+.preview-title {
+  flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0;
+}
+.preview-download {
+  font-size:13px; padding:5px 11px; border-radius:8px;
+  text-decoration:none; color:var(--ink); border:1px solid var(--line);
+}
+.preview-download:hover { border-color:var(--line-2); }
+.preview-body { padding:22px; max-width:1100px; margin:0 auto; }
+.preview-text {
+  background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:16px 18px; font-family:var(--fm); font-size:13px; line-height:1.55;
+  color:var(--ink); white-space:pre-wrap; word-break:break-word; overflow-x:auto;
+}
+.preview-markdown {
+  background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:18px 22px;
+}
+.preview-csv {
+  width:100%; border-collapse:collapse;
+  background:var(--card); border:1px solid var(--line); border-radius:10px;
+  font-size:12.5px; overflow:hidden;
+}
+.preview-csv th, .preview-csv td {
+  padding:7px 11px; border-bottom:1px solid var(--line); text-align:left;
+}
+.preview-csv th { font-weight:600; color:var(--ink); background:var(--bg); }
+.preview-csv td { color:var(--ink-2); }
 
 /* ───────────── composer ───────────── */
 .composer-wrap { padding:12px 28px 18px; }
@@ -990,6 +1065,10 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
 
   /* Connector marketplace grid — single column feels better on phone. */
   .app-grid { grid-template-columns:1fr; }
+
+  /* Artifact cards span the chat width on phones. */
+  .art-card { width:100%; }
+  .preview-body { padding:14px; }
 
   /* Auth pages already use a centered card; just trim padding. */
   body.auth-shell { padding:16px; }

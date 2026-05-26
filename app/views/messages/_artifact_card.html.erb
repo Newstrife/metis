@@ -1,0 +1,16 @@
+<% open_url = previewer.open_url(self) %>
+<article class="art-card">
+  <%= render previewer.card_partial, previewer: previewer, artifact: artifact %>
+  <footer class="art-card-foot">
+    <span class="art-name"><%= artifact.filename %></span>
+    <span class="art-size"><%= number_to_human_size(artifact.byte_size) %></span>
+    <span class="art-actions">
+      <% if open_url %>
+        <%= link_to "Open", open_url, target: "_blank", rel: "noopener", class: "art-action" %>
+      <% end %>
+      <%= link_to "Download",
+                  rails_blob_path(artifact, disposition: "attachment"),
+                  class: "art-action art-action--ghost" %>
+    </span>
+  </footer>
+</article>

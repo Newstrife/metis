@@ -1,0 +1,13 @@
+<% content_for :title, @blob.filename.to_s %>
+
+<header class="preview-header">
+  <%= link_to "← Back", conversation_path(@message.conversation), class: "preview-back" %>
+  <h1 class="preview-title"><%= @blob.filename %></h1>
+  <%= link_to "Download",
+              rails_blob_path(@blob, disposition: "attachment"),
+              class: "preview-download" %>
+</header>
+
+<main class="preview-body">
+  <%= render @previewer.preview_partial, previewer: @previewer, blob: @blob %>
+</main>

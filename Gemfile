@@ -31,6 +31,10 @@ gem "omniauth-rails_csrf_protection"
 # Render Markdown message content to HTML (GFM-compliant, native tables)
 gem "commonmarker"
 
+# Standard library; bundled gem in Ruby 4+ that we use to stream CSV
+# artifact previews row by row.
+gem "csv"
+
 # Pagination — used for endless scrolling of the sidebar conversation list
 gem "pagy", "~> 43.5"
 
