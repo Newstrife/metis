@@ -380,7 +380,7 @@ turbo-frame#main { display:contents; }
 .att-name { font-size:13px; font-weight:500; color:var(--ink); }
 .att-size { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
 
-/* artifacts — files the agent published this turn (below the body). */
+/* artifacts */
 .msg-artifacts { display:flex; flex-wrap:wrap; gap:8px; }
 .msg-artifacts:not(:empty) { margin-top:10px; }
 .art-image-link { display:block; }

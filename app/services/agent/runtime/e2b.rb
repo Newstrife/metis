@@ -62,9 +62,7 @@ module Agent
       def run(pi_args:, &block)
         sandbox = acquire_sandbox
         @sandbox_id = sandbox.sandbox_id
-        # See Local#run — floored so a coarse-granularity mtime in the
-        # sandbox doesn't fall before a sub-second start time.
-        turn_started_at = Time.current.floor
+        turn_started_at = Time.current.floor  # see Local#run
         execute(sandbox, pi_args: pi_args, &block)
       ensure
         if sandbox
@@ -216,11 +214,8 @@ module Agent
         end
       end
 
-      # Walk artifacts/ inside the still-running sandbox, read files
-      # whose modified_time falls in the turn window, and buffer them
-      # for the caller to attach. MUST happen before #pause_sandbox —
-      # a paused sandbox's filesystem is unreachable. Logged-not-raised
-      # for the same reason as the other post-turn projections.
+      # Must run before #pause_sandbox — a paused sandbox's filesystem
+      # is unreachable.
       def collect_sandbox_artifacts(sandbox, since:)
         return unless sandbox.files.exists?(ARTIFACTS_DIR)
 
@@ -240,9 +235,6 @@ module Agent
         Rails.logger.warn("E2B artifact collection failed for conversation #{conversation.id}: #{e.message}")
       end
 
-      # Recursive walk over the sandbox filesystem. The SDK's `list`
-      # takes a depth, but we walk explicitly so the call site doesn't
-      # have to guess an upper bound.
       def list_sandbox_files(sandbox, root)
         files = []
         stack = [ root ]

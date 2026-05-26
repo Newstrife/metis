@@ -3,12 +3,8 @@ module Agent
     # Interface every runtime implements. A runtime decides where the
     # agent process physically runs and how its filesystem persists.
     class Base
-      # Per-file ceiling for artifact collection. Bigger files are
-      # skipped (with a warning) — both runtimes keep at least one
-      # in-memory copy per artifact in flight, and we'd rather drop a
-      # huge file than OOM the worker. If the operator needs to move
-      # something large, the agent should hand back a path, not stage
-      # it for download.
+      # Each artifact is held in memory at least once during attach;
+      # drop oversized files rather than OOM the worker.
       MAX_ARTIFACT_BYTES = 10.megabytes
 
       attr_reader :conversation
@@ -18,12 +14,8 @@ module Agent
         @artifacts = []
       end
 
-      # Files the agent published during the most recent #run, under
-      # workspace/artifacts/. Each entry is { filename:, content_type:,
-      # io: }, ready to pass to ActiveStorage#attach. Populated by the
-      # runtime before #run finalizes (pre-pause for E2b, while the
-      # bind mount is reachable for Docker) so the caller can attach
-      # them after #run returns.
+      # Files published during the most recent #run. Each entry is
+      # { filename:, io: }, ready to pass to ActiveStorage#attach.
       attr_reader :artifacts
 
       # Directory the agent should pass to `pi --session-dir`.
@@ -116,12 +108,8 @@ module Agent
 
       protected
 
-      # Collect files under a host directory that were created or
-      # touched at/after `since` into the @artifacts buffer for the
-      # caller to attach. mtime-windowed so cleanup of artifacts/ is
-      # not Metis's job — old turns' files simply fall outside the
-      # window. Failures are logged, never raised (a storage hiccup
-      # must not crash a turn the user already saw stream).
+      # mtime-windowed so cleanup of artifacts/ stays the runtime's
+      # job — old turns' files fall outside the window.
       def collect_host_artifacts(dir:, since:)
         return unless dir.directory?
 

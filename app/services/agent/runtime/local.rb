@@ -25,9 +25,8 @@ module Agent
         workspace.stage_mcp_config(mcp_config)
         workspace.stage_identity(identity_content)
         workspace.stage_skills
-        # Floor to whole seconds: some filesystems (ext4 on CI) store
-        # mtime at second granularity, so a sub-second-precise capture
-        # here can end up *after* a file written immediately after.
+        # ext4 (CI) stores mtime at second granularity — a sub-second
+        # start time can end up after a file written same-second.
         turn_started_at = Time.current.floor
         session = PiAgent.session(args: pi_args, cwd: workspace.workspace_dir.to_s)
         begin

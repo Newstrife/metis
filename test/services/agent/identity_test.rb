@@ -96,11 +96,8 @@ class Agent::IdentityTest < ActiveSupport::TestCase
   end
 
   test "tells the agent that artifacts/ is the publish channel back to the operator" do
-    # Without this the agent saves its outputs under arbitrary subdirs
-    # (retro/, output/, etc.) and the artifact-collection convention
-    # never triggers — see PR #15. The instruction is intentionally
-    # aggressive: "default to writing generated files there", because a
-    # softer phrasing left the agent leaving CSVs in workspace/ root.
+    # The phrasing is intentionally aggressive — a softer version left
+    # the agent leaving CSVs in workspace/ root.
     out = render
 
     assert_match(/artifacts\//, out)

@@ -10,9 +10,8 @@ class Message < ApplicationRecord
   has_many_attached :images
   has_many_attached :files
 
-  # Files the agent published from this turn (anything it wrote under
-  # workspace/artifacts/). Pulled from the runtime post-turn by
-  # ChatJob — never written by the user.
+  # Files the agent published this turn — populated by ChatJob from the
+  # runtime, never the user.
   has_many_attached :artifacts
 
   encrypts :content

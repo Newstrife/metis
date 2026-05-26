@@ -285,9 +285,8 @@ class ChatJobTest < ActiveSupport::TestCase
   end
 
   test "attaches the runtime's artifacts even when the stream raises mid-turn" do
-    # The runtime collects in its own ensure (pre-pause for E2b), so by
-    # the time the adapter re-raises, @runtime.artifacts may already
-    # contain partial work. Dropping it would hide the agent's output.
+    # The runtime collects in its own ensure, so partial work is already
+    # buffered by the time the adapter re-raises.
     crasher = Class.new do
       attr_reader :artifacts
       def initialize(artifacts) = (@artifacts = artifacts)

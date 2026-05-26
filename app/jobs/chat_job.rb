@@ -18,9 +18,8 @@ class ChatJob < ApplicationJob
     Rails.logger.error("ChatJob #{conversation_id} failed: #{e.class}: #{e.message}")
     fail_message(assistant_message, broadcaster, "The agent run failed.")
   ensure
-    # Attach whatever the runtime collected, even if the stream raised.
-    # Partial artifacts from before the crash are still on disk; dropping
-    # them would hide the agent's work from the operator.
+    # Even on crash — the runtime already buffered what the agent wrote
+    # before the stream raised.
     attach_artifacts(assistant_message, adapter, broadcaster) if adapter
   end
 
@@ -152,12 +151,7 @@ class ChatJob < ApplicationJob
     conversation.update_column(:runtime_state, info)
   end
 
-  # Pull files the agent published under workspace/artifacts/ into
-  # ActiveStorage on the assistant message and broadcast the strip.
-  # Runs in the perform's ensure block, so a turn that errored mid-stream
-  # still surfaces whatever partial files the agent already wrote.
-  # Failures are logged, never raised — same rule as the other post-turn
-  # projections.
+  # Logged-not-raised — a storage hiccup must not crash recovery.
   def attach_artifacts(assistant_message, adapter, broadcaster)
     return if adapter.artifacts.blank?
 

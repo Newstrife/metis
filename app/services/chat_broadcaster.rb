@@ -54,10 +54,8 @@ class ChatBroadcaster
     )
   end
 
-  # Called by ChatJob once artifacts published by the agent have been
-  # attached to the assistant message: re-renders the artifacts strip.
-  # The message card always carries an empty placeholder with this id,
-  # so a replace works even when this is the first one.
+  # Replaces into an always-rendered placeholder, so the first strip
+  # works the same as subsequent updates.
   def refresh_artifacts
     Turbo::StreamsChannel.broadcast_replace_to(
       @conversation,

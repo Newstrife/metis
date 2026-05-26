@@ -29,9 +29,7 @@ module Agent
     PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
     SKILLS_SOURCE = Rails.root.join(".pi/skills").freeze
     SKILLS_SUBPATH = ".pi/skills".freeze
-    # Convention path the agent writes to when it wants to publish a
-    # file back to the user (rendered into the assistant message). The
-    # directory is created lazily by the agent — not by Metis.
+    # Created lazily by the agent — Metis never provisions it.
     ARTIFACTS_SUBPATH = "artifacts".freeze
 
     def self.scratch(conversation)
