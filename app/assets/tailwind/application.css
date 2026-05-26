@@ -912,6 +912,15 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
     gap:10px;
   }
   .chat-title, .pane-title { font-size:17px; }
+  /* Long titles ellipsis on mobile. We constrain the inner text span
+     (not the h1) so the rename-input — which uses negative margins to
+     align its border with the title baseline — is unaffected. */
+  .chat-title [data-conversation-title-target="text"] {
+    display:block;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
   .chat-sub { margin-top:5px; gap:7px; }
   .chat-actions { gap:2px; }
   .chat-action { width:30px; height:30px; }
@@ -957,9 +966,9 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .profile-page { padding:18px 14px; }
   .profile-header { padding-left:46px; }
 
-  /* Share-popover anchored to the right edge of the chat-head can
-     drift off-screen when chat-head is tighter; clamp it. */
-  .flash-toast { top:8px; width:min(420px, calc(100vw - 24px)); }
+  /* Slide flash toasts below the hamburger so they don't share the
+     top-left corner with it. Also clamp width to viewport. */
+  .flash-toast { top:56px; width:min(420px, calc(100vw - 24px)); }
 
   /* Connector marketplace grid — single column feels better on phone. */
   .app-grid { grid-template-columns:1fr; }
