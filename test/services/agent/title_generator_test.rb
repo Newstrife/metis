@@ -88,6 +88,19 @@ class Agent::TitleGeneratorTest < ActiveSupport::TestCase
     end
   end
 
+  test "wraps the conversation context in <session> tags as a prompt-injection guard" do
+    captured = nil
+    fake_response = { "content" => [ { "text" => "Intro to Ruby" } ] }
+
+    with_stub(Rails.application.config.x.agent, :api_keys, -> { { "anthropic" => "test-key" } }) do
+      generator = Agent::TitleGenerator.new(@conversation)
+      generator.define_singleton_method(:post) { |_uri, body, _hdrs| captured = body; fake_response }
+      generator.call
+    end
+
+    assert_match(%r{<session>.*User: What is Ruby\?.*</session>}m, captured.dig(:messages, 0, :content))
+  end
+
   test "includes the assistant reply in the prompt context when available" do
     @conversation.messages.create!(
       role: :assistant, content: "Ruby is a dynamic language.", streaming_status: :done
