@@ -117,6 +117,9 @@ turbo-frame#main { display:contents; }
   display:flex; align-items:center; padding:9px 10px; border-radius:10px;
   cursor:pointer; color:var(--ink-2); font-size:13.5px; text-decoration:none;
   transition:background-color .13s,color .13s,box-shadow .13s;
+  /* Tiny gap so a selected row's rounded corner doesn't kiss a
+     hovered neighbour's corner and look like a pinched seam. */
+  margin-bottom:1px;
 }
 .convo .tt { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .convo:hover { background:var(--card); color:var(--ink); box-shadow:var(--sh-sm); }
@@ -523,6 +526,7 @@ turbo-frame#main { display:contents; }
   display:flex; align-items:center; gap:10px; padding:8px 10px;
   border-radius:10px; color:var(--ink-2); font-size:13.5px; text-decoration:none;
   transition:background-color .13s,color .13s,box-shadow .13s;
+  margin-bottom:1px;
 }
 .nav-item:hover { background:var(--card); color:var(--ink); box-shadow:var(--sh-sm); }
 .nav-item.on { background:var(--card); color:var(--ink); font-weight:600; box-shadow:var(--sh-md); }
