@@ -1,0 +1,36 @@
+<%# Inline share panel for the chat header. Rendered into #conversation_share
+    on the initial page and on every share/unshare request (Turbo Stream and
+    full-page fallback both reuse this partial). %>
+<div id="<%= dom_id(conversation, :share) %>"
+     class="share-panel"
+     data-share-target="panel"
+     data-shared="<%= conversation.shared? %>">
+  <% if conversation.shared? %>
+    <% url = shared_conversation_url(token: conversation.share_token) %>
+    <p class="share-panel-label">Anyone with this link can view the conversation.</p>
+    <div class="share-panel-row">
+      <input type="text"
+             class="share-panel-url"
+             readonly
+             value="<%= url %>"
+             data-share-target="url"
+             data-action="focus->share#selectAll">
+      <button type="button"
+              class="share-panel-copy"
+              data-action="click->share#copy"
+              data-share-target="copyButton">Copy</button>
+    </div>
+    <%= button_to "Revoke link",
+          share_conversation_path(conversation),
+          method: :delete,
+          class: "share-panel-revoke",
+          form: { data: { turbo_stream: true } } %>
+  <% else %>
+    <p class="share-panel-label">Create a public link so anyone can view this conversation.</p>
+    <%= button_to "Create share link",
+          share_conversation_path(conversation),
+          method: :post,
+          class: "share-panel-create",
+          form: { data: { turbo_stream: true } } %>
+  <% end %>
+</div>

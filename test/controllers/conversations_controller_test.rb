@@ -60,6 +60,46 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "share mints a token and renders the panel via turbo stream" do
+    conversation = @user.conversations.create!(title: "to share")
+    sign_in @user
+
+    post share_conversation_path(conversation), as: :turbo_stream
+    assert_response :success
+    assert conversation.reload.shared?
+    assert_match conversation.share_token, @response.body
+  end
+
+  test "share is idempotent and keeps the same token" do
+    conversation = @user.conversations.create!(title: "stable")
+    sign_in @user
+
+    post share_conversation_path(conversation), as: :turbo_stream
+    first_token = conversation.reload.share_token
+    post share_conversation_path(conversation), as: :turbo_stream
+    assert_equal first_token, conversation.reload.share_token
+  end
+
+  test "unshare clears the share token" do
+    conversation = @user.conversations.create!(title: "revoke me")
+    conversation.generate_share_token!
+    sign_in @user
+
+    delete share_conversation_path(conversation), as: :turbo_stream
+    assert_response :success
+    assert_nil conversation.reload.share_token
+  end
+
+  test "share is scoped to the current user's conversations" do
+    other = User.create!(email: "other@example.com", password: "password123")
+    conversation = other.conversations.create!(title: "not mine")
+    sign_in @user
+
+    post share_conversation_path(conversation), as: :turbo_stream
+    assert_response :not_found
+    assert_nil conversation.reload.share_token
+  end
+
   test "sidebar paginates with a sentinel when more pages exist" do
     sign_in @user
     stub_const(ApplicationController, :SIDEBAR_PAGE_SIZE, 2) do

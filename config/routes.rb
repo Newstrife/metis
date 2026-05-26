@@ -18,9 +18,13 @@ Rails.application.routes.draw do
       post :cancel
       post :archive
       post :unarchive
+      post :share
+      delete :share, action: :unshare
     end
     resources :messages, only: :create
   end
+
+  get "/share/:token", to: "shared_conversations#show", as: :shared_conversation
 
   # Account settings live behind a single /settings shell — profile,
   # connectors, and future sections (api keys, notifications, …) share

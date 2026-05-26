@@ -167,4 +167,22 @@ class ConversationTest < ActiveSupport::TestCase
     @conversation.apply_generated_title!(nil)
     assert_nil @conversation.title
   end
+
+  test "shared? is false until a share token is minted" do
+    refute @conversation.shared?
+    @conversation.generate_share_token!
+    assert @conversation.shared?
+  end
+
+  test "generate_share_token! returns the same token on repeat calls" do
+    token = @conversation.generate_share_token!
+    assert_equal token, @conversation.generate_share_token!
+  end
+
+  test "revoke_share! clears the share token" do
+    @conversation.generate_share_token!
+    @conversation.revoke_share!
+    refute @conversation.shared?
+    assert_nil @conversation.reload.share_token
+  end
 end
