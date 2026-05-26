@@ -3,11 +3,20 @@ module Agent
     # Interface every runtime implements. A runtime decides where the
     # agent process physically runs and how its filesystem persists.
     class Base
+      # Each artifact is held in memory at least once during attach;
+      # drop oversized files rather than OOM the worker.
+      MAX_ARTIFACT_BYTES = 10.megabytes
+
       attr_reader :conversation
 
       def initialize(conversation:)
         @conversation = conversation
+        @artifacts = []
       end
+
+      # Files published during the most recent #run. Each entry is
+      # { filename:, io: }, ready to pass to ActiveStorage#attach.
+      attr_reader :artifacts
 
       # Directory the agent should pass to `pi --session-dir`.
       def session_dir
@@ -95,6 +104,30 @@ module Agent
         end
 
         env
+      end
+
+      protected
+
+      # mtime-windowed so cleanup of artifacts/ stays the runtime's
+      # job — old turns' files fall outside the window.
+      def collect_host_artifacts(dir:, since:)
+        return unless dir.directory?
+
+        Dir.glob(dir.join("**/*"), File::FNM_DOTMATCH).each do |path|
+          next if File.directory?(path)
+          next unless File.mtime(path) >= since
+
+          size = File.size(path)
+          if size > MAX_ARTIFACT_BYTES
+            Rails.logger.warn("Skipping oversized artifact #{path} (#{size} bytes)")
+            next
+          end
+
+          rel = Pathname.new(path).relative_path_from(dir).to_s
+          @artifacts << { filename: rel, io: File.open(path, "rb") }
+        end
+      rescue StandardError => e
+        Rails.logger.warn("Artifact collection failed for conversation #{conversation.id}: #{e.message}")
       end
 
       private

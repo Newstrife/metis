@@ -11,18 +11,22 @@ class ChatJob < ApplicationJob
     user_message = Message.find(user_message_id)
     assistant_message = Message.find(assistant_message_id)
     broadcaster = ChatBroadcaster.new(conversation, assistant_message)
+    adapter = Agent::Adapters.for(conversation)
 
-    run(conversation, user_message, assistant_message, broadcaster)
+    run(conversation, user_message, assistant_message, broadcaster, adapter)
   rescue StandardError => e
     Rails.logger.error("ChatJob #{conversation_id} failed: #{e.class}: #{e.message}")
     fail_message(assistant_message, broadcaster, "The agent run failed.")
+  ensure
+    # Even on crash — the runtime already buffered what the agent wrote
+    # before the stream raised.
+    attach_artifacts(assistant_message, adapter, broadcaster) if adapter
   end
 
   private
 
-  def run(conversation, user_message, assistant_message, broadcaster)
+  def run(conversation, user_message, assistant_message, broadcaster, adapter)
     assistant_message.update!(streaming_status: :streaming)
-    adapter = Agent::Adapters.for(conversation)
     text = +""
     reasoning = +""
     tools = {}
@@ -145,6 +149,22 @@ class ChatJob < ApplicationJob
     return if info.blank? || info == conversation.runtime_state
 
     conversation.update_column(:runtime_state, info)
+  end
+
+  # Logged-not-raised — a storage hiccup must not crash recovery.
+  def attach_artifacts(assistant_message, adapter, broadcaster)
+    return if adapter.artifacts.blank?
+
+    adapter.artifacts.each do |artifact|
+      assistant_message.artifacts.attach(
+        io: artifact[:io],
+        filename: artifact[:filename],
+        content_type: artifact[:content_type]
+      )
+    end
+    broadcaster&.refresh_artifacts
+  rescue StandardError => e
+    Rails.logger.warn("Artifact attach failed for message #{assistant_message.id}: #{e.message}")
   end
 
   # Mark the turn errored after a crash. Reloads first to drop any

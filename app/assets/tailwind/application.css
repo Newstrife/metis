@@ -380,6 +380,21 @@ turbo-frame#main { display:contents; }
 .att-name { font-size:13px; font-weight:500; color:var(--ink); }
 .att-size { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
 
+/* artifacts */
+.msg-artifacts { display:flex; flex-wrap:wrap; gap:8px; }
+.msg-artifacts:not(:empty) { margin-top:10px; }
+.art-image-link { display:block; }
+.art-image { display:block; max-height:170px; border-radius:10px; border:1px solid var(--line); }
+.art-file {
+  display:flex; align-items:center; gap:8px; text-decoration:none;
+  background:var(--bg); border:1px solid var(--line); border-radius:10px;
+  padding:8px 11px; transition:border-color .13s;
+}
+.art-file:hover { border-color:var(--line-2); }
+.art-file svg { width:16px; height:16px; color:var(--ink-3); flex:none; }
+.art-name { font-size:13px; font-weight:500; color:var(--ink); }
+.art-size { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
+
 /* ───────────── composer ───────────── */
 .composer-wrap { padding:12px 28px 18px; }
 .composer-inner { max-width:760px; margin:0 auto; }

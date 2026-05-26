@@ -10,6 +10,10 @@ class Message < ApplicationRecord
   has_many_attached :images
   has_many_attached :files
 
+  # Files the agent published this turn — populated by ChatJob from the
+  # runtime, never the user.
+  has_many_attached :artifacts
+
   encrypts :content
   encrypts :reasoning
 
@@ -32,6 +36,10 @@ class Message < ApplicationRecord
 
   def attachments?
     images.attached? || files.attached?
+  end
+
+  def artifacts?
+    artifacts.attached?
   end
 
   # End-to-end turn duration in seconds; nil until the turn finishes.

@@ -141,6 +141,17 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     assert session.closed?, "session closed by the runtime"
   end
 
+  test "collects artifacts from the bind-mounted host workspace post-turn" do
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        FileUtils.mkdir_p(@workspace.artifacts_dir)
+        File.write(@workspace.artifacts_dir.join("chart.png"), "fakepng")
+      end
+    end
+
+    assert_equal [ "chart.png" ], @runtime.artifacts.map { |a| a[:filename] }
+  end
+
   test "files the agent writes survive into the next turn via the persistent bind mount" do
     # Drop something into the workspace during the first turn; assert it
     # is still there at the start of the second turn. This is the core

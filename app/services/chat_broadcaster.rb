@@ -54,6 +54,17 @@ class ChatBroadcaster
     )
   end
 
+  # Replaces into an always-rendered placeholder, so the first strip
+  # works the same as subsequent updates.
+  def refresh_artifacts
+    Turbo::StreamsChannel.broadcast_replace_to(
+      @conversation,
+      target: "#{base_id}_artifacts",
+      partial: "messages/artifacts",
+      locals: { message: @message }
+    )
+  end
+
   # Called by ChatJob once the turn is persisted: re-renders the
   # reasoning/tools disclosure from the saved message, which collapses
   # it (the turn is now done) — or removes it if there was neither.

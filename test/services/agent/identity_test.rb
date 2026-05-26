@@ -95,6 +95,17 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/projected inputs/i, out)
   end
 
+  test "tells the agent that artifacts/ is the publish channel back to the operator" do
+    # The phrasing is intentionally aggressive — a softer version left
+    # the agent leaving CSVs in workspace/ root.
+    out = render
+
+    assert_match(/artifacts\//, out)
+    assert_match(/attached to\s+your reply/i, out)
+    assert_match(/default to writing\s+generated files there/i, out)
+    assert_match(/when in\s+doubt, publish/i, out)
+  end
+
   test "tells the agent to honor project AGENTS.md/CLAUDE.md when entering a subdirectory" do
     # pi only parent-walks context files from cwd at session start, so a
     # project at workspace/foo/AGENTS.md is never auto-loaded. The standing

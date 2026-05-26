@@ -102,6 +102,64 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     assert session.closed?
   end
 
+  test "collects files the agent wrote under workspace/artifacts/" do
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        FileUtils.mkdir_p(@workspace.artifacts_dir)
+        File.write(@workspace.artifacts_dir.join("report.csv"), "a,b\n1,2\n")
+      end
+    end
+
+    assert_equal 1, @runtime.artifacts.size
+    artifact = @runtime.artifacts.first
+    assert_equal "report.csv", artifact[:filename]
+    assert_equal "a,b\n1,2\n", artifact[:io].read
+  end
+
+  test "preserves the subdirectory in the filename so siblings don't collide" do
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        FileUtils.mkdir_p(@workspace.artifacts_dir.join("reports"))
+        FileUtils.mkdir_p(@workspace.artifacts_dir.join("drafts"))
+        File.write(@workspace.artifacts_dir.join("reports/q4.csv"), "final")
+        File.write(@workspace.artifacts_dir.join("drafts/q4.csv"), "wip")
+      end
+    end
+
+    names = @runtime.artifacts.map { |a| a[:filename] }.sort
+    assert_equal [ "drafts/q4.csv", "reports/q4.csv" ], names
+  end
+
+  test "skips artifacts above the size cap" do
+    # Sparse file — File.size reports 11MB without actually using disk.
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        FileUtils.mkdir_p(@workspace.artifacts_dir)
+        File.write(@workspace.artifacts_dir.join("ok.txt"), "small")
+        File.open(@workspace.artifacts_dir.join("huge.bin"), "w") { |f| f.truncate(11.megabytes) }
+      end
+    end
+
+    names = @runtime.artifacts.map { |a| a[:filename] }
+    assert_equal [ "ok.txt" ], names
+  end
+
+  test "ignores artifacts older than this turn" do
+    FileUtils.mkdir_p(@workspace.artifacts_dir)
+    stale = @workspace.artifacts_dir.join("old.txt")
+    File.write(stale, "from a previous turn")
+    File.utime(stale.mtime - 3600, stale.mtime - 3600, stale)
+
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        File.write(@workspace.artifacts_dir.join("fresh.txt"), "from this turn")
+      end
+    end
+
+    names = @runtime.artifacts.map { |a| a[:filename] }
+    assert_equal [ "fresh.txt" ], names
+  end
+
   test "run stages the conversation's connectors into .mcp.json" do
     @conversation.team.connectors.create!(name: "fs", transport: :stdio, definition: { "command" => "npx" })
 
