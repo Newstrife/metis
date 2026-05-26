@@ -83,8 +83,35 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     assert_equal @user.email.split("@", 2).first, env["GIT_AUTHOR_NAME"]
   end
 
-  test "sandbox_env is empty when the user has no GitHub grant" do
+  test "sandbox_env is empty when the user has no GitHub or Google grant" do
     assert_empty @runtime.sandbox_env
+  end
+
+  test "sandbox_env carries GOOGLE_WORKSPACE_CLI_TOKEN when the user has a Google grant" do
+    @user.oauth_grants.create!(
+      provider: "google", access_token: "ya29.live-google", refresh_token: "rt",
+      expires_at: 1.hour.from_now,
+      scopes: "https://www.googleapis.com/auth/gmail.readonly"
+    )
+
+    env = @runtime.sandbox_env
+
+    assert_equal "ya29.live-google", env["GOOGLE_WORKSPACE_CLI_TOKEN"]
+    # gws would otherwise prompt for a desktop keyring inside the
+    # headless sandbox and hang the first call.
+    assert_equal "file", env["GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND"]
+  end
+
+  test "sandbox_env does not set GOOGLE_WORKSPACE_CLI_TOKEN without a Google grant" do
+    @user.oauth_grants.create!(
+      provider: "github", access_token: "ghu_live", refresh_token: "rt",
+      expires_at: 1.hour.from_now, scopes: "repo"
+    )
+
+    env = @runtime.sandbox_env
+
+    assert_nil env["GOOGLE_WORKSPACE_CLI_TOKEN"]
+    assert_nil env["GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND"]
   end
 
   test "sandbox_env carries GH_TOKEN for a GitHub grant with empty scopes (App OAuth)" do

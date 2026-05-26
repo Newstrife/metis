@@ -38,3 +38,12 @@ RUN npm install --global "@earendil-works/pi-coding-agent@${PI_VERSION}"
 # must be able to read the extension and write pi's session/cache state.
 RUN HOME=/tmp pi install npm:pi-mcp-adapter@2.7.0 \
  && chmod -R a+rwX /tmp/.pi
+
+# The Google Workspace CLI (gws) — how the agent reaches Gmail,
+# Calendar, and Drive. It reads its bearer from
+# GOOGLE_WORKSPACE_CLI_TOKEN, which Agent::Runtime::Base#sandbox_env
+# exports per turn from the user's Google OauthGrant. The shipped
+# `gws-*` skills in `.pi/skills/` are what tells the agent how to
+# drive it. The npm package downloads the matching pre-built binary
+# from the project's GitHub Releases.
+RUN npm install --global @googleworkspace/cli

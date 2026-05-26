@@ -61,6 +61,14 @@ class ConnectorTest < ActiveSupport::TestCase
     assert_not Connector.new(team: team, name: "x", transport: :http, definition: {}).valid?
   end
 
+  test "a cli connector saves with an empty definition (no MCP server to validate)" do
+    # CLI connectors (Gmail, Calendar, Drive via gws) skip the
+    # definition-shape check entirely — they don't render into
+    # .mcp.json at all.
+    assert Connector.new(team: team, name: "gmail", transport: :cli,
+                          catalog_key: "gmail", definition: {}).valid?
+  end
+
   test "credential_for prefers the member's own credential over the shared one" do
     connector = stdio_connector
     connector.save!

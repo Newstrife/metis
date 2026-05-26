@@ -45,7 +45,18 @@ reasons pi made them the other way*.
 6. **pi executes; Rails governs.** Skills, extensions, MCP — all pi.
    Rails holds the credentials and decides who sees what. It does not
    re-implement.
-7. **Built to share.** A tool you make is a tool your team can use.
+7. **MCP is the default connector transport.** Connectors speak MCP
+   through one pi extension
+   ([`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter)) —
+   see [`docs/connectors.md`](docs/connectors.md). CLI + skill is the
+   documented fallback when no MCP server exists or its distribution
+   is gated (today: Google Workspace through `gws`, because the
+   self-hosted `google_workspace_mcp` path depends on Google's MCP
+   Developer Preview, which excludes personal accounts). The fallback
+   has real cost — vendored skill files drift when the CLI changes,
+   and the catalog branches on transport — so the bar is "MCP
+   unavailable or gated," not "CLI feels easier."
+8. **Built to share.** A tool you make is a tool your team can use.
 
 ## What we won't build
 
@@ -57,13 +68,6 @@ have considered and rejected.
   pluggable-agent seam — it translates pi's wire into a canonical UI
   vocabulary (`Agent::UiEvent`). A different agent would be a different
   product, not a different adapter.
-- **Connectors that wrap CLIs.** A CLI assumes it is the top-level app
-  run by an interactive human. Metis has none of those. Connectors
-  speak MCP through one pi extension
-  ([`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter)) —
-  see [`docs/connectors.md`](docs/connectors.md). A service that ships
-  only a CLI is not a connector until an MCP server for it exists. We
-  are fine with that bet.
 - **A Rails-side MCP runtime.** Metis is the **host** — it holds
   credentials and stages `.mcp.json` per turn. pi speaks the protocol.
   Re-implementing MCP in Rails duplicates pi.

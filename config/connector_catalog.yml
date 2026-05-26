@@ -25,36 +25,31 @@ github:
     header: Authorization
     format: "Bearer %{token}"
 
+# The Google connectors (gmail, google_calendar, google_drive) do not
+# stage an MCP server. The agent reaches Google via the `gws` CLI
+# (https://github.com/googleworkspace/cli), which Runtime::Base#sandbox_env
+# authorises by exporting GOOGLE_WORKSPACE_CLI_TOKEN — the operator's
+# Google access token, the same one a workspace MCP server would have
+# been handed as a bearer. The bearer's scopes (the union of every
+# Google connector the user has connected) decide what `gws` can call.
+# The connector entries below therefore have no `definition.url` and
+# no `credential`; they exist as marketplace tiles + an oauth_scopes
+# manifest that drives the consent screen.
 gmail:
   name: Gmail
   category: Productivity
   description: Search, read, draft, and label Gmail messages as the operator.
-  transport: http
-  definition:
-    # Self-hosted google_workspace_mcp (chagel/google_workspace_mcp) in
-    # external OAuth mode (MCP_ENABLE_OAUTH21=true). The bearer is
-    # metis's per-user OauthGrant for Google; the server validates it
-    # against Google's userinfo API on every request and dispatches
-    # tools based on the token's scopes. The same server hosts every
-    # Google connector (Gmail, Calendar, …); the bearer's scopes decide
-    # what each one can call. Override WORKSPACE_MCP_URL in the
-    # environment when running it somewhere other than the dev shell.
-    url: <%= ENV.fetch("WORKSPACE_MCP_URL", "http://localhost:10299/mcp/") %>
+  transport: cli
   auth: oauth
   oauth_provider: google
-  # The full scope set workspace-mcp's `gmail:drafts` permission tier
-  # cumulatively expects: readonly (search/get) + labels + modify
-  # (label_thread/message) + compose (draft creation). Asking for them
-  # all up front means one consent screen covers every Gmail tool the
-  # server exposes.
+  # Mirrors what `gws gmail` needs end-to-end: readonly (search/get)
+  # + labels + modify (label_thread/message) + compose (draft/send).
+  # One consent screen covers every Gmail skill the agent has.
   oauth_scopes:
     - https://www.googleapis.com/auth/gmail.readonly
     - https://www.googleapis.com/auth/gmail.labels
     - https://www.googleapis.com/auth/gmail.modify
     - https://www.googleapis.com/auth/gmail.compose
-  credential:
-    header: Authorization
-    format: "Bearer %{token}"
 
 linear:
   name: Linear
@@ -80,20 +75,26 @@ google_calendar:
   name: Google Calendar
   category: Productivity
   description: Read and manage calendars, events, and invitations as the operator.
-  transport: http
-  definition:
-    # Same self-hosted workspace_mcp instance as gmail (see above) —
-    # the server dispatches calendar tools when the bearer carries
-    # calendar scopes.
-    url: <%= ENV.fetch("WORKSPACE_MCP_URL", "http://localhost:10299/mcp/") %>
+  transport: cli
   auth: oauth
   oauth_provider: google
-  # workspace-mcp's `calendar:full` tier: read + write on the user's
-  # calendars and event collection. One consent screen, all calendar
-  # tools (list/get/create/update/delete events, list calendars, …).
+  # Read + write on the user's calendars and event collection — what
+  # `gws calendar` (list/get/create/update/delete events, list
+  # calendars, +agenda, +insert) needs end-to-end.
   oauth_scopes:
     - https://www.googleapis.com/auth/calendar
     - https://www.googleapis.com/auth/calendar.events
-  credential:
-    header: Authorization
-    format: "Bearer %{token}"
+
+google_drive:
+  name: Google Drive
+  category: Productivity
+  description: Browse, search, and upload files in Google Drive as the operator.
+  transport: cli
+  auth: oauth
+  oauth_provider: google
+  # What `gws drive` needs end-to-end: list/get on the user's files
+  # and shared drives, plus create/update for +upload and metadata
+  # writes.
+  oauth_scopes:
+    - https://www.googleapis.com/auth/drive
+    - https://www.googleapis.com/auth/drive.file

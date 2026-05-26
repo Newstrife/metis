@@ -25,30 +25,27 @@ class ConnectorCatalogTest < ActiveSupport::TestCase
     assert_includes ConnectorCatalog.by_category.keys, "Development"
   end
 
-  test "ERB in the catalog yaml interpolates from the environment" do
-    # The Google connectors share one self-hosted google_workspace_mcp
-    # URL sourced from WORKSPACE_MCP_URL via ERB, so the deployment can
-    # move between dev and prod without a code change. Verify both
-    # entries pick up the same override.
-    original = ENV["WORKSPACE_MCP_URL"]
-    ENV["WORKSPACE_MCP_URL"] = "https://workspace-mcp.example/mcp/"
-    ConnectorCatalog.instance_variable_set(:@all, nil)
+  test "the Google connectors are cli-transport OAuth apps with no MCP definition" do
+    %w[gmail google_calendar google_drive].each do |key|
+      app = ConnectorCatalog.find(key)
 
-    assert_equal "https://workspace-mcp.example/mcp/",
-                 ConnectorCatalog.find("gmail").definition["url"]
-    assert_equal "https://workspace-mcp.example/mcp/",
-                 ConnectorCatalog.find("google_calendar").definition["url"]
-  ensure
-    original.nil? ? ENV.delete("WORKSPACE_MCP_URL") : ENV["WORKSPACE_MCP_URL"] = original
-    ConnectorCatalog.instance_variable_set(:@all, nil)
+      assert app, "expected catalog entry #{key.inspect}"
+      assert_equal "cli", app.transport,
+        "#{key} should be cli-transport (reached via the gws CLI, not an MCP server)"
+      assert app.oauth?, "#{key} should authenticate via OAuth"
+      assert_equal "google", app.oauth_provider
+      assert_empty app.definition,
+        "#{key} should not declare an MCP server definition"
+      assert_nil app.credential,
+        "#{key} should not declare a credential map (token flows through GOOGLE_WORKSPACE_CLI_TOKEN)"
+      assert app.oauth_scopes.any?, "#{key} should declare oauth scopes for the consent screen"
+    end
   end
 
-  test "google_calendar is an OAuth app with calendar scopes" do
+  test "google_calendar advertises read/write calendar scopes" do
     calendar = ConnectorCatalog.find("google_calendar")
 
     assert_equal "Google Calendar", calendar.name
-    assert calendar.oauth?
-    assert_equal "google", calendar.oauth_provider
     assert_includes calendar.oauth_scopes, "https://www.googleapis.com/auth/calendar"
     assert_includes calendar.oauth_scopes, "https://www.googleapis.com/auth/calendar.events"
   end

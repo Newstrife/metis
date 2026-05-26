@@ -32,7 +32,11 @@ module Agent
     private
 
     def connectors
-      @conversation.team.connectors
+      # cli-transport connectors (Gmail, Calendar, Drive via `gws`) have
+      # no MCP server to stage — the agent reaches them through a CLI on
+      # PATH, authorised by Runtime::Base#sandbox_env. Filter them out
+      # so they never land in .mcp.json.
+      @conversation.team.connectors.where.not(transport: Connector.transports[:cli])
     end
 
     # A connector's server entry for this conversation's member, or nil

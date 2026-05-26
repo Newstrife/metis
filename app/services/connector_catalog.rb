@@ -55,9 +55,7 @@ class ConnectorCatalog
 
     def load_apps
       # Process ERB before YAML so entries can interpolate deployment
-      # config (notably self-hosted MCP server URLs) from the
-      # environment, e.g.:
-      #   url: <%= ENV.fetch("WORKSPACE_MCP_URL", "http://localhost:8000/mcp/") %>
+      # config (e.g. a self-hosted MCP server URL) from the environment.
       raw = ERB.new(File.read(PATH), trim_mode: "-").result
       YAML.safe_load(raw).map do |key, attrs|
         App.new(
