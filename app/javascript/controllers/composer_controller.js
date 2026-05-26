@@ -21,11 +21,13 @@ export default class extends Controller {
     document.addEventListener("turbo:before-stream-render", this._streamRenderHandler)
     this._resetHandler = () => this._resetSize()
     this.element.form?.addEventListener("reset", this._resetHandler)
+    this._observeComposerSize()
   }
 
   disconnect() {
     document.removeEventListener("turbo:before-stream-render", this._streamRenderHandler)
     this.element.form?.removeEventListener("reset", this._resetHandler)
+    this._composerObserver?.disconnect()
   }
 
   submitOnEnter(event) {
@@ -47,6 +49,20 @@ export default class extends Controller {
 
   _resetSize() {
     this.element.style.height = ""
+  }
+
+  // Expose composer-wrap height as a CSS variable on the chat shell so
+  // siblings (the scroll-to-bottom pill) can anchor above the composer.
+  // ResizeObserver catches every cause — textarea growth, file
+  // previews, viewport resize changing wrap padding.
+  _observeComposerSize() {
+    const wrap = this.element.closest(".composer-wrap")
+    const chat = wrap?.closest(".chat")
+    if (!wrap || !chat || typeof ResizeObserver === "undefined") return
+    this._composerObserver = new ResizeObserver(() => {
+      chat.style.setProperty("--composer-h", wrap.offsetHeight + "px")
+    })
+    this._composerObserver.observe(wrap)
   }
 
   _handleStreamRender(event) {
