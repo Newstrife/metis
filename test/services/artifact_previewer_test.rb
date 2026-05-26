@@ -48,10 +48,10 @@ class ArtifactPreviewerTest < ActiveSupport::TestCase
     assert_equal "/blob/x", image.open_url(routes)
   end
 
-  test "Fallback has no open_url so the card only offers Download" do
+  test "Fallback has no open_url and no preview modes so the card only offers Download" do
     fallback = Previewers::Fallback.new(blob_with(content_type: "application/zip"))
     assert_nil fallback.open_url(Object.new)
-    assert_nil fallback.preview_partial
+    assert_empty fallback.preview_modes
   end
 
   test "Text head_lines returns UTF-8 even when the blob carries non-ASCII bytes" do
@@ -90,6 +90,28 @@ class ArtifactPreviewerTest < ActiveSupport::TestCase
 
     assert_equal "FILE", no_ext.kind_label
     assert_equal "FILE", long_ext.kind_label
+  end
+
+  test "Text exposes preview+source modes for markdown, source+preview for html, source-only for plain code" do
+    md = Previewers::Text.new(blob_with(content_type: "text/markdown", filename: "x.md"))
+    html = Previewers::Text.new(blob_with(content_type: "text/html", filename: "x.html"))
+    rb = Previewers::Text.new(blob_with(content_type: "application/octet-stream", filename: "x.rb"))
+
+    assert_equal %i[preview source], md.preview_modes
+    assert_equal :preview, md.default_mode
+    assert_equal %i[source preview], html.preview_modes
+    assert_equal :source, html.default_mode
+    assert_equal [ :source ], rb.preview_modes
+  end
+
+  test "Text routes each mode to the right partial" do
+    md = Previewers::Text.new(blob_with(content_type: "text/markdown", filename: "x.md"))
+    html = Previewers::Text.new(blob_with(content_type: "text/html", filename: "x.html"))
+
+    assert_equal "previewers/markdown_full", md.partial_for_mode(:preview)
+    assert_equal "previewers/text_full", md.partial_for_mode(:source)
+    assert_equal "previewers/html_full", html.partial_for_mode(:preview)
+    assert_equal "previewers/text_full", html.partial_for_mode(:source)
   end
 
   test "Csv head_rows returns UTF-8 cells even when the blob carries non-ASCII bytes" do

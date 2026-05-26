@@ -164,9 +164,10 @@ turbo-frame#main { display:contents; }
   outline:none; border-color:var(--accent);
   box-shadow:0 0 0 3px var(--accent-glow);
 }
+.flash-undo-form { display:inline; margin:0 0 0 8px; }
 .flash-undo {
   background:transparent; border:0; color:var(--ink); text-decoration:underline;
-  cursor:pointer; padding:0 0 0 8px; font:inherit;
+  cursor:pointer; padding:0; font:inherit;
 }
 .archived-list { padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
 .archived-row {
@@ -465,6 +466,22 @@ turbo-frame#main { display:contents; }
   text-decoration:none; color:var(--ink); border:1px solid var(--line);
 }
 .preview-download:hover { border-color:var(--line-2); }
+
+/* Segmented Source/Preview toggle in the preview header. */
+.preview-modes {
+  display:inline-flex; padding:2px; gap:0;
+  background:var(--canvas); border:1px solid var(--line); border-radius:8px;
+}
+.preview-mode {
+  font-size:12.5px; padding:4px 11px; border-radius:6px;
+  text-decoration:none; color:var(--ink-2);
+  transition:background .12s, color .12s;
+}
+.preview-mode:hover { color:var(--ink); }
+.preview-mode.is-on {
+  background:var(--card); color:var(--ink);
+  box-shadow:var(--sh-sm);
+}
 .preview-body { padding:22px; max-width:1100px; margin:0 auto; }
 .preview-text {
   background:var(--card); border:1px solid var(--line); border-radius:10px;
@@ -485,6 +502,10 @@ turbo-frame#main { display:contents; }
 }
 .preview-csv th { font-weight:600; color:var(--ink); background:var(--bg); }
 .preview-csv td { color:var(--ink-2); }
+.preview-html {
+  width:100%; height:calc(100vh - 110px);
+  background:var(--card); border:1px solid var(--line); border-radius:10px;
+}
 
 /* ───────────── composer ───────────── */
 .composer-wrap { padding:12px 28px 18px; }

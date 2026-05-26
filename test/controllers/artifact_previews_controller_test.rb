@@ -48,7 +48,46 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_user_session_path
   end
 
-  test "404s a renderer with no preview_partial (e.g. PDF — opened via blob URL, not this route)" do
+  test "renders the markdown preview by default; ?mode=source switches to raw" do
+    @message.artifacts.attach(
+      io: StringIO.new("# Heading\n\nbody **bold**\n"),
+      filename: "notes.md", content_type: "text/markdown"
+    )
+    md_blob = ActiveStorage::Blob.find_by(filename: "notes.md")
+
+    sign_in @user
+    get artifact_preview_path(md_blob.signed_id)
+    assert_select "article.preview-markdown h1", text: "Heading"
+
+    get artifact_preview_path(md_blob.signed_id, mode: :source)
+    assert_select "pre.preview-text", text: /# Heading/
+  end
+
+  test "renders HTML source by default; ?mode=preview renders inside a sandboxed iframe" do
+    @message.artifacts.attach(
+      io: StringIO.new("<h1>Hi</h1>"),
+      filename: "page.html", content_type: "text/html"
+    )
+    html_blob = ActiveStorage::Blob.find_by(filename: "page.html")
+
+    sign_in @user
+    get artifact_preview_path(html_blob.signed_id)
+    assert_select "pre.preview-text", text: /<h1>Hi<\/h1>/
+
+    get artifact_preview_path(html_blob.signed_id, mode: :preview)
+    assert_select "iframe.preview-html"
+    assert_match(/<iframe[^>]*\bsandbox=""/, response.body,
+                 "sandbox must be present AND empty — the empty allowlist is the security guarantee")
+  end
+
+  test "an invalid ?mode= falls back to the renderer's default" do
+    sign_in @user
+    get artifact_preview_path(@blob.signed_id, mode: "nope")
+    assert_response :success
+    assert_select "table.preview-csv"
+  end
+
+  test "404s a renderer with no preview modes (e.g. PDF — opened via blob URL, not this route)" do
     @message.artifacts.attach(
       io: StringIO.new("%PDF-1.4 fake"),
       filename: "report.pdf",

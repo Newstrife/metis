@@ -28,9 +28,21 @@ module Previewers
     end
 
     def card_partial = "previewers/text_card"
-    def preview_partial = "previewers/text_full"
-
     def open_url(routes) = routes.artifact_preview_path(blob.signed_id)
+
+    def preview_modes
+      return %i[preview source] if markdown?
+      return %i[source preview] if html?
+
+      [ :source ]
+    end
+
+    def partial_for_mode(mode)
+      case mode
+      when :preview then markdown? ? "previewers/markdown_full" : "previewers/html_full"
+      when :source then "previewers/text_full"
+      end
+    end
 
     # First N lines for the card. Streams off the blob — never loads
     # the whole file into a string.
@@ -48,6 +60,11 @@ module Previewers
     def markdown?
       blob.content_type == "text/markdown" ||
         blob.filename.to_s.match?(/\.(md|markdown)\z/i)
+    end
+
+    def html?
+      blob.content_type == "text/html" ||
+        blob.filename.to_s.match?(/\.html?\z/i)
     end
 
     # blob.download returns ASCII-8BIT; scrub replaces invalid byte

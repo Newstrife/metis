@@ -7,10 +7,20 @@ class ArtifactPreviewsController < ApplicationController
     raise ActiveRecord::RecordNotFound unless @message&.conversation&.team&.members&.include?(current_user)
 
     @previewer = ArtifactPreviewer.for(@blob)
-    raise ActiveRecord::RecordNotFound unless @previewer.preview_partial
+    raise ActiveRecord::RecordNotFound if @previewer.preview_modes.empty?
+
+    @mode = resolve_mode
+    @partial = @previewer.partial_for_mode(@mode)
   end
 
   private
+
+  def resolve_mode
+    requested = params[:mode]&.to_sym
+    return requested if @previewer.preview_modes.include?(requested)
+
+    @previewer.default_mode
+  end
 
   # The blob has to be an :artifacts attachment on a Message — a
   # leaked signed_id for some other blob (a user upload, an avatar)

@@ -27,6 +27,13 @@ module Previewers
 
     def card_partial = "previewers/fallback_card"
     def open_url(_routes) = nil
-    def preview_partial = nil
+
+    # Modes the dedicated preview page supports. Empty = there is no
+    # preview page (the type opens directly via blob URL or is
+    # download-only). When 2+, the page renders a Source/Preview
+    # toggle in the header.
+    def preview_modes = []
+    def default_mode = preview_modes.first
+    def partial_for_mode(_mode) = nil
   end
 end

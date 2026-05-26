@@ -1,0 +1,4 @@
+<%# sandbox="" is the empty allowlist: no script, no forms, no top-nav,
+    no same-origin. The HTML can render visually but cannot do anything
+    dynamic in our origin. Don't drop this attribute. %>
+<iframe class="preview-html" sandbox="" srcdoc="<%= previewer.full_content %>"></iframe>
