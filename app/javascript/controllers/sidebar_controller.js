@@ -15,9 +15,18 @@ export default class extends Controller {
 
   disconnect() {
     document.removeEventListener("turbo:frame-load", this._onFrameLoad)
+    document.body.classList.remove("drawer-open")
   }
 
-  toggle() { this.element.classList.toggle("sidebar-open") }
-  open()   { this.element.classList.add("sidebar-open") }
-  close()  { this.element.classList.remove("sidebar-open") }
+  toggle() {
+    this.element.classList.contains("sidebar-open") ? this.close() : this.open()
+  }
+  open() {
+    this.element.classList.add("sidebar-open")
+    document.body.classList.add("drawer-open")
+  }
+  close() {
+    this.element.classList.remove("sidebar-open")
+    document.body.classList.remove("drawer-open")
+  }
 }
