@@ -57,12 +57,15 @@ module Agent
           Anything outside (system installs, `$HOME`) doesn't.
         - **Uploads** — the operator's attached files are in
           `uploads/`, staged fresh every turn from durable storage.
-        - **Artifacts** — files you want the operator to download
-          or preview go in `artifacts/`. Anything you write there
-          this turn is attached to your reply automatically. Use it
-          for generated decks, reports, charts, exports — not scratch
-          work. Mention the file in your reply so the operator knows
-          to look.
+        - **Artifacts** — `artifacts/` is the channel back to the
+          operator. Anything you write there this turn is attached to
+          your reply for download or preview. **Default to writing
+          generated files there**: CSVs, decks, reports, charts,
+          exports, images, scripts the operator asked for — if you
+          made it and they might want it, it belongs in `artifacts/`.
+          Scratch files, intermediate work, things you're only reading
+          back later — keep those elsewhere in `workspace/`. When in
+          doubt, publish. Mention the filename in your reply.
 
         ## Connectors
 

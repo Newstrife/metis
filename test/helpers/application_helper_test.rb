@@ -89,6 +89,26 @@ class ApplicationHelperTest < ActionView::TestCase
     assert_equal "Activity", activity_summary(Message.new(streaming_status: :done))
   end
 
+  test "tool_call_display_name relabels bash commands that invoke a skill" do
+    args = { "command" => "cd /metis/workspace && python3 /metis/workspace/.pi/skills/pptx/scripts/embed_fonts.py" }
+    assert_equal "skill: pptx", tool_call_display_name("bash", args)
+  end
+
+  test "tool_call_display_name leaves ordinary bash commands alone" do
+    assert_equal "bash", tool_call_display_name("bash", { "command" => "ls -la" })
+  end
+
+  test "tool_call_display_name relabels read/write that touch a skill file" do
+    args = { "path" => "/metis/workspace/.pi/skills/gws-calendar/SKILL.md" }
+    assert_equal "skill: gws-calendar", tool_call_display_name("read", args)
+    assert_equal "skill: gws-calendar", tool_call_display_name("write", args)
+  end
+
+  test "tool_call_display_name tolerates nil or non-hash args" do
+    assert_equal "bash", tool_call_display_name("bash", nil)
+    assert_equal "bash", tool_call_display_name("bash", "not a hash")
+  end
+
   test "connector_authorize_path_for returns nil when the provider is not configured" do
     app = ConnectorCatalog.find("gmail")
 

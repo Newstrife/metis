@@ -1,6 +1,6 @@
 <details id="tool_<%= tool_call_id %>" class="toolcall<%= " err" if is_error %>" <%= "open" if local_assigns.fetch(:open, true) %>>
   <summary class="toolcall-head">
-    <span class="toolcall-fn"><%= name %></span>
+    <span class="toolcall-fn"><%= tool_call_display_name(name, args) %></span>
     <span class="toolcall-status"><%= status %></span>
   </summary>
 
