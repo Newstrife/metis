@@ -18,7 +18,7 @@ module Previewers
     def card_partial = "previewers/text_card"
     def preview_partial = "previewers/text_full"
 
-    def open_url(routes) = routes.artifact_preview_url(blob.signed_id)
+    def open_url(routes) = routes.artifact_preview_path(blob.signed_id)
 
     # First N lines for the card. Streams off the blob — never loads
     # the whole file into a string.

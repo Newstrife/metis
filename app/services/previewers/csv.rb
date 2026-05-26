@@ -9,7 +9,7 @@ module Previewers
     def card_partial = "previewers/csv_card"
     def preview_partial = "previewers/csv_full"
 
-    def open_url(routes) = routes.artifact_preview_url(blob.signed_id)
+    def open_url(routes) = routes.artifact_preview_path(blob.signed_id)
 
     def head_rows(limit: INLINE_ROW_LIMIT)
       take_rows(limit)

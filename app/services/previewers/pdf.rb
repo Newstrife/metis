@@ -5,7 +5,7 @@ module Previewers
     def self.handles?(content_type) = content_type == "application/pdf"
 
     def open_url(routes)
-      routes.rails_blob_url(blob, disposition: "inline")
+      routes.rails_blob_path(blob, disposition: "inline")
     end
   end
 end

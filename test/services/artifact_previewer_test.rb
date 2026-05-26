@@ -38,10 +38,12 @@ class ArtifactPreviewerTest < ActiveSupport::TestCase
                        ArtifactPreviewer.for(blob_with(content_type: "application/octet-stream"))
   end
 
-  test "Image renderer offers an open_url for non-SVG raster images" do
+  test "Image renderer uses a path helper so Turbo broadcasts get the right host" do
+    # Turbo broadcasts render outside a request context; *_url helpers
+    # fall back to example.org. Paths are host-agnostic.
     image = Previewers::Image.new(blob_with(content_type: "image/jpeg"))
     routes = Object.new
-    def routes.rails_blob_url(blob, **opts) = "/blob/#{blob.filename}"
+    def routes.rails_blob_path(blob, **opts) = "/blob/#{blob.filename}"
 
     assert_equal "/blob/x", image.open_url(routes)
   end
