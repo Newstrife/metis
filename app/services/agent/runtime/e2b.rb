@@ -27,6 +27,7 @@ module Agent
       SCOPE_DIR = "/home/user/metis".freeze
       SESSION_DIR = "#{SCOPE_DIR}/sessions".freeze
       WORKSPACE_DIR = "#{SCOPE_DIR}/workspace".freeze
+      ARTIFACTS_DIR = "#{WORKSPACE_DIR}/#{Agent::Workspace::ARTIFACTS_SUBPATH}".freeze
       # Outside SCOPE_DIR on purpose — extensions are code shipped from
       # this app, restaged each turn rather than relied on to persist
       # via pause/resume (so a pi-extensions update reaches an existing
@@ -61,9 +62,13 @@ module Agent
       def run(pi_args:, &block)
         sandbox = acquire_sandbox
         @sandbox_id = sandbox.sandbox_id
+        turn_started_at = Time.current
         execute(sandbox, pi_args: pi_args, &block)
       ensure
-        pause_sandbox(sandbox) if sandbox
+        if sandbox
+          collect_sandbox_artifacts(sandbox, since: turn_started_at) if turn_started_at
+          pause_sandbox(sandbox)
+        end
       end
 
       # Adds the microVM's id, so a turn can be traced to its sandbox in
@@ -207,6 +212,43 @@ module Agent
           rel = Pathname.new(path).relative_path_from(source).to_s
           sandbox.files.write("#{dest_root}/#{rel}", File.binread(path))
         end
+      end
+
+      # Walk artifacts/ inside the still-running sandbox, read files
+      # whose modified_time falls in the turn window, and buffer them
+      # for the caller to attach. MUST happen before #pause_sandbox —
+      # a paused sandbox's filesystem is unreachable. Logged-not-raised
+      # for the same reason as the other post-turn projections.
+      def collect_sandbox_artifacts(sandbox, since:)
+        return unless sandbox.files.exists?(ARTIFACTS_DIR)
+
+        list_sandbox_files(sandbox, ARTIFACTS_DIR).each do |entry|
+          next unless entry.modified_time && entry.modified_time >= since
+
+          bytes = sandbox.files.read(entry.path, format: "bytes")
+          @artifacts << { filename: File.basename(entry.path), io: StringIO.new(bytes) }
+        end
+      rescue StandardError => e
+        Rails.logger.warn("E2B artifact collection failed for conversation #{conversation.id}: #{e.message}")
+      end
+
+      # Recursive walk over the sandbox filesystem. The SDK's `list`
+      # takes a depth, but we walk explicitly so the call site doesn't
+      # have to guess an upper bound.
+      def list_sandbox_files(sandbox, root)
+        files = []
+        stack = [ root ]
+        until stack.empty?
+          entries = sandbox.files.list(stack.pop)
+          entries.each do |entry|
+            if entry.file?
+              files << entry
+            elsif entry.directory?
+              stack << entry.path
+            end
+          end
+        end
+        files
       end
 
       def transport_factory(sandbox, pi_args, envs)

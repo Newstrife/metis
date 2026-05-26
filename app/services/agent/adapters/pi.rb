@@ -56,6 +56,7 @@ module Agent
       def context_usage = @session_stats&.dig("contextUsage")
       def model_info = @model_info
       def runtime_info = @runtime.runtime_info
+      def artifacts = @runtime.artifacts
 
       def abort
         @session&.abort

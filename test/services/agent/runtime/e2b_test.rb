@@ -21,13 +21,30 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
 
   class FakeFiles
     attr_reader :writes
+    attr_accessor :exist_paths, :entries_by_dir, :read_responses
 
     def initialize
       @writes = {}
+      @exist_paths = []
+      @entries_by_dir = {}
+      @read_responses = {}
     end
 
     def write(path, data)
       @writes[path] = data
+    end
+
+    def exists?(path)
+      @exist_paths.include?(path)
+    end
+
+    def list(path, **)
+      @entries_by_dir.fetch(path, [])
+    end
+
+    def read(path, format: "text", **)
+      bytes = @read_responses.fetch(path)
+      format == "bytes" ? bytes.b : bytes
     end
   end
 
@@ -194,6 +211,59 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     end
 
     assert_equal({ "runtime" => "e2b", "sandbox_id" => "sbx-99" }, @runtime.runtime_info)
+  end
+
+  test "collects artifacts from the sandbox before the pause" do
+    art_path = "#{Agent::Runtime::E2b::ARTIFACTS_DIR}/report.csv"
+    paused_with_artifacts = nil
+
+    sandbox = FakeSandbox.new(
+      on_pause: ->(_s) { paused_with_artifacts = @runtime.artifacts.map { |a| a[:filename] } }
+    )
+    sandbox.files.exist_paths << Agent::Runtime::E2b::ARTIFACTS_DIR
+    sandbox.files.entries_by_dir[Agent::Runtime::E2b::ARTIFACTS_DIR] = [
+      E2B::Models::EntryInfo.new(
+        name: "report.csv", type: E2B::Models::FileType::FILE,
+        path: art_path, modified_time: Time.now + 5
+      )
+    ]
+    sandbox.files.read_responses[art_path] = "a,b\n1,2\n"
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_equal [ "report.csv" ], paused_with_artifacts,
+                 "artifacts collected before pause — a paused sandbox is unreachable"
+    assert_equal "a,b\n1,2\n", @runtime.artifacts.first[:io].read
+  end
+
+  test "skips artifacts whose modified_time predates the turn" do
+    art_path = "#{Agent::Runtime::E2b::ARTIFACTS_DIR}/old.csv"
+    sandbox = FakeSandbox.new
+    sandbox.files.exist_paths << Agent::Runtime::E2b::ARTIFACTS_DIR
+    sandbox.files.entries_by_dir[Agent::Runtime::E2b::ARTIFACTS_DIR] = [
+      E2B::Models::EntryInfo.new(
+        name: "old.csv", type: E2B::Models::FileType::FILE,
+        path: art_path, modified_time: Time.now - 3600
+      )
+    ]
+    sandbox.files.read_responses[art_path] = "stale"
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_empty @runtime.artifacts
+  end
+
+  test "no-op when the artifacts dir was never created" do
+    sandbox = FakeSandbox.new
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_empty @runtime.artifacts
   end
 
   test ".kill_sandbox swallows NotFoundError so eviction is idempotent" do

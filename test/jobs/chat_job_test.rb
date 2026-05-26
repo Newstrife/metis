@@ -3,16 +3,17 @@ require "test_helper"
 class ChatJobTest < ActiveSupport::TestCase
   # Fake adapter that replays a canned Agent::UiEvent stream.
   class FakeAdapter
-    attr_reader :native_session_id, :token_totals, :context_usage, :model_info, :runtime_info
+    attr_reader :native_session_id, :token_totals, :context_usage, :model_info, :runtime_info, :artifacts
 
     def initialize(events, native_session_id: nil, token_totals: nil, context_usage: nil,
-                   model_info: nil, runtime_info: nil)
+                   model_info: nil, runtime_info: nil, artifacts: [])
       @events = events
       @native_session_id = native_session_id
       @token_totals = token_totals
       @context_usage = context_usage
       @model_info = model_info
       @runtime_info = runtime_info
+      @artifacts = artifacts
     end
 
     def stream(_input, images: [], files: [])
@@ -261,6 +262,26 @@ class ChatJobTest < ActiveSupport::TestCase
     @assistant_message.reload
     assert_not_nil @assistant_message.finished_at
     assert_operator @assistant_message.duration, :>, 0
+  end
+
+  test "attaches the runtime's artifacts to the assistant message" do
+    artifacts = [
+      { filename: "report.csv", io: StringIO.new("a,b\n1,2\n"), content_type: "text/csv" },
+      { filename: "chart.png",  io: StringIO.new("fakepng"),    content_type: "image/png" }
+    ]
+    run_with([ Agent::UiEvent.new(:turn_finished) ], artifacts: artifacts)
+
+    @assistant_message.reload
+    assert_equal 2, @assistant_message.artifacts.count
+    names = @assistant_message.artifacts.map { |a| a.filename.to_s }
+    assert_includes names, "report.csv"
+    assert_includes names, "chart.png"
+  end
+
+  test "no artifacts attached when the runtime published none" do
+    run_with([ Agent::UiEvent.new(:turn_finished) ])
+
+    assert_not @assistant_message.reload.artifacts.attached?
   end
 
   test "stamps finished_at even when the turn fails" do

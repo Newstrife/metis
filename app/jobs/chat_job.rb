@@ -60,8 +60,10 @@ class ChatJob < ApplicationJob
     persist_context_usage(conversation, adapter)
     persist_agent_model(conversation, adapter)
     persist_runtime(conversation, adapter)
+    attach_artifacts(assistant_message, adapter)
     conversation.touch
     broadcaster.refresh_usage
+    broadcaster.refresh_artifacts if assistant_message.artifacts?
     broadcaster.collapse_activity
     broadcaster.refresh_composer
   end
@@ -145,6 +147,21 @@ class ChatJob < ApplicationJob
     return if info.blank? || info == conversation.runtime_state
 
     conversation.update_column(:runtime_state, info)
+  end
+
+  # Pull files the agent published under workspace/artifacts/ into
+  # ActiveStorage on the assistant message. Failures are logged, never
+  # raised — same rule as the other post-turn projections.
+  def attach_artifacts(assistant_message, adapter)
+    Array(adapter.artifacts).each do |artifact|
+      assistant_message.artifacts.attach(
+        io: artifact[:io],
+        filename: artifact[:filename],
+        content_type: artifact[:content_type]
+      )
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Artifact attach failed for message #{assistant_message.id}: #{e.message}")
   end
 
   # Mark the turn errored after a crash. Reloads first to drop any

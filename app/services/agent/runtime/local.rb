@@ -25,10 +25,12 @@ module Agent
         workspace.stage_mcp_config(mcp_config)
         workspace.stage_identity(identity_content)
         workspace.stage_skills
+        turn_started_at = Time.current
         session = PiAgent.session(args: pi_args, cwd: workspace.workspace_dir.to_s)
         begin
           yield session
         ensure
+          collect_host_artifacts(dir: workspace.artifacts_dir, since: turn_started_at)
           session.close
         end
       end

@@ -29,6 +29,10 @@ module Agent
     PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
     SKILLS_SOURCE = Rails.root.join(".pi/skills").freeze
     SKILLS_SUBPATH = ".pi/skills".freeze
+    # Convention path the agent writes to when it wants to publish a
+    # file back to the user (rendered into the assistant message). The
+    # directory is created lazily by the agent — not by Metis.
+    ARTIFACTS_SUBPATH = "artifacts".freeze
 
     def self.scratch(conversation)
       new(conversation, SCRATCH_ROOT)
@@ -51,6 +55,7 @@ module Agent
     def session_dir = scope_dir.join("sessions")
     def workspace_dir = scope_dir.join("workspace")
     def uploads_dir = workspace_dir.join("uploads")
+    def artifacts_dir = workspace_dir.join(ARTIFACTS_SUBPATH)
 
     # Discard any stale scope and recreate it empty — for a runtime that
     # repopulates it from the archive.

@@ -7,7 +7,16 @@ module Agent
 
       def initialize(conversation:)
         @conversation = conversation
+        @artifacts = []
       end
+
+      # Files the agent published during the most recent #run, under
+      # workspace/artifacts/. Each entry is { filename:, content_type:,
+      # io: }, ready to pass to ActiveStorage#attach. Populated by the
+      # runtime before #run finalizes (pre-pause for E2b, while the
+      # bind mount is reachable for Docker) so the caller can attach
+      # them after #run returns.
+      attr_reader :artifacts
 
       # Directory the agent should pass to `pi --session-dir`.
       def session_dir
@@ -95,6 +104,28 @@ module Agent
         end
 
         env
+      end
+
+      protected
+
+      # Collect files under a host directory that were created or
+      # touched at/after `since` into the @artifacts buffer for the
+      # caller to attach. mtime-windowed so cleanup of artifacts/ is
+      # not Metis's job — old turns' files simply fall outside the
+      # window. Failures are logged, never raised (a storage hiccup
+      # must not crash a turn the user already saw stream).
+      def collect_host_artifacts(dir:, since:)
+        return unless dir.directory?
+
+        Dir.glob(dir.join("**/*"), File::FNM_DOTMATCH).each do |path|
+          next if File.directory?(path)
+          next unless File.mtime(path) >= since
+
+          rel = Pathname.new(path).relative_path_from(dir).to_s
+          @artifacts << { filename: File.basename(rel), io: File.open(path, "rb") }
+        end
+      rescue StandardError => e
+        Rails.logger.warn("Artifact collection failed for conversation #{conversation.id}: #{e.message}")
       end
 
       private
