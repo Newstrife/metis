@@ -9,15 +9,23 @@ import { Controller } from "@hotwired/stimulus"
 // 2. Auto-focus — on initial load, Turbo Drive navigation, and after a
 //    streaming turn ends. Skipped on touch-primary devices and when the
 //    user is focused on something else (so we don't steal a selection).
+//
+// 3. Auto-resize — grows with content up to MAX_HEIGHT_PX, then scrolls.
+//    Resets to the natural `rows` size on form reset (post-submit).
+const MAX_HEIGHT_PX = 200
+
 export default class extends Controller {
   connect() {
     this._focusIfIdle()
     this._streamRenderHandler = this._handleStreamRender.bind(this)
     document.addEventListener("turbo:before-stream-render", this._streamRenderHandler)
+    this._resetHandler = () => this._resetSize()
+    this.element.form?.addEventListener("reset", this._resetHandler)
   }
 
   disconnect() {
     document.removeEventListener("turbo:before-stream-render", this._streamRenderHandler)
+    this.element.form?.removeEventListener("reset", this._resetHandler)
   }
 
   submitOnEnter(event) {
@@ -30,7 +38,16 @@ export default class extends Controller {
     form.requestSubmit()
   }
 
+  autoResize() {
+    this.element.style.height = "auto"
+    this.element.style.height = Math.min(this.element.scrollHeight, MAX_HEIGHT_PX) + "px"
+  }
+
   // ── private ──────────────────────────────────────────────────────────────
+
+  _resetSize() {
+    this.element.style.height = ""
+  }
 
   _handleStreamRender(event) {
     const stream = event.detail?.newStream || event.target

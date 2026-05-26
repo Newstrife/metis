@@ -21,7 +21,7 @@
       <div class="composer">
         <textarea name="content" rows="2"
                   data-controller="composer"
-                  data-action="keydown->composer#submitOnEnter"
+                  data-action="keydown->composer#submitOnEnter input->composer#autoResize"
                   placeholder="<%= new_chat ? "Ask anything to start a new chat…" : "Message the agent…" %>"></textarea>
         <div class="composer-bar">
           <label class="attach" title="Attach photos or files" aria-label="Attach photos or files">
