@@ -95,6 +95,16 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/projected inputs/i, out)
   end
 
+  test "tells the agent that artifacts/ is the publish channel back to the operator" do
+    # Without this the agent saves its outputs under arbitrary subdirs
+    # (retro/, output/, etc.) and the artifact-collection convention
+    # never triggers — see PR #15.
+    out = render
+
+    assert_match(/artifacts\//, out)
+    assert_match(/attached to your reply/i, out)
+  end
+
   test "tells the agent to honor project AGENTS.md/CLAUDE.md when entering a subdirectory" do
     # pi only parent-walks context files from cwd at session start, so a
     # project at workspace/foo/AGENTS.md is never auto-loaded. The standing
