@@ -76,8 +76,10 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
 
     get artifact_preview_path(html_blob.signed_id, mode: :preview)
     assert_select "iframe.preview-html"
-    assert_match(/<iframe[^>]*\bsandbox=""/, response.body,
-                 "sandbox must be present AND empty — the empty allowlist is the security guarantee")
+    assert_match(/<iframe[^>]*\bsandbox="allow-scripts"/, response.body,
+                 "sandbox must be present with allow-scripts but nothing else")
+    refute_match(/sandbox="[^"]*allow-same-origin/, response.body,
+                 "allow-same-origin alongside allow-scripts is equivalent to no sandbox — never add it")
   end
 
   test "an invalid ?mode= falls back to the renderer's default" do

@@ -1,4 +1,8 @@
-<%# sandbox="" is the empty allowlist: no script, no forms, no top-nav,
-    no same-origin. The HTML can render visually but cannot do anything
-    dynamic in our origin. Don't drop this attribute. %>
-<iframe class="preview-html" sandbox="" srcdoc="<%= previewer.full_content %>"></iframe>
+<%# sandbox="allow-scripts" — JS runs inside the iframe so demos work,
+    but the absence of allow-same-origin keeps the document in a unique
+    opaque origin: no access to our cookies, storage, DOM, or session.
+    Forms, top-nav, popups, and downloads stay blocked. Never add
+    allow-same-origin alongside allow-scripts — that combination is
+    equivalent to no sandbox at all. %>
+<iframe class="preview-html" sandbox="allow-scripts"
+        srcdoc="<%= previewer.full_content %>"></iframe>
