@@ -217,7 +217,8 @@ turbo-frame#main { display:contents; }
 }
 
 .scroll-to-bottom {
-  position:absolute; left:50%; bottom:130px;
+  position:absolute; left:50%;
+  bottom:calc(var(--composer-h, 110px) + 16px);
   display:inline-flex; align-items:center; gap:7px;
   padding:7px 13px 7px 10px; border-radius:10px;
   background:var(--canvas); border:1px solid var(--line);
@@ -950,8 +951,6 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .welcome { padding:24px 18px; }
   .welcome h1 { font-size:21px; }
   .welcome p { font-size:14px; }
-
-  .scroll-to-bottom { bottom:120px; }
 
   /* Share popover — keep it inside the viewport on narrow screens. */
   .share-panel {
