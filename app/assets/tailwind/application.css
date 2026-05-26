@@ -408,7 +408,9 @@ turbo-frame#main { display:contents; }
   width:100%; background:none; border:none; outline:none; resize:none;
   font-family:var(--fb); font-size:14.5px; color:var(--ink);
   padding:14px 17px 4px; line-height:1.55;
+  scrollbar-width:none;
 }
+.composer textarea::-webkit-scrollbar { display:none; }
 .composer textarea::placeholder { color:var(--faint); }
 .composer-bar { display:flex; align-items:center; gap:8px; padding:7px 9px 9px; }
 .composer-actions { display:contents; }
