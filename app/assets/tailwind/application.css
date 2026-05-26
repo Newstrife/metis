@@ -1102,6 +1102,11 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .chat-actions { gap:2px; }
   .chat-action { width:30px; height:30px; }
 
+  /* Power-user telemetry (model / runtime / context bar) lives behind
+     the conversation page on desktop. On mobile it stole a third of
+     the viewport for info you rarely act on — hide entirely. */
+  .ctx-group { display:none; }
+
   .archived-banner { padding:8px 14px; }
 
   .stream {
@@ -1121,8 +1126,14 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .att-image { max-height:140px; }
 
   .composer-wrap { padding:8px 14px 14px; }
-  .composer textarea { padding:12px 14px 4px; font-size:16px; }
-  .composer-bar { padding:6px 7px 7px; }
+  /* Start at a single comfortable line; autoResize takes over as the
+     user types, and form-reset returns to this CSS height. font-size
+     stays 16px to keep iOS from zooming on focus. */
+  .composer textarea {
+    height:44px; min-height:44px;
+    padding:11px 14px 4px; font-size:16px;
+  }
+  .composer-bar { padding:4px 7px 7px; }
 
   .welcome { padding:24px 18px; }
   .welcome h1 { font-size:21px; }
