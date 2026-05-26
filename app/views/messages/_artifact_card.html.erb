@@ -1,0 +1,37 @@
+<% open_url = previewer.open_url(self) %>
+<% base, ext = filename_parts(artifact.filename.to_s) %>
+<article class="art-card">
+  <div class="art-card-body-wrap">
+    <span class="art-kind" aria-label="<%= previewer.kind_label %>"><%= previewer.kind_label %></span>
+    <%= render previewer.card_partial, previewer: previewer, artifact: artifact %>
+  </div>
+  <footer class="art-card-foot">
+    <span class="art-name" title="<%= artifact.filename %>">
+      <span class="art-name-base"><%= base %></span><span class="art-ext"><%= ext %></span>
+    </span>
+    <span class="art-size"><%= number_to_human_size(artifact.byte_size) %></span>
+    <span class="art-actions">
+      <% if open_url %>
+        <%= link_to open_url, target: "_blank", rel: "noopener",
+                    class: "art-action", title: "Open", "aria-label": "Open" do %>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        <% end %>
+      <% end %>
+      <%= link_to rails_blob_path(artifact, disposition: "attachment"),
+                  class: "art-action art-action--ghost",
+                  title: "Download", "aria-label": "Download" do %>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      <% end %>
+    </span>
+  </footer>
+</article>

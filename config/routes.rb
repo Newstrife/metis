@@ -26,6 +26,9 @@ Rails.application.routes.draw do
 
   get "/share/:token", to: "shared_conversations#show", as: :shared_conversation
 
+  get "/artifacts/:signed_id/preview",
+      to: "artifact_previews#show", as: :artifact_preview
+
   # Account settings live behind a single /settings shell — profile,
   # connectors, and future sections (api keys, notifications, …) share
   # the same two-column layout. Helpers (`profile_path`,

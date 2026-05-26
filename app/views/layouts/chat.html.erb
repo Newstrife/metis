@@ -39,7 +39,7 @@
                     unarchive_conversation_path(flash[:undo_archive_id]),
                     method: :post,
                     class: "flash-undo",
-                    form: { data: { turbo_frame: "_top" } } %>
+                    form: { class: "flash-undo-form", data: { turbo_frame: "_top" } } %>
             <% end %>
           </div>
         <% end %>

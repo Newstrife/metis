@@ -1,0 +1,13 @@
+<% rows = previewer.head_rows %>
+<div class="art-card-body art-card-body--csv">
+  <table class="art-csv">
+    <% rows.each_with_index do |row, idx| %>
+      <% tag = idx.zero? ? "th" : "td" %>
+      <tr>
+        <% row.each do |cell| %>
+          <<%= tag %>><%= cell %></<%= tag %>>
+        <% end %>
+      </tr>
+    <% end %>
+  </table>
+</div>
