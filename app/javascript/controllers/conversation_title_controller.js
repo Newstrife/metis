@@ -7,6 +7,20 @@ export default class extends Controller {
   static targets = ["text", "input"]
   static values  = { url: String }
 
+  connect() {
+    this._syncDocumentTitle()
+    this._titleObserver = new MutationObserver(() => this._syncDocumentTitle())
+    this._titleObserver.observe(this.textTarget, { childList: true, characterData: true, subtree: true })
+  }
+
+  disconnect() {
+    this._titleObserver?.disconnect()
+  }
+
+  _syncDocumentTitle() {
+    document.title = this.textTarget.textContent.trim() || "Metis"
+  }
+
   edit() {
     this._previous = this.textTarget.textContent.trim()
     this.inputTarget.value = this._previous
