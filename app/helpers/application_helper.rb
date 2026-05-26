@@ -40,6 +40,15 @@ module ApplicationHelper
     format("%dm %02ds", minutes, rest)
   end
 
+  # Split a filename into [base, ext] so the artifact card can
+  # truncate the base with ellipsis while keeping the extension
+  # visible — "long_module_name.rb" → "long_modu…" + ".rb".
+  def filename_parts(filename)
+    ext = File.extname(filename)
+    base = ext.empty? ? filename : filename.delete_suffix(ext)
+    [ base, ext ]
+  end
+
   # pi has no skill primitive — a skill invocation surfaces as bash /
   # read / write whose args reference `.pi/skills/<name>/`. Detect that
   # so the activity log shows `skill: <name>` instead of a wall of bash.

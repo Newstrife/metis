@@ -68,6 +68,30 @@ class ArtifactPreviewerTest < ActiveSupport::TestCase
     assert_equal "héllo wörld\n", lines.first
   end
 
+  test "code files (Ruby, HTML, CSS, SQL, JS) route to the Text renderer by extension" do
+    # Marcel often returns application/octet-stream for source code,
+    # so the renderer falls back to extension matching.
+    %w[task.rb dashboard.html styles.css schema.sql app.ts main.go].each do |filename|
+      blob = blob_with(content_type: "application/octet-stream", filename: filename)
+      assert_instance_of Previewers::Text, ArtifactPreviewer.for(blob),
+                         "expected Text for #{filename}"
+    end
+  end
+
+  test "kind_label is the uppercase extension" do
+    assert_equal "RB", Previewers::Text.new(blob_with(content_type: "text/plain", filename: "task.rb")).kind_label
+    assert_equal "PNG", Previewers::Image.new(blob_with(content_type: "image/png", filename: "chart.png")).kind_label
+    assert_equal "JSON", Previewers::Text.new(blob_with(content_type: "application/json", filename: "data.json")).kind_label
+  end
+
+  test "kind_label falls back to FILE for missing or absurdly long extensions" do
+    no_ext = Previewers::Fallback.new(blob_with(content_type: "application/octet-stream", filename: "weirdbin"))
+    long_ext = Previewers::Fallback.new(blob_with(content_type: "application/octet-stream", filename: "x.somethingbig"))
+
+    assert_equal "FILE", no_ext.kind_label
+    assert_equal "FILE", long_ext.kind_label
+  end
+
   test "Csv head_rows returns UTF-8 cells even when the blob carries non-ASCII bytes" do
     user = User.create!(email: "enc-csv@example.com", password: "password123")
     msg = user.conversations.create!.messages.create!(role: :assistant, content: "x", streaming_status: :done)

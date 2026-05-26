@@ -5,7 +5,7 @@ module Previewers
     SUPPORTED = %w[image/png image/jpeg image/gif image/webp].freeze
     VARIANT_THRESHOLD = 2.megabytes
 
-    def self.handles?(content_type) = SUPPORTED.include?(content_type)
+    def self.handles?(blob) = SUPPORTED.include?(blob.content_type)
 
     def card_partial = "previewers/image_card"
 

@@ -5,15 +5,27 @@ module Previewers
   # Markdown gets the existing markdown helper on the preview page;
   # everything else stays inside a <pre>.
   class Text < Base
-    SUPPORTED = %w[
-      text/plain
-      text/markdown
-      application/json
-      application/xml
-      text/xml
+    # Content types we trust to be textual on sight. Marcel's
+    # detection for source code is unreliable (a .rb file often comes
+    # back as application/octet-stream), so we also accept anything
+    # with a known code extension below.
+    SUPPORTED_TYPES = %w[
+      text/plain text/markdown text/html text/css text/csv text/xml
+      application/json application/xml application/javascript
+      text/javascript text/x-ruby text/x-python
     ].freeze
 
-    def self.handles?(content_type) = SUPPORTED.include?(content_type)
+    SUPPORTED_EXTENSIONS = %w[
+      .txt .md .markdown .json .xml .html .htm .css
+      .js .ts .jsx .tsx .rb .py .go .rs .java .kt .swift
+      .c .h .cpp .hpp .cs .php .sql .sh .bash .zsh
+      .yml .yaml .toml .ini .conf .log .diff .patch
+    ].freeze
+
+    def self.handles?(blob)
+      SUPPORTED_TYPES.include?(blob.content_type) ||
+        SUPPORTED_EXTENSIONS.include?(File.extname(blob.filename.to_s).downcase)
+    end
 
     def card_partial = "previewers/text_card"
     def preview_partial = "previewers/text_full"

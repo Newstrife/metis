@@ -9,6 +9,6 @@ class ArtifactPreviewer
   ].freeze
 
   def self.for(blob)
-    RENDERERS.find { |klass| klass.handles?(blob.content_type) }.new(blob)
+    RENDERERS.find { |klass| klass.handles?(blob) }.new(blob)
   end
 end

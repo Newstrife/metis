@@ -1,6 +1,6 @@
 module Previewers
   # Catches anything no other renderer claims: download-only.
   class Fallback < Base
-    def self.handles?(_content_type) = true
+    def self.handles?(_blob) = true
   end
 end

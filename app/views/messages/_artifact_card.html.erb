@@ -1,8 +1,14 @@
 <% open_url = previewer.open_url(self) %>
+<% base, ext = filename_parts(artifact.filename.to_s) %>
 <article class="art-card">
-  <%= render previewer.card_partial, previewer: previewer, artifact: artifact %>
+  <div class="art-card-body-wrap">
+    <span class="art-kind" aria-label="<%= previewer.kind_label %>"><%= previewer.kind_label %></span>
+    <%= render previewer.card_partial, previewer: previewer, artifact: artifact %>
+  </div>
   <footer class="art-card-foot">
-    <span class="art-name"><%= artifact.filename %></span>
+    <span class="art-name" title="<%= artifact.filename %>">
+      <span class="art-name-base"><%= base %></span><span class="art-ext"><%= ext %></span>
+    </span>
     <span class="art-size"><%= number_to_human_size(artifact.byte_size) %></span>
     <span class="art-actions">
       <% if open_url %>

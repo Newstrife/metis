@@ -4,7 +4,9 @@ module Previewers
   # CSV both renders inline (first ~50 rows) and full on the preview
   # page. Always streamed — blob.download would load the whole file.
   class Csv < Base
-    def self.handles?(content_type) = content_type == "text/csv"
+    def self.handles?(blob)
+      blob.content_type == "text/csv" || blob.filename.to_s.match?(/\.csv\z/i)
+    end
 
     def card_partial = "previewers/csv_card"
     def preview_partial = "previewers/csv_full"
