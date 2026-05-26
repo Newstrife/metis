@@ -3,6 +3,14 @@ module Agent
     # Interface every runtime implements. A runtime decides where the
     # agent process physically runs and how its filesystem persists.
     class Base
+      # Per-file ceiling for artifact collection. Bigger files are
+      # skipped (with a warning) — both runtimes keep at least one
+      # in-memory copy per artifact in flight, and we'd rather drop a
+      # huge file than OOM the worker. If the operator needs to move
+      # something large, the agent should hand back a path, not stage
+      # it for download.
+      MAX_ARTIFACT_BYTES = 10.megabytes
+
       attr_reader :conversation
 
       def initialize(conversation:)
@@ -121,8 +129,14 @@ module Agent
           next if File.directory?(path)
           next unless File.mtime(path) >= since
 
+          size = File.size(path)
+          if size > MAX_ARTIFACT_BYTES
+            Rails.logger.warn("Skipping oversized artifact #{path} (#{size} bytes)")
+            next
+          end
+
           rel = Pathname.new(path).relative_path_from(dir).to_s
-          @artifacts << { filename: File.basename(rel), io: File.open(path, "rb") }
+          @artifacts << { filename: rel, io: File.open(path, "rb") }
         end
       rescue StandardError => e
         Rails.logger.warn("Artifact collection failed for conversation #{conversation.id}: #{e.message}")

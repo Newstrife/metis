@@ -227,8 +227,14 @@ module Agent
         list_sandbox_files(sandbox, ARTIFACTS_DIR).each do |entry|
           next unless entry.modified_time && entry.modified_time >= since
 
+          if entry.size > MAX_ARTIFACT_BYTES
+            Rails.logger.warn("Skipping oversized artifact #{entry.path} (#{entry.size} bytes)")
+            next
+          end
+
           bytes = sandbox.files.read(entry.path, format: "bytes")
-          @artifacts << { filename: File.basename(entry.path), io: StringIO.new(bytes) }
+          rel = entry.path.delete_prefix("#{ARTIFACTS_DIR}/")
+          @artifacts << { filename: rel, io: StringIO.new(bytes) }
         end
       rescue StandardError => e
         Rails.logger.warn("E2B artifact collection failed for conversation #{conversation.id}: #{e.message}")

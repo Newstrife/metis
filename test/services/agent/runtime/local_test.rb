@@ -116,6 +116,34 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     assert_equal "a,b\n1,2\n", artifact[:io].read
   end
 
+  test "preserves the subdirectory in the filename so siblings don't collide" do
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        FileUtils.mkdir_p(@workspace.artifacts_dir.join("reports"))
+        FileUtils.mkdir_p(@workspace.artifacts_dir.join("drafts"))
+        File.write(@workspace.artifacts_dir.join("reports/q4.csv"), "final")
+        File.write(@workspace.artifacts_dir.join("drafts/q4.csv"), "wip")
+      end
+    end
+
+    names = @runtime.artifacts.map { |a| a[:filename] }.sort
+    assert_equal [ "drafts/q4.csv", "reports/q4.csv" ], names
+  end
+
+  test "skips artifacts above the size cap" do
+    # Sparse file — File.size reports 11MB without actually using disk.
+    with_pi_session(fake_session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        FileUtils.mkdir_p(@workspace.artifacts_dir)
+        File.write(@workspace.artifacts_dir.join("ok.txt"), "small")
+        File.open(@workspace.artifacts_dir.join("huge.bin"), "w") { |f| f.truncate(11.megabytes) }
+      end
+    end
+
+    names = @runtime.artifacts.map { |a| a[:filename] }
+    assert_equal [ "ok.txt" ], names
+  end
+
   test "ignores artifacts older than this turn" do
     FileUtils.mkdir_p(@workspace.artifacts_dir)
     stale = @workspace.artifacts_dir.join("old.txt")

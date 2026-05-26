@@ -284,6 +284,32 @@ class ChatJobTest < ActiveSupport::TestCase
     assert_not @assistant_message.reload.artifacts.attached?
   end
 
+  test "attaches the runtime's artifacts even when the stream raises mid-turn" do
+    # The runtime collects in its own ensure (pre-pause for E2b), so by
+    # the time the adapter re-raises, @runtime.artifacts may already
+    # contain partial work. Dropping it would hide the agent's output.
+    crasher = Class.new do
+      attr_reader :artifacts
+      def initialize(artifacts) = (@artifacts = artifacts)
+      def stream(*) = raise "pi crashed"
+      def native_session_id = nil
+      def token_totals = nil
+      def context_usage = nil
+      def model_info = nil
+      def runtime_info = nil
+    end
+    artifacts = [ { filename: "partial.txt", io: StringIO.new("got this far"), content_type: "text/plain" } ]
+
+    with_adapter(crasher.new(artifacts)) do
+      ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
+    end
+
+    @assistant_message.reload
+    assert @assistant_message.errored?, "still marked errored — the crash is not silenced"
+    assert_equal 1, @assistant_message.artifacts.count
+    assert_equal "partial.txt", @assistant_message.artifacts.first.filename.to_s
+  end
+
   test "stamps finished_at even when the turn fails" do
     raiser = Object.new
     def raiser.stream(*)

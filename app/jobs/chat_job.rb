@@ -11,18 +11,23 @@ class ChatJob < ApplicationJob
     user_message = Message.find(user_message_id)
     assistant_message = Message.find(assistant_message_id)
     broadcaster = ChatBroadcaster.new(conversation, assistant_message)
+    adapter = Agent::Adapters.for(conversation)
 
-    run(conversation, user_message, assistant_message, broadcaster)
+    run(conversation, user_message, assistant_message, broadcaster, adapter)
   rescue StandardError => e
     Rails.logger.error("ChatJob #{conversation_id} failed: #{e.class}: #{e.message}")
     fail_message(assistant_message, broadcaster, "The agent run failed.")
+  ensure
+    # Attach whatever the runtime collected, even if the stream raised.
+    # Partial artifacts from before the crash are still on disk; dropping
+    # them would hide the agent's work from the operator.
+    attach_artifacts(assistant_message, adapter, broadcaster) if adapter
   end
 
   private
 
-  def run(conversation, user_message, assistant_message, broadcaster)
+  def run(conversation, user_message, assistant_message, broadcaster, adapter)
     assistant_message.update!(streaming_status: :streaming)
-    adapter = Agent::Adapters.for(conversation)
     text = +""
     reasoning = +""
     tools = {}
@@ -60,10 +65,8 @@ class ChatJob < ApplicationJob
     persist_context_usage(conversation, adapter)
     persist_agent_model(conversation, adapter)
     persist_runtime(conversation, adapter)
-    attach_artifacts(assistant_message, adapter)
     conversation.touch
     broadcaster.refresh_usage
-    broadcaster.refresh_artifacts if assistant_message.artifacts?
     broadcaster.collapse_activity
     broadcaster.refresh_composer
   end
@@ -150,16 +153,22 @@ class ChatJob < ApplicationJob
   end
 
   # Pull files the agent published under workspace/artifacts/ into
-  # ActiveStorage on the assistant message. Failures are logged, never
-  # raised — same rule as the other post-turn projections.
-  def attach_artifacts(assistant_message, adapter)
-    Array(adapter.artifacts).each do |artifact|
+  # ActiveStorage on the assistant message and broadcast the strip.
+  # Runs in the perform's ensure block, so a turn that errored mid-stream
+  # still surfaces whatever partial files the agent already wrote.
+  # Failures are logged, never raised — same rule as the other post-turn
+  # projections.
+  def attach_artifacts(assistant_message, adapter, broadcaster)
+    return if adapter.artifacts.blank?
+
+    adapter.artifacts.each do |artifact|
       assistant_message.artifacts.attach(
         io: artifact[:io],
         filename: artifact[:filename],
         content_type: artifact[:content_type]
       )
     end
+    broadcaster&.refresh_artifacts
   rescue StandardError => e
     Rails.logger.warn("Artifact attach failed for message #{assistant_message.id}: #{e.message}")
   end

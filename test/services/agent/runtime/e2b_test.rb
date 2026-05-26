@@ -257,6 +257,48 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     assert_empty @runtime.artifacts
   end
 
+  test "skips artifacts above the size cap" do
+    big_path = "#{Agent::Runtime::E2b::ARTIFACTS_DIR}/huge.bin"
+    ok_path = "#{Agent::Runtime::E2b::ARTIFACTS_DIR}/ok.csv"
+    sandbox = FakeSandbox.new
+    sandbox.files.exist_paths << Agent::Runtime::E2b::ARTIFACTS_DIR
+    sandbox.files.entries_by_dir[Agent::Runtime::E2b::ARTIFACTS_DIR] = [
+      E2B::Models::EntryInfo.new(name: "huge.bin", type: E2B::Models::FileType::FILE,
+                                 path: big_path, size: 11.megabytes, modified_time: Time.now + 5),
+      E2B::Models::EntryInfo.new(name: "ok.csv", type: E2B::Models::FileType::FILE,
+                                 path: ok_path, size: 12, modified_time: Time.now + 5)
+    ]
+    sandbox.files.read_responses[ok_path] = "a,b\n1,2\n"
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_equal [ "ok.csv" ], @runtime.artifacts.map { |a| a[:filename] }
+  end
+
+  test "preserves the subdirectory in the artifact filename" do
+    art_path = "#{Agent::Runtime::E2b::ARTIFACTS_DIR}/reports/q4.csv"
+    sandbox = FakeSandbox.new
+    sandbox.files.exist_paths << Agent::Runtime::E2b::ARTIFACTS_DIR
+    sandbox.files.entries_by_dir[Agent::Runtime::E2b::ARTIFACTS_DIR] = [
+      E2B::Models::EntryInfo.new(name: "reports", type: E2B::Models::FileType::DIRECTORY,
+                                 path: "#{Agent::Runtime::E2b::ARTIFACTS_DIR}/reports",
+                                 modified_time: Time.now + 5)
+    ]
+    sandbox.files.entries_by_dir["#{Agent::Runtime::E2b::ARTIFACTS_DIR}/reports"] = [
+      E2B::Models::EntryInfo.new(name: "q4.csv", type: E2B::Models::FileType::FILE,
+                                 path: art_path, size: 8, modified_time: Time.now + 5)
+    ]
+    sandbox.files.read_responses[art_path] = "csv data"
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_equal [ "reports/q4.csv" ], @runtime.artifacts.map { |a| a[:filename] }
+  end
+
   test "no-op when the artifacts dir was never created" do
     sandbox = FakeSandbox.new
     with_e2b(create: sandbox) do
