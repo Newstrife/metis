@@ -439,12 +439,15 @@ turbo-frame#main { display:contents; }
 }
 .art-name .art-ext { flex:none; color:var(--ink-2); }
 .art-card-foot .art-size { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
-.art-actions { display:flex; gap:6px; }
+.art-actions { display:flex; gap:4px; }
 .art-action {
-  font-size:12px; padding:4px 9px; border-radius:7px;
+  width:28px; height:28px; padding:0; border-radius:7px;
+  display:inline-flex; align-items:center; justify-content:center;
   text-decoration:none; color:var(--ink); border:1px solid var(--line);
-  background:var(--card); transition:border-color .13s, background .13s;
+  background:var(--card);
+  transition:border-color .13s, background .13s, color .13s;
 }
+.art-action svg { width:14px; height:14px; }
 .art-action:hover { border-color:var(--line-2); background:var(--canvas); }
 .art-action--ghost { color:var(--ink-3); border-color:transparent; background:transparent; }
 .art-action--ghost:hover { color:var(--ink); background:var(--canvas); }
@@ -460,8 +463,14 @@ turbo-frame#main { display:contents; }
   display:flex; align-items:center; gap:14px;
   padding:14px 22px; border-bottom:1px solid var(--line); background:var(--card);
 }
-.preview-back { font-size:13px; color:var(--ink-3); text-decoration:none; }
+.preview-back {
+  height:32px; box-sizing:border-box;
+  display:inline-flex; align-items:center; gap:6px;
+  padding:0 4px;
+  font-size:13px; color:var(--ink-3); text-decoration:none;
+}
 .preview-back:hover { color:var(--ink); }
+.preview-back-arrow { font-size:16px; line-height:1; }
 .preview-title {
   flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--ink);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0;
@@ -1142,6 +1151,20 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   /* Artifact cards span the chat width on phones. */
   .art-card { width:100%; }
   .preview-body { padding:14px; }
+
+  /* Preview header — tighten and ditch text labels so the controls
+     fit a 360px viewport. Fullscreen is hidden entirely: mobile is
+     already full screen, the button just crowds the row. */
+  .preview-header { padding:10px 12px; gap:8px; }
+  .preview-title { font-size:13px; }
+  .preview-action-label { display:none; }
+  .preview-back { padding:0; }
+  .preview-fs { display:none; }
+  .preview-download {
+    width:32px; padding:0; justify-content:center;
+  }
+  .preview-download::before { margin-right:0; }
+  .preview-mode { padding:0 9px; font-size:12px; }
 
   /* Auth pages already use a centered card; just trim padding. */
   body.auth-shell { padding:16px; }

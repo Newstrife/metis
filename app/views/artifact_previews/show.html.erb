@@ -1,7 +1,10 @@
 <% content_for :title, @blob.filename.to_s %>
 
 <header class="preview-header">
-  <%= link_to "← Back", conversation_path(@message.conversation), class: "preview-back" %>
+  <%= link_to conversation_path(@message.conversation), class: "preview-back" do %>
+    <span class="preview-back-arrow" aria-hidden="true">←</span>
+    <span class="preview-action-label">Back</span>
+  <% end %>
   <h1 class="preview-title"><%= @blob.filename %></h1>
 
   <% if @previewer.preview_modes.size > 1 %>
@@ -16,12 +19,15 @@
 
   <% if @partial == "previewers/html_full" %>
     <button type="button" class="preview-fs"
-            data-action="click->fullscreen#enter">Fullscreen</button>
+            data-action="click->fullscreen#enter">
+      <span class="preview-action-label">Fullscreen</span>
+    </button>
   <% end %>
 
-  <%= link_to "Download",
-              rails_blob_path(@blob, disposition: "attachment"),
-              class: "preview-download" %>
+  <%= link_to rails_blob_path(@blob, disposition: "attachment"),
+              class: "preview-download" do %>
+    <span class="preview-action-label">Download</span>
+  <% end %>
 </header>
 
 <main class="preview-body">
