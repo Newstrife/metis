@@ -55,7 +55,9 @@ module Agent
         workspace.stage_mcp_config(mcp_config)
         workspace.stage_identity(identity_content)
         workspace.stage_skills
-        turn_started_at = Time.current
+        # See Local#run — floored so an ext4 second-granularity mtime
+        # doesn't fall before a sub-second start time.
+        turn_started_at = Time.current.floor
         env = sandbox_env
         session = PiAgent.session(bin: "docker", args: docker_args(pi_args, env: env), env: env)
         begin

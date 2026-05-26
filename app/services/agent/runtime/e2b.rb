@@ -62,7 +62,9 @@ module Agent
       def run(pi_args:, &block)
         sandbox = acquire_sandbox
         @sandbox_id = sandbox.sandbox_id
-        turn_started_at = Time.current
+        # See Local#run — floored so a coarse-granularity mtime in the
+        # sandbox doesn't fall before a sub-second start time.
+        turn_started_at = Time.current.floor
         execute(sandbox, pi_args: pi_args, &block)
       ensure
         if sandbox
