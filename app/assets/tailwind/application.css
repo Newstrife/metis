@@ -466,20 +466,46 @@ turbo-frame#main { display:contents; }
   flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--ink);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0;
 }
-.preview-download {
-  font-size:13px; padding:5px 11px; border-radius:8px;
-  text-decoration:none; color:var(--ink); border:1px solid var(--line);
+/* Standalone action buttons (Fullscreen, Download). Sized to match
+   the segmented toggle below so the header reads as one row of
+   equally-weighted controls. */
+.preview-download, .preview-fs {
+  height:32px; box-sizing:border-box;
+  display:inline-flex; align-items:center;
+  padding:0 12px; border-radius:8px;
+  font-family:inherit; font-size:13px; font-weight:500; line-height:1;
+  text-decoration:none; color:var(--ink);
+  background:transparent; border:1px solid var(--line);
+  cursor:pointer;
+  transition:background .12s, border-color .12s, color .12s;
 }
-.preview-download:hover { border-color:var(--line-2); }
+.preview-download:hover, .preview-fs:hover {
+  background:var(--card); border-color:var(--line-2);
+}
+.preview-fs::before {
+  content:""; width:13px; height:13px; margin-right:6px;
+  background:currentColor;
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'/></svg>") center/contain no-repeat;
+          mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'/></svg>") center/contain no-repeat;
+}
+.preview-download::before {
+  content:""; width:13px; height:13px; margin-right:6px;
+  background:currentColor;
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3v13M6 11l6 6 6-6M5 21h14'/></svg>") center/contain no-repeat;
+          mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3v13M6 11l6 6 6-6M5 21h14'/></svg>") center/contain no-repeat;
+}
 
-/* Segmented Source/Preview toggle in the preview header. */
+/* Segmented Source/Preview toggle, sized to match standalone buttons. */
 .preview-modes {
-  display:inline-flex; padding:2px; gap:0;
-  background:var(--canvas); border:1px solid var(--line); border-radius:8px;
+  display:inline-flex; height:32px; box-sizing:border-box;
+  padding:3px; gap:0;
+  background:transparent; border:1px solid var(--line); border-radius:8px;
 }
 .preview-mode {
-  font-size:12.5px; padding:4px 11px; border-radius:6px;
-  text-decoration:none; color:var(--ink-2);
+  display:inline-flex; align-items:center;
+  padding:0 11px; border-radius:5px;
+  font-size:12.5px; font-weight:500; line-height:1;
+  text-decoration:none; color:var(--ink-3);
   transition:background .12s, color .12s;
 }
 .preview-mode:hover { color:var(--ink); }

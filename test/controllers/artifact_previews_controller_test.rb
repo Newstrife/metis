@@ -80,6 +80,13 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
                  "sandbox must be present with allow-scripts but nothing else")
     refute_match(/sandbox="[^"]*allow-same-origin/, response.body,
                  "allow-same-origin alongside allow-scripts is equivalent to no sandbox — never add it")
+    assert_select "button.preview-fs", text: "Fullscreen"
+  end
+
+  test "Fullscreen button does not appear in non-HTML previews" do
+    sign_in @user
+    get artifact_preview_path(@blob.signed_id)  # the CSV blob from setup
+    assert_select "button.preview-fs", false
   end
 
   test "an invalid ?mode= falls back to the renderer's default" do

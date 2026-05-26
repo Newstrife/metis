@@ -14,6 +14,11 @@
     </nav>
   <% end %>
 
+  <% if @partial == "previewers/html_full" %>
+    <button type="button" class="preview-fs"
+            data-action="click->fullscreen#enter">Fullscreen</button>
+  <% end %>
+
   <%= link_to "Download",
               rails_blob_path(@blob, disposition: "attachment"),
               class: "preview-download" %>

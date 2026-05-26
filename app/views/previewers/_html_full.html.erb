@@ -4,5 +4,6 @@
     Forms, top-nav, popups, and downloads stay blocked. Never add
     allow-same-origin alongside allow-scripts — that combination is
     equivalent to no sandbox at all. %>
-<iframe class="preview-html" sandbox="allow-scripts"
+<iframe class="preview-html" sandbox="allow-scripts" allow="fullscreen"
+        data-fullscreen-target="frame"
         srcdoc="<%= previewer.full_content %>"></iframe>
