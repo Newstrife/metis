@@ -24,6 +24,24 @@
     </div>
     <div class="chat-actions">
       <% unless @conversation.archived? %>
+        <div class="share" data-controller="share">
+          <button type="button"
+                  class="chat-action"
+                  data-action="click->share#toggle"
+                  title="Share conversation"
+                  aria-label="Share conversation">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="3.5" r="1.75"/>
+              <circle cx="4" cy="8" r="1.75"/>
+              <circle cx="12" cy="12.5" r="1.75"/>
+              <path d="M5.5 7.1l5-2.7"/>
+              <path d="M5.5 8.9l5 2.7"/>
+            </svg>
+          </button>
+          <%= render "conversations/share", conversation: @conversation %>
+        </div>
+
         <%= button_to archive_conversation_path(@conversation),
               method: :post,
               class: "chat-action",

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_25_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_25_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -79,12 +79,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_25_120000) do
     t.string "e2b_sandbox_id"
     t.jsonb "runtime_state", default: {}, null: false
     t.jsonb "settings", default: {}, null: false
+    t.string "share_token"
     t.bigint "team_id", null: false
     t.string "title"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["archived_at"], name: "index_conversations_on_archived_at"
     t.index ["e2b_sandbox_id"], name: "index_conversations_on_e2b_sandbox_id"
+    t.index ["share_token"], name: "index_conversations_on_share_token", unique: true
     t.index ["team_id"], name: "index_conversations_on_team_id"
     t.index ["user_id"], name: "index_conversations_on_user_id"
   end

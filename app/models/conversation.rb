@@ -21,6 +21,22 @@ class Conversation < ApplicationRecord
     archived_at.present?
   end
 
+  def shared?
+    share_token.present?
+  end
+
+  # Mint a public share token on first call; later calls return the
+  # existing token so the URL stays stable for already-distributed links.
+  def generate_share_token!
+    return share_token if shared?
+    update!(share_token: SecureRandom.urlsafe_base64(16))
+    share_token
+  end
+
+  def revoke_share!
+    update!(share_token: nil)
+  end
+
   # Soft-archive: hides the conversation from the active sidebar but
   # preserves all messages, attachments, and runtime state. Fully
   # reversible via #unarchive!. No-op if already archived.

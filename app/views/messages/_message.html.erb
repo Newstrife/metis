@@ -27,7 +27,9 @@
           <%= render "messages/attachments", message: message %>
         <% end %>
 
-        <%= render "messages/activity", message: message %>
+        <% unless local_assigns[:hide_activity] %>
+          <%= render "messages/activity", message: message %>
+        <% end %>
 
         <div id="<%= dom_id(message) %>_body"
              class="chat-content"><%= markdown(message.content) %></div>
