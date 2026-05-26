@@ -450,8 +450,13 @@ turbo-frame#main { display:contents; }
 .art-action--ghost:hover { color:var(--ink); background:var(--canvas); }
 
 /* preview page (standalone tab) */
-.preview-shell { background:var(--bg); min-height:100vh; color:var(--ink); font-family:var(--fb); }
+.preview-shell {
+  background:var(--bg); min-height:100vh; height:100vh; height:100dvh;
+  color:var(--ink); font-family:var(--fb);
+  display:flex; flex-direction:column;
+}
 .preview-header {
+  flex:none;
   display:flex; align-items:center; gap:14px;
   padding:14px 22px; border-bottom:1px solid var(--line); background:var(--card);
 }
@@ -482,16 +487,21 @@ turbo-frame#main { display:contents; }
   background:var(--card); color:var(--ink);
   box-shadow:var(--sh-sm);
 }
-.preview-body { padding:22px; max-width:1100px; margin:0 auto; }
-.preview-text {
+.preview-body {
+  flex:1; min-height:0; padding:22px;
+  display:flex; flex-direction:column;
+}
+/* Text-flow content reads better in a narrow column; HTML/CSV
+   want every pixel they can get. */
+.preview-text, .preview-markdown {
+  max-width:1100px; width:100%; margin-inline:auto;
   background:var(--card); border:1px solid var(--line); border-radius:10px;
+}
+.preview-text {
   padding:16px 18px; font-family:var(--fm); font-size:13px; line-height:1.55;
   color:var(--ink); white-space:pre-wrap; word-break:break-word; overflow-x:auto;
 }
-.preview-markdown {
-  background:var(--card); border:1px solid var(--line); border-radius:10px;
-  padding:18px 22px;
-}
+.preview-markdown { padding:18px 22px; }
 .preview-csv {
   width:100%; border-collapse:collapse;
   background:var(--card); border:1px solid var(--line); border-radius:10px;
@@ -503,7 +513,7 @@ turbo-frame#main { display:contents; }
 .preview-csv th { font-weight:600; color:var(--ink); background:var(--bg); }
 .preview-csv td { color:var(--ink-2); }
 .preview-html {
-  width:100%; height:calc(100vh - 110px);
+  flex:1; min-height:0; width:100%;
   background:var(--card); border:1px solid var(--line); border-radius:10px;
 }
 
