@@ -39,6 +39,13 @@ Rails.application.routes.draw do
     post "profile/detect_timezone", to: "profiles#detect_timezone",
                                     as: :detect_timezone_profile
     resources :connectors, except: :show
+    resources :skills, except: :show do
+      member do
+        post   "files",                   action: :add_file,      as: :add_file
+        delete "files/:file_id",          action: :destroy_file,  as: :destroy_file
+        get    "files/:file_id/download", action: :download_file, as: :download_file
+      end
+    end
   end
   get "/settings", to: redirect("/settings/profile")
 

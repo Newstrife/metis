@@ -33,8 +33,18 @@ module Agent
           yield session
         ensure
           collect_host_artifacts(dir: workspace.artifacts_dir, since: turn_started_at)
+          ingest_team_skills(slugs: touched_skill_slugs)
           session.close
         end
+      end
+
+      # Sync agent-written DB skills back from the host workspace.
+      # Logged-not-raised — a sync hiccup must not crash the turn the
+      # operator already saw stream.
+      def ingest_team_skills(slugs:)
+        workspace.ingest_team_skills(slugs: slugs, by: conversation.user)
+      rescue StandardError => e
+        Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
       end
 
       private

@@ -49,18 +49,6 @@ module ApplicationHelper
     [ base, ext ]
   end
 
-  # pi has no skill primitive — a skill invocation surfaces as bash /
-  # read / write whose args reference `.pi/skills/<name>/`. Detect that
-  # so the activity log shows `skill: <name>` instead of a wall of bash.
-  SKILL_PATH_REGEX = %r{\.pi/skills/([A-Za-z0-9_.-]+)/}.freeze
-
-  def tool_call_display_name(name, args)
-    return name unless args.is_a?(Hash)
-
-    match = args.values.find { |v| v.is_a?(String) && v.match?(SKILL_PATH_REGEX) }
-    match ? "skill: #{match[SKILL_PATH_REGEX, 1]}" : name
-  end
-
   # Summary label for an assistant turn's reasoning/tools disclosure.
   def activity_summary(message)
     return "Working…" unless message.done?

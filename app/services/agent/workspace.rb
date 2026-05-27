@@ -5,18 +5,22 @@ module Agent
   # uploads into it.
   #
   # A scope holds:
-  #   sessions/           pi's --session-dir (the transcript)
-  #   workspace/          pi's working directory
-  #   workspace/uploads/  staged user uploads — projected each turn from
-  #                       the durable Message attachments, never archived
-  #                       (see docs/session-persistence.md)
-  #   workspace/.mcp.json MCP connector config — rendered each turn from
-  #                       the conversation's Connectors, never archived
-  #   workspace/AGENTS.md Agent boot identity — rendered each turn (see
-  #                       Agent::Identity), never archived, pi auto-loads
-  #   workspace/.pi/skills/  Project skills — projected each turn from
-  #                          the repo's .pi/skills/ tree (see
-  #                          stage_skills), never archived, pi auto-discovers
+  #   sessions/             pi's --session-dir (the transcript)
+  #   workspace/            pi's working directory
+  #   workspace/uploads/    staged user uploads — projected each turn from
+  #                         the durable Message attachments, never archived
+  #                         (see docs/session-persistence.md)
+  #   workspace/.mcp.json   MCP connector config — rendered each turn from
+  #                         the conversation's Connectors, never archived
+  #   workspace/AGENTS.md   Agent boot identity — rendered each turn (see
+  #                         Agent::Identity), never archived, pi auto-loads
+  #   workspace/.pi/skills/ Skills pi auto-discovers — staged each turn
+  #                         from the repo's .pi/skills/ tree plus the
+  #                         team's enabled Skill rows. Never archived;
+  #                         the tree is wiped & rewritten on every turn
+  #                         so agent edits don't accumulate (see
+  #                         stage_skills + ingest_team_skills, and
+  #                         docs/skills.md).
   #
   # Two roots, because persistence is a per-runtime concern:
   #   Workspace.scratch    — under tmp/, for a runtime that re-hydrates
@@ -29,6 +33,8 @@ module Agent
     PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
     SKILLS_SOURCE = Rails.root.join(".pi/skills").freeze
     SKILLS_SUBPATH = ".pi/skills".freeze
+    # Mirrors Runtime::E2b#TEAM_SKILLS_MARKER — see stage_skills.
+    SKILLS_MARKER = ".staged.sig".freeze
     # Created lazily by the agent — Metis never provisions it.
     ARTIFACTS_SUBPATH = "artifacts".freeze
 
@@ -54,6 +60,7 @@ module Agent
     def workspace_dir = scope_dir.join("workspace")
     def uploads_dir = workspace_dir.join("uploads")
     def artifacts_dir = workspace_dir.join(ARTIFACTS_SUBPATH)
+    def skills_dir = workspace_dir.join(SKILLS_SUBPATH)
 
     # Discard any stale scope and recreate it empty — for a runtime that
     # repopulates it from the archive.
@@ -95,18 +102,131 @@ module Agent
       File.write(workspace_dir.join(Identity::FILENAME), content)
     end
 
-    # Project the repo's .pi/skills/ tree into workspace/.pi/skills/.
-    # pi auto-discovers skills there relative to cwd. Per-turn projected
-    # input — the repo is the canonical source; the destination is
-    # cleared first so a deleted skill disappears from the workspace.
-    # No-op when the source dir is absent.
+    # Project repo and team skills into workspace/.pi/skills/. Dest is wiped
+    # each turn so deletions propagate and agent edits don't accumulate.
+    # SKILLS_MARKER carries a fingerprint of (repo + team); a matching marker
+    # skips the work entirely. Mirrors Runtime::E2b's stage_team_skills.
     def stage_skills
-      return unless SKILLS_SOURCE.directory?
+      dest = skills_dir
+      signature = staged_skills_signature
+      marker = dest.join(SKILLS_MARKER)
 
-      dest = workspace_dir.join(SKILLS_SUBPATH)
+      return if marker.file? && marker.read == signature
+
       FileUtils.rm_rf(dest)
-      FileUtils.mkdir_p(dest.dirname)
-      FileUtils.cp_r(SKILLS_SOURCE, dest)
+
+      if SKILLS_SOURCE.directory?
+        FileUtils.mkdir_p(dest.dirname)
+        FileUtils.cp_r(SKILLS_SOURCE, dest)
+      end
+
+      team_skills = @conversation.team.skills.enabled
+      if team_skills.any?
+        FileUtils.mkdir_p(dest)
+        team_skills.find_each { |skill| skill.extract_to(dest.join(skill.slug)) }
+      end
+
+      return unless dest.directory?
+
+      # Stamp last — a mid-stage crash leaves a stale signature, next turn re-stages.
+      File.write(marker, signature)
+    end
+
+    def staged_skills_signature
+      Digest::SHA1.hexdigest("#{self.class.repo_skills_fingerprint}|#{Skill.team_signature(@conversation.team)}")
+    end
+
+    # Memoized for the life of the process — SKILLS_SOURCE doesn't change
+    # between turns of a deployed checkout.
+    def self.repo_skills_fingerprint
+      return @repo_skills_fingerprint if @repo_skills_fingerprint
+      return @repo_skills_fingerprint = "" unless SKILLS_SOURCE.directory?
+
+      base = "#{SKILLS_SOURCE}/"
+      payload = Dir.glob(SKILLS_SOURCE.join("**/*"), File::FNM_DOTMATCH)
+        .reject { |p| File.directory?(p) }
+        .sort
+        .map { |f| "#{f.delete_prefix(base)}:#{File.size(f)}:#{File.mtime(f).to_i}" }
+        .join(",")
+      @repo_skills_fingerprint = Digest::SHA1.hexdigest(payload)
+    end
+
+    def self.reset_repo_skills_fingerprint!
+      @repo_skills_fingerprint = nil
+    end
+
+    # Upsert agent-touched team skills. Adapter pre-filters to slugs the agent
+    # actually wrote; repo slugs are excluded as a runtime guard. Never deletes
+    # — operator UI owns that.
+    def ingest_team_skills(slugs:, by:)
+      return if slugs.empty?
+      return unless skills_dir.directory?
+
+      repo_slugs = self.class.repo_slugs
+      slugs.each do |slug|
+        next if repo_slugs.include?(slug)
+        next unless Skill::SLUG_FORMAT.match?(slug)
+
+        ingest_one_skill_from_disk(skills_dir.join(slug), by: by)
+      end
+    end
+
+    # DB-side of ingest. Host runtimes (Local/Docker) build `files` from
+    # disk; E2b reads from the sandbox. `files`: relative path -> bytes,
+    # must include "SKILL.md".
+    def ingest_team_skill_from_files(slug:, files:, by:)
+      return unless Skill::SLUG_FORMAT.match?(slug)
+      return if self.class.repo_slugs.include?(slug)
+
+      body = files[Skill::SKILL_MD]
+      return if body.blank?
+
+      body = body.dup.force_encoding("UTF-8")
+      skill = @conversation.team.skills.find_or_initialize_by(slug: slug)
+      skill.created_by ||= by
+      skill.updated_by = by
+      if (desc = Skill.parse_description(body)).present?
+        skill.description = desc
+      end
+      skill.content_cache = body
+
+      # Re-attach the whole file map even if SKILL.md is unchanged — a
+      # supporting file may have shifted. Per-file diffing would be cheaper
+      # but the agent-wrote-identical-bytes case is rare.
+      skill.files.purge if skill.persisted?
+      skill.save!
+
+      files.each do |rel, content|
+        skill.replace_file!(rel, content)
+      end
+    rescue StandardError => e
+      Rails.logger.warn("ingest_team_skill(slug=#{slug}) failed for conversation #{@conversation.id}: #{e.message}")
+    end
+
+    # Set of slugs the repo currently ships at .pi/skills/. Used to
+    # filter ingest (above) and the Skill model's uniqueness
+    # validation, so team skills can never shadow a repo skill.
+    def self.repo_slugs
+      return Set.new unless SKILLS_SOURCE.directory?
+
+      SKILLS_SOURCE.children
+        .select(&:directory?)
+        .map { |p| p.basename.to_s }
+        .to_set
+    end
+
+    private
+
+    def ingest_one_skill_from_disk(skill_dir, by:)
+      return unless skill_dir.directory?
+
+      files = skill_dir.glob("**/*").reject(&:directory?).each_with_object({}) do |path, h|
+        rel = path.relative_path_from(skill_dir).to_s
+        h[rel] = path.binread
+      end
+      return if files.empty?
+
+      ingest_team_skill_from_files(slug: skill_dir.basename.to_s, files: files, by: by)
     end
   end
 end

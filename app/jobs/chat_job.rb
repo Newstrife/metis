@@ -92,11 +92,12 @@ class ChatJob < ApplicationJob
   # keyed by id so progress and result land on the right entry.
   def record_tool_call(tools, event)
     call = (tools[event[:tool_call_id]] ||= { "tool_call_id" => event[:tool_call_id] })
-    call["name"]     = event[:name]     if event.data.key?(:name)
-    call["args"]     = event[:args]     if event.data.key?(:args)
-    call["output"]   = event[:output]   if event.data.key?(:output)
-    call["is_error"] = event[:is_error] if event.data.key?(:is_error)
-    call["status"]   = event.type == :tool_call_finished ? "done" : "running"
+    call["name"]       = event[:name]       if event.data.key?(:name)
+    call["args"]       = event[:args]       if event.data.key?(:args)
+    call["output"]     = event[:output]     if event.data.key?(:output)
+    call["is_error"]   = event[:is_error]   if event.data.key?(:is_error)
+    call["skill_slug"] = event[:skill_slug] if event.data.key?(:skill_slug)
+    call["status"]     = event.type == :tool_call_finished ? "done" : "running"
   end
 
   # Record pi's session id so the next message resumes the same session.

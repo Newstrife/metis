@@ -40,3 +40,6 @@
 
 # Ignore local Claude Code settings (personal, not shared).
 /.claude/settings.local.json
+
+# Skills are sourced per-checkout (vendored / team-managed via DB), not vendored in-repo for now.
+/.pi/skills/

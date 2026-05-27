@@ -12,6 +12,7 @@ module Agent
       def initialize(conversation:)
         @conversation = conversation
         @artifacts = []
+        @touched_skill_slugs = Set.new
       end
 
       # Files published during the most recent #run. Each entry is
@@ -30,6 +31,14 @@ module Agent
       # paths. Default: none.
       def extension_paths
         []
+      end
+
+      # Slugs the agent's tools touched this turn — fed by Agent::Adapters::Pi.
+      # Each runtime drains this in its own ingest_team_skills implementation.
+      attr_reader :touched_skill_slugs
+
+      def note_skill_touched(slug)
+        @touched_skill_slugs << slug if slug.present?
       end
 
       # The rendered `.mcp.json` (Agent::McpConfig) for this

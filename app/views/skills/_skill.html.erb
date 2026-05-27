@@ -1,0 +1,11 @@
+<%= link_to edit_skill_path(skill), class: "conn-row" do %>
+  <div class="conn-main">
+    <div class="conn-name"><%= skill.slug %></div>
+    <% if skill.description.present? %>
+      <div class="conn-sub"><%= skill.description %></div>
+    <% end %>
+  </div>
+  <span class="skill-badge<%= ' off' unless skill.enabled? %>">
+    <%= skill.enabled? ? "Enabled" : "Disabled" %>
+  </span>
+<% end %>

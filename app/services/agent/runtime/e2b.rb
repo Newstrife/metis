@@ -1,4 +1,5 @@
 require "shellwords"
+require "digest"
 
 module Agent
   module Runtime
@@ -33,6 +34,11 @@ module Agent
       # via pause/resume (so a pi-extensions update reaches an existing
       # conversation on the next turn).
       EXTENSIONS_DIR = "/home/user/pi-extensions".freeze
+      # Repo .pi/skills/ baked into the template image by the e2b:template
+      # rake task. #provision copies this into the workspace on fresh
+      # sandboxes, dodging the per-file upload that .pi/skills/'s 300+
+      # files used to cost (~60s over the wire).
+      BAKED_REPO_SKILLS_DIR = "/opt/metis/repo-skills".freeze
       SANDBOX_TIMEOUT = 600
 
       # Kill a paused sandbox by id, swallowing the not-found case.
@@ -67,8 +73,31 @@ module Agent
       ensure
         if sandbox
           collect_sandbox_artifacts(sandbox, since: turn_started_at) if turn_started_at
+          ingest_team_skills(sandbox: sandbox, slugs: touched_skill_slugs)
           pause_sandbox(sandbox)
         end
+      end
+
+      # Pull each touched skill out of the sandbox and upsert it. The
+      # adapter already filtered to .pi/skills/<slug>/ paths, so we
+      # know exactly which dirs to read — no listing of the whole
+      # tree, no mtime gate. Must run before #pause_sandbox: a paused
+      # sandbox's filesystem is unreachable. Logged-not-raised.
+      def ingest_team_skills(sandbox:, slugs:)
+        return if slugs.empty?
+
+        repo_slugs = Agent::Workspace.repo_slugs
+        slugs.each do |slug|
+          next if repo_slugs.include?(slug)
+          next unless Skill::SLUG_FORMAT.match?(slug)
+
+          files = read_sandbox_skill_files(sandbox, slug)
+          next if files.empty?
+
+          workspace.ingest_team_skill_from_files(slug: slug, files: files, by: conversation.user)
+        end
+      rescue StandardError => e
+        Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
       end
 
       # Adds the microVM's id, so a turn can be traced to its sandbox in
@@ -109,6 +138,7 @@ module Agent
       def resume_existing
         sandbox = E2B::Sandbox.connect(conversation.e2b_sandbox_id)
         sandbox.resume(timeout: SANDBOX_TIMEOUT)
+        @sandbox_was_resumed = true
         sandbox
       rescue E2B::NotFoundError
         Rails.logger.info(
@@ -120,6 +150,7 @@ module Agent
       end
 
       def create_fresh
+        @sandbox_was_resumed = false
         E2B::Sandbox.create(template: template, timeout: SANDBOX_TIMEOUT)
       end
 
@@ -149,6 +180,22 @@ module Agent
         sandbox.commands.run("mkdir -p #{SESSION_DIR} #{WORKSPACE_DIR}/uploads")
       end
 
+      # Copy the baked repo .pi/skills/ tree from the template image
+      # into the conversation workspace. One sandbox-local cp instead
+      # of ~300 per-file upload RPCs over the wire. No-op on resumed
+      # sandboxes (the tree persists via pause/resume) and on dev
+      # sandboxes whose template predates the bake.
+      def stage_repo_skills_from_template(sandbox)
+        return unless sandbox.files.exists?(BAKED_REPO_SKILLS_DIR)
+
+        dest = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}"
+        sandbox.commands.run(
+          "rm -rf #{Shellwords.escape(dest)} && " \
+          "mkdir -p #{Shellwords.escape(File.dirname(dest))} && " \
+          "cp -r #{Shellwords.escape(BAKED_REPO_SKILLS_DIR)} #{Shellwords.escape(dest)}"
+        )
+      end
+
       # Upload the app's pi extensions into the sandbox so `pi --extension`
       # can load them. Re-staged each turn even on a resumed sandbox so
       # an update to a bundled extension reaches in-flight conversations.
@@ -167,6 +214,27 @@ module Agent
       # extensions do not collide on the shared index.ts basename.
       def sandbox_extension_path(source)
         "#{EXTENSIONS_DIR}/#{source.parent.basename}.ts"
+      end
+
+      # Read every file under WORKSPACE_DIR/.pi/skills/<slug>/ in the
+      # sandbox into an in-memory map keyed by relative path. One list
+      # RPC + one read per file. Skill dirs are small (SKILL.md plus
+      # a handful of supporting files), so the cost is bounded.
+      def read_sandbox_skill_files(sandbox, slug)
+        root = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}/#{slug}"
+        return {} unless sandbox.files.exists?(root)
+
+        files = {}
+        list_sandbox_files(sandbox, root).each do |entry|
+          rel = entry.path.delete_prefix("#{root}/")
+          files[rel] = sandbox.files.read(entry.path, format: "bytes")
+        end
+        files
+      end
+
+      # Need workspace for the DB-side ingest helper.
+      def workspace
+        @workspace ||= Agent::Workspace.persistent(conversation)
       end
 
       # Project the conversation's uploaded files into uploads/. Re-
@@ -195,16 +263,41 @@ module Agent
         sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::Identity::FILENAME}", identity_content)
       end
 
-      # Project the repo's .pi/skills/ tree into the sandbox workspace.
-      # pi auto-discovers skills from .pi/skills/ relative to cwd.
-      # Per-turn projected input — the prior turn's tree is wiped first
-      # so a deleted skill in the repo disappears from the sandbox.
+      # Project skills into the sandbox at WORKSPACE_DIR/.pi/skills/.
+      # pi auto-discovers from cwd, so both repo skills and team skills
+      # land in one tree.
+      #
+      # Repo skills: the template image ships .pi/skills/ at
+      # BAKED_REPO_SKILLS_DIR. On a fresh sandbox we copy it into the
+      # workspace with one sandbox-local cp; on resumed sandboxes we
+      # trust pause/resume to have preserved the tree. If the template
+      # predates the bake and BAKED_REPO_SKILLS_DIR is absent, we fall
+      # back to uploading from the host (slow but correct).
+      #
+      # Team skills: re-staged every turn — small in number, may
+      # change between turns via the operator UI or agent authoring.
+      # Stale team-skill dirs (operator-deleted or disabled) are
+      # cleaned up by listing the tree.
       def stage_skills(sandbox)
+        dest_root = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}"
+
+        unless @sandbox_was_resumed
+          if sandbox.files.exists?(BAKED_REPO_SKILLS_DIR)
+            stage_repo_skills_from_template(sandbox)
+          else
+            # Legacy fallback for templates built before the bake.
+            sandbox.commands.run("rm -rf #{Shellwords.escape(dest_root)}")
+            stage_repo_skills_from_host(sandbox, dest_root)
+          end
+        end
+
+        stage_team_skills(sandbox, dest_root)
+      end
+
+      def stage_repo_skills_from_host(sandbox, dest_root)
         source = Agent::Workspace::SKILLS_SOURCE
         return unless source.directory?
 
-        dest_root = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}"
-        sandbox.commands.run("rm -rf #{Shellwords.escape(dest_root)}")
         Dir.glob(source.join("**/*"), File::FNM_DOTMATCH).each do |path|
           next if File.directory?(path)
           next if File.basename(path).match?(/\A\.{1,2}\z/)
@@ -212,6 +305,49 @@ module Agent
           rel = Pathname.new(path).relative_path_from(source).to_s
           sandbox.files.write("#{dest_root}/#{rel}", File.binread(path))
         end
+      end
+
+      TEAM_SKILLS_MARKER = ".team-skills.sig".freeze
+
+      def stage_team_skills(sandbox, dest_root)
+        signature = Skill.team_signature(conversation.team)
+        marker_path = "#{dest_root}/#{TEAM_SKILLS_MARKER}"
+
+        # No-drift path on a resumed sandbox: ~17 RPCs → 1.
+        if @sandbox_was_resumed && sandbox.files.exists?(marker_path)
+          return if sandbox.files.read(marker_path) == signature
+        end
+
+        repo_slugs = Agent::Workspace.repo_slugs
+        enabled = conversation.team.skills.enabled.to_a
+        enabled_slugs = enabled.map(&:slug).to_set
+
+        # Drop sandbox dirs no longer enabled (operator-deleted / disabled).
+        if sandbox.files.exists?(dest_root)
+          sandbox.files.list(dest_root).each do |entry|
+            next if entry.file?
+
+            slug = File.basename(entry.path)
+            next if repo_slugs.include?(slug)
+            next if enabled_slugs.include?(slug)
+
+            sandbox.commands.run("rm -rf #{Shellwords.escape(entry.path)}")
+          end
+        end
+
+        enabled.each do |skill|
+          slug_dir = "#{dest_root}/#{skill.slug}"
+          sandbox.commands.run("rm -rf #{Shellwords.escape(slug_dir)}")
+          skill.files.each do |file|
+            rel = Pathname.new(skill.relative_path(file)).cleanpath.to_s
+            next if rel.start_with?("..") || rel.start_with?("/")
+
+            sandbox.files.write("#{slug_dir}/#{rel}", file.download)
+          end
+        end
+
+        # Stamp last — a mid-stage failure leaves a stale signature, next turn reapplies.
+        sandbox.files.write(marker_path, signature)
       end
 
       # Must run before #pause_sandbox — a paused sandbox's filesystem

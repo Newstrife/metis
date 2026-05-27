@@ -74,8 +74,10 @@ module Agent
         when :message_end
           ui(:message_finished, event, id: message_id(event), content: message_content(event))
         when :tool_execution_start
+          note_skill_touched(event)
           ui(:tool_call_started, event,
-             tool_call_id: event["toolCallId"], name: event["toolName"], args: event["args"])
+             tool_call_id: event["toolCallId"], name: event["toolName"], args: event["args"],
+             skill_slug: display_skill_slug(event["args"]))
         when :tool_execution_update
           ui(:tool_call_progress, event,
              tool_call_id: event["toolCallId"], output: content_text(event["partialResult"]))
@@ -100,6 +102,36 @@ module Agent
       end
 
       private
+
+      WRITE_TOOL_NAMES = %w[write edit].freeze
+      SKILL_PATH_REGEX = %r{\.pi/skills/([a-z0-9][a-z0-9\-]*)/}.freeze
+
+      # Tell the runtime which skill slug this tool touched, so post-turn ingest
+      # scans exactly those dirs. See docs/skills.md.
+      def note_skill_touched(event)
+        args = event["args"] || {}
+        case event["toolName"]
+        when *WRITE_TOOL_NAMES
+          slug = skill_slug_from(args["path"])
+          @runtime.note_skill_touched(slug) if slug
+        when "bash"
+          args["command"].to_s.scan(SKILL_PATH_REGEX).each { |m| @runtime.note_skill_touched(m.first) }
+        end
+      end
+
+      def skill_slug_from(path)
+        m = path.to_s.match(SKILL_PATH_REGEX)
+        m && m[1]
+      end
+
+      # First skill slug found in any string arg — stamped on tool_call_started
+      # so the activity log can label the call without re-parsing in the view.
+      def display_skill_slug(args)
+        return nil unless args.is_a?(Hash)
+
+        match = args.values.find { |v| v.is_a?(String) && v.match?(SKILL_PATH_REGEX) }
+        match && match[SKILL_PATH_REGEX, 1]
+      end
 
       # Image attachments become pi's inline image content.
       def pi_images(images)

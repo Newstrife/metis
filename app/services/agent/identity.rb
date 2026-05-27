@@ -74,6 +74,25 @@ module Agent
         Server config and auth headers are in `.mcp.json`, rendered
         for this turn. The MCP bridge reads it.
 
+        ## Team skills
+
+        Team-authored skills live at `.pi/skills/<slug>/SKILL.md`
+        alongside the built-in repo skills. When the operator asks
+        you to **create** or **modify** a team skill, write the file
+        there — Metis syncs it back to the team's DB when the turn
+        ends, and the next turn (and every member of the team) sees
+        the change.
+
+        - Slug: kebab-case (`code-review`), becomes the directory name.
+        - SKILL.md: YAML frontmatter with `name` and `description`,
+          then the markdown body that's loaded when pi auto-triggers
+          the skill. Supporting files alongside SKILL.md are kept.
+        - **Don't modify built-in repo skills.** Their slugs are
+          reserved; edits won't persist (the tree is wiped & re-copied
+          fresh from the repo every turn) and the team won't see them.
+        - To delete a skill, ask the operator to do it from the UI —
+          removing files won't auto-delete the row.
+
         ## Conventions
 
         - `uploads/` and `.mcp.json` are projected inputs — rewritten

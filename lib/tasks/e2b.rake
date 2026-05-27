@@ -23,7 +23,7 @@ namespace :e2b do
       rm -rf /var/lib/apt/lists/*
     SH
 
-    template = E2B::Template.new
+    template = E2B::Template.new(file_context_path: Rails.root.to_s)
                             .from_node_image
                             .apt_install([ "curl", "gnupg" ])
                             .run_cmd(install_gh, user: "root")
@@ -43,6 +43,13 @@ namespace :e2b do
                             # Also workaround for E2B builder leaving user state
                             # unresolved after a prior `user: "root"` step.
                             .run_cmd("pi install npm:pi-mcp-adapter@2.7.0", user: "user")
+                            # Bake the repo's .pi/skills/ tree into the image.
+                            # Agent::Runtime::E2b#provision copies this into
+                            # the conversation workspace on a fresh sandbox
+                            # (one sandbox-local cp instead of ~300 per-file
+                            # upload RPCs over the wire). Rebuild the template
+                            # whenever this tree changes.
+                            .copy(".pi/skills", "/opt/metis/repo-skills", user: "root")
 
     # tags must be a non-null array — the E2B v3 build API rejects null.
     info = E2B::Template.build(template, name: name, tags: [], on_build_logs: ->(line) { puts line })

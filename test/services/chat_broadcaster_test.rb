@@ -32,6 +32,20 @@ class ChatBroadcasterTest < ActiveSupport::TestCase
       event(:tool_call_started, tool_call_id: "t1", name: "bash", args: {}),
       status: :running)
 
-    assert_equal %i[tool_call_id name args output is_error status].sort, locals.keys.sort
+    assert_equal %i[tool_call_id name args output is_error skill_slug status].sort, locals.keys.sort
+  end
+
+  test "record_tool carries skill_slug from started through later events" do
+    @broadcaster.send(:record_tool,
+      event(:tool_call_started, tool_call_id: "t1", name: "bash",
+                                args: { "command" => "cat .pi/skills/eli5/SKILL.md" },
+                                skill_slug: "eli5"),
+      status: :running)
+
+    locals = @broadcaster.send(:record_tool,
+      event(:tool_call_finished, tool_call_id: "t1", output: "ok", is_error: false),
+      status: :done)
+
+    assert_equal "eli5", locals[:skill_slug]
   end
 end

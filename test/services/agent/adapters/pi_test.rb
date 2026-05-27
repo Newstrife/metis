@@ -43,8 +43,11 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
   # A runtime that yields a caller-supplied stub session, bypassing any
   # real pi process — so adapter behaviour is tested in isolation.
   class FakeRuntime
+    attr_reader :touched_skill_slugs
+
     def initialize(session)
       @session = session
+      @touched_skill_slugs = Set.new
     end
 
     def session_dir
@@ -57,6 +60,10 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
     def runtime_info
       { "runtime" => "fake" }
+    end
+
+    def note_skill_touched(slug)
+      @touched_skill_slugs << slug if slug
     end
 
     def run(pi_args:)
@@ -157,6 +164,21 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_equal "call_1", ui[:tool_call_id]
     assert_equal "bash", ui[:name]
     assert_equal({ "command" => "ls" }, ui[:args])
+    assert_nil ui[:skill_slug]
+  end
+
+  test "tool_call_started stamps skill_slug when args reference a skill path" do
+    ui = adapter.translate(pi_event("type" => "tool_execution_start", "toolCallId" => "call_1",
+                                    "toolName" => "read",
+                                    "args" => { "path" => "/metis/workspace/.pi/skills/pptx/SKILL.md" }))
+    assert_equal "pptx", ui[:skill_slug]
+  end
+
+  test "tool_call_started stamps skill_slug for a bash command touching a skill file" do
+    ui = adapter.translate(pi_event("type" => "tool_execution_start", "toolCallId" => "call_1",
+                                    "toolName" => "bash",
+                                    "args" => { "command" => "cat .pi/skills/eli5/SKILL.md" }))
+    assert_equal "eli5", ui[:skill_slug]
   end
 
   test "translates tool_execution_update progress" do
@@ -263,6 +285,48 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
 
     assert loaded.any? { |path| path.end_with?(".pi/extensions/web-tools/index.ts") },
            "the web-tools extension is passed to pi"
+  end
+
+  # --- touched-skill slug collection ---------------------------------
+
+  # pi's tool_execution_start carries args; _end does not. We hook
+  # start so the path is available.
+  def start_event(name, args)
+    pi_event("type" => "tool_execution_start",
+             "toolName" => name,
+             "args" => args,
+             "toolCallId" => "tc-1")
+  end
+
+  test "translate records the slug for a write tool that targets a team-skill path" do
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.translate(start_event("write", { "path" => "/metis/workspace/.pi/skills/haiku-mode/SKILL.md" }))
+    assert_equal Set["haiku-mode"], adapter.instance_variable_get(:@runtime).touched_skill_slugs
+  end
+
+  test "translate records the slug for an edit tool that targets a team-skill path" do
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.translate(start_event("edit", { "path" => "/metis/workspace/.pi/skills/tldr/SKILL.md" }))
+    assert_equal Set["tldr"], adapter.instance_variable_get(:@runtime).touched_skill_slugs
+  end
+
+  test "translate records all skill slugs mentioned in a bash command (heuristic)" do
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.translate(start_event("bash",
+      { "command" => "cp /metis/workspace/.pi/skills/eli5/SKILL.md /metis/workspace/.pi/skills/eli5-copy/SKILL.md" }))
+    assert_equal Set["eli5", "eli5-copy"], adapter.instance_variable_get(:@runtime).touched_skill_slugs
+  end
+
+  test "translate ignores read events — only writes register" do
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.translate(start_event("read", { "path" => "/metis/workspace/.pi/skills/haiku-mode/SKILL.md" }))
+    assert_empty adapter.instance_variable_get(:@runtime).touched_skill_slugs
+  end
+
+  test "translate ignores writes outside the .pi/skills/ tree" do
+    adapter = streaming_adapter(PROMPT_STUB)
+    adapter.translate(start_event("write", { "path" => "/metis/workspace/random.md" }))
+    assert_empty adapter.instance_variable_get(:@runtime).touched_skill_slugs
   end
 
   test "pi_args omits --continue for a fresh conversation" do

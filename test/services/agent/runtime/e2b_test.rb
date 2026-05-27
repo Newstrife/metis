@@ -1,4 +1,5 @@
 require "test_helper"
+require "ostruct"
 
 class Agent::Runtime::E2bTest < ActiveSupport::TestCase
   setup do
@@ -91,6 +92,25 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
 
   # Stub E2B::Sandbox.create / .connect and PiAgent.session for the block.
   # `on_connect` is invoked with the sandbox_id requested.
+  # Point Agent::Workspace::SKILLS_SOURCE at a tmp dir for the block.
+  def with_skills_source
+    Dir.mktmpdir do |tmp|
+      source = Pathname.new(tmp).join("skills")
+      FileUtils.mkdir_p(source)
+      original = Agent::Workspace::SKILLS_SOURCE
+      Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
+      Agent::Workspace.const_set(:SKILLS_SOURCE, source)
+      Agent::Workspace.reset_repo_skills_fingerprint!
+      begin
+        yield source
+      ensure
+        Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
+        Agent::Workspace.const_set(:SKILLS_SOURCE, original)
+        Agent::Workspace.reset_repo_skills_fingerprint!
+      end
+    end
+  end
+
   def with_e2b(create: nil, connect: nil, session: fake_session, on_connect: nil)
     create_original  = E2B::Sandbox.method(:create)
     connect_original = E2B::Sandbox.method(:connect)
@@ -188,6 +208,185 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     paths = @runtime.extension_paths.map(&:to_s)
 
     assert_includes paths, "#{Agent::Runtime::E2b::EXTENSIONS_DIR}/web-tools.ts"
+  end
+
+  test "uploads the team's enabled skills into the sandbox skills tree alongside repo skills" do
+    skill = @conversation.team.skills.create!(slug: "summarize", description: "x")
+    skill.replace_skill_md!("# body")
+    skill.save!
+    sandbox = FakeSandbox.new
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    staged = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/summarize/SKILL.md"
+    assert_equal "# body", sandbox.files.writes[staged]
+  end
+
+  test "fresh sandbox without a baked template uploads the repo .pi/skills/ tree from the host" do
+    sandbox = FakeSandbox.new
+    # BAKED_REPO_SKILLS_DIR is NOT in exist_paths — simulates a legacy
+    # template that predates the bake. The runtime falls back to
+    # per-file upload.
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("summarize"))
+      File.write(source.join("summarize/SKILL.md"), "# repo skill")
+      with_e2b(create: sandbox) do
+        @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+      end
+    end
+
+    repo_uploads = sandbox.files.writes.keys.grep(%r{\A#{Agent::Runtime::E2b::WORKSPACE_DIR}/\.pi/skills/[^/]+/SKILL\.md\z})
+    assert repo_uploads.any?, "legacy template falls back to host upload"
+  end
+
+  test "fresh sandbox with a baked template copies repo skills with one sandbox-local cp" do
+    sandbox = FakeSandbox.new
+    sandbox.files.exist_paths << Agent::Runtime::E2b::BAKED_REPO_SKILLS_DIR
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    # No per-file uploads from the host
+    repo_uploads = sandbox.files.writes.keys.grep(%r{\A#{Agent::Runtime::E2b::WORKSPACE_DIR}/\.pi/skills/[^/]+/SKILL\.md\z})
+    assert_empty repo_uploads, "baked template path must not upload repo files"
+
+    # One cp -r from the baked dir to the workspace
+    cp_calls = sandbox.commands.runs.select { |c|
+      c.include?("cp -r") && c.include?(Agent::Runtime::E2b::BAKED_REPO_SKILLS_DIR)
+    }
+    assert cp_calls.any?, "expected a cp -r from the baked dir"
+  end
+
+  test "resumed sandbox skips team-skill rewrite when the signature marker matches the DB" do
+    @conversation.update_column(:e2b_sandbox_id, "sbx-warm")
+    skill = @conversation.team.skills.create!(slug: "tldr", description: "x")
+    skill.replace_skill_md!("# body")
+    skill.save!
+
+    runtime = Agent::Runtime::E2b.new(conversation: @conversation)
+    signature = Skill.team_signature(@conversation.team)
+
+    dest_root = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills"
+    marker_path = "#{dest_root}/#{Agent::Runtime::E2b::TEAM_SKILLS_MARKER}"
+    sandbox = FakeSandbox.new(sandbox_id: "sbx-warm")
+    sandbox.files.exist_paths << marker_path
+    sandbox.files.read_responses[marker_path] = signature
+
+    with_e2b(connect: sandbox) do
+      runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    # No file rewrites or rm-rfs for team skills when the signature matches.
+    refute sandbox.files.writes.key?("#{dest_root}/tldr/SKILL.md"),
+           "matching signature must skip the full team-skill rewrite"
+  end
+
+  test "resumed sandbox restages team skills when the signature drifts" do
+    @conversation.update_column(:e2b_sandbox_id, "sbx-warm")
+    skill = @conversation.team.skills.create!(slug: "tldr", description: "x")
+    skill.replace_skill_md!("# body")
+    skill.save!
+
+    dest_root = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills"
+    marker_path = "#{dest_root}/#{Agent::Runtime::E2b::TEAM_SKILLS_MARKER}"
+    sandbox = FakeSandbox.new(sandbox_id: "sbx-warm")
+    sandbox.files.exist_paths << marker_path
+    sandbox.files.read_responses[marker_path] = "stale-signature"
+
+    with_e2b(connect: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_equal "# body", sandbox.files.writes["#{dest_root}/tldr/SKILL.md"],
+                 "stale signature triggers a full restage"
+    assert sandbox.files.writes.key?(marker_path), "marker rewritten after the restage"
+  end
+
+  test "resumed sandbox skips repo upload (trusts pause/resume) but still re-stages team skills" do
+    @conversation.update_column(:e2b_sandbox_id, "sbx-warm")
+    skill = @conversation.team.skills.create!(slug: "summarize", description: "x")
+    skill.replace_skill_md!("# team body")
+    skill.save!
+    sandbox = FakeSandbox.new(sandbox_id: "sbx-warm")
+
+    with_e2b(connect: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    # Team skill always re-staged
+    team_path = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/summarize/SKILL.md"
+    assert_equal "# team body", sandbox.files.writes[team_path]
+
+    # Repo skills NOT re-uploaded on resume
+    repo_uploads = sandbox.files.writes.keys.grep(%r{\A#{Agent::Runtime::E2b::WORKSPACE_DIR}/\.pi/skills/(?!summarize/)[^/]+/}).reject { |p| p.start_with?("#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/summarize/") }
+    assert_empty repo_uploads,
+                 "resumed sandbox must NOT re-upload repo skills (trusts pause/resume)"
+  end
+
+  test "resumed sandbox removes stale team-skill dirs no longer enabled" do
+    @conversation.update_column(:e2b_sandbox_id, "sbx-warm")
+    # Pretend a previously-staged team skill is still sitting in the sandbox.
+    dest_root = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills"
+    sandbox = FakeSandbox.new(sandbox_id: "sbx-warm")
+    sandbox.files.exist_paths << dest_root
+    sandbox.files.entries_by_dir[dest_root] = [
+      OpenStruct.new(path: "#{dest_root}/orphaned", file?: false)
+    ]
+
+    with_e2b(connect: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    rm_calls = sandbox.commands.runs.select { |c| c.include?("rm -rf") && c.include?("orphaned") }
+    assert rm_calls.any?, "orphan team-skill dir gets cleaned up on resume"
+  end
+
+  test "ingests touched team skills from the sandbox at turn end" do
+    sandbox = FakeSandbox.new
+    skill_dir = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/code-review"
+    skill_md_path = "#{skill_dir}/SKILL.md"
+    sandbox.files.exist_paths << skill_dir
+    sandbox.files.entries_by_dir[skill_dir] = [
+      OpenStruct.new(path: skill_md_path, file?: true)
+    ]
+    sandbox.files.read_responses[skill_md_path] = <<~MD
+      ---
+      name: code-review
+      description: From the sandbox.
+      ---
+      # body
+    MD
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        # Adapter would normally call this as it sees the write event.
+        @runtime.note_skill_touched("code-review")
+      end
+    end
+
+    skill = @conversation.team.skills.find_by(slug: "code-review")
+    assert_not_nil skill, "touched slug was read from the sandbox + ingested"
+    assert_equal "From the sandbox.", skill.description
+  end
+
+  test "does not ingest sandbox files for slugs the adapter did not record" do
+    sandbox = FakeSandbox.new
+    # Pretend the agent wrote here, but the adapter never recorded the
+    # slug — sandbox state alone must not produce a team row.
+    skill_dir = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/decoy"
+    sandbox.files.exist_paths << skill_dir
+    sandbox.files.entries_by_dir[skill_dir] = [
+      OpenStruct.new(path: "#{skill_dir}/SKILL.md", file?: true)
+    ]
+    sandbox.files.read_responses["#{skill_dir}/SKILL.md"] = "# never"
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_nil @conversation.team.skills.find_by(slug: "decoy")
   end
 
   test "projects the conversation's uploaded files into the sandbox uploads dir" do

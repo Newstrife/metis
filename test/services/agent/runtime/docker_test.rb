@@ -39,6 +39,7 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     assert_includes paths, "/metis-extensions/web-tools/index.ts"
   end
 
+
   test "runtime_info names the docker runtime and its container" do
     info = @runtime.runtime_info
     assert_equal "docker", info["runtime"]
