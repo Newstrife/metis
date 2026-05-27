@@ -155,6 +155,64 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
     assert_equal "# team skill", File.read(dest.join("summarize/SKILL.md"))
   end
 
+  test "stage_skills skips re-staging when the signature marker matches" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("alpha"))
+      File.write(source.join("alpha/SKILL.md"), "v1")
+      workspace.stage_skills
+
+      # Tamper with the staged tree: if the second stage skips, our
+      # edit survives; if it wipes & re-copies, it reverts to "v1".
+      tampered = workspace.workspace_dir.join(".pi/skills/alpha/SKILL.md")
+      File.write(tampered, "tampered")
+      workspace.stage_skills
+
+      assert_equal "tampered", tampered.read
+    end
+  end
+
+  test "stage_skills re-stages when the repo source changes" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("alpha"))
+      File.write(source.join("alpha/SKILL.md"), "v1")
+      workspace.stage_skills
+
+      File.write(source.join("alpha/SKILL.md"), "v2 (different)")
+      Agent::Workspace.reset_repo_skills_fingerprint!
+      workspace.stage_skills
+
+      assert_equal "v2 (different)",
+        workspace.workspace_dir.join(".pi/skills/alpha/SKILL.md").read
+    end
+  end
+
+  test "stage_skills re-stages when a team skill is updated" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    skill = @conversation.team.skills.create!(slug: "drift", description: "x")
+    skill.replace_skill_md!("first")
+    skill.save!
+
+    with_skills_source(create: false) { workspace.stage_skills }
+    assert_equal "first",
+      workspace.workspace_dir.join(".pi/skills/drift/SKILL.md").read
+
+    travel 2.seconds do
+      skill.replace_skill_md!("second")
+      skill.save!
+      with_skills_source(create: false) { workspace.stage_skills }
+    end
+
+    assert_equal "second",
+      workspace.workspace_dir.join(".pi/skills/drift/SKILL.md").read
+  end
+
   test "stage_skills skips disabled team skills" do
     workspace = Agent::Workspace.scratch(@conversation)
     workspace.ensure!
@@ -338,11 +396,13 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
       original = Agent::Workspace::SKILLS_SOURCE
       Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
       Agent::Workspace.const_set(:SKILLS_SOURCE, source)
+      Agent::Workspace.reset_repo_skills_fingerprint!
       begin
         yield source
       ensure
         Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
         Agent::Workspace.const_set(:SKILLS_SOURCE, original)
+        Agent::Workspace.reset_repo_skills_fingerprint!
       end
     end
   end

@@ -33,6 +33,8 @@ module Agent
     PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
     SKILLS_SOURCE = Rails.root.join(".pi/skills").freeze
     SKILLS_SUBPATH = ".pi/skills".freeze
+    # Mirrors Runtime::E2b#TEAM_SKILLS_MARKER — see stage_skills.
+    SKILLS_MARKER = ".staged.sig".freeze
     # Created lazily by the agent — Metis never provisions it.
     ARTIFACTS_SUBPATH = "artifacts".freeze
 
@@ -118,8 +120,18 @@ module Agent
     # Slug collisions between repo and team are prevented at save time
     # by Skill#slug_not_in_repo_tree. The ingest path also filters by
     # repo slug as a runtime guard (see ingest_team_skills).
+    #
+    # A successful stage stamps SKILLS_MARKER with a fingerprint of
+    # (repo files, enabled team skills). Next turn skips the work if
+    # the fingerprint still matches — mirrors Runtime::E2b's marker so
+    # Docker/Local behave the same way on a no-drift turn.
     def stage_skills
       dest = skills_dir
+      signature = staged_skills_signature
+      marker = dest.join(SKILLS_MARKER)
+
+      return if marker.file? && marker.read == signature
+
       FileUtils.rm_rf(dest)
 
       if SKILLS_SOURCE.directory?
@@ -128,10 +140,41 @@ module Agent
       end
 
       team_skills = @conversation.team.skills.enabled
-      return if team_skills.empty?
+      if team_skills.any?
+        FileUtils.mkdir_p(dest)
+        team_skills.find_each { |skill| skill.extract_to(dest.join(skill.slug)) }
+      end
 
-      FileUtils.mkdir_p(dest)
-      team_skills.find_each { |skill| skill.extract_to(dest.join(skill.slug)) }
+      return unless dest.directory?
+
+      # Stamp last so a mid-stage crash leaves the old (now-stale)
+      # signature in place — next turn re-stages, self-healing.
+      File.write(marker, signature)
+    end
+
+    def staged_skills_signature
+      team = @conversation.team.skills.enabled.order(:slug).pluck(:slug, :updated_at)
+        .map { |slug, ts| "#{slug}:#{ts.to_i}" }.join(",")
+      Digest::SHA1.hexdigest("#{self.class.repo_skills_fingerprint}|#{team}")
+    end
+
+    # Memoized for the life of the process — SKILLS_SOURCE is part of
+    # the deployed checkout and doesn't change between turns.
+    def self.repo_skills_fingerprint
+      return @repo_skills_fingerprint if @repo_skills_fingerprint
+      return @repo_skills_fingerprint = "" unless SKILLS_SOURCE.directory?
+
+      base = "#{SKILLS_SOURCE}/"
+      payload = Dir.glob(SKILLS_SOURCE.join("**/*"), File::FNM_DOTMATCH)
+        .reject { |p| File.directory?(p) }
+        .sort
+        .map { |f| "#{f.delete_prefix(base)}:#{File.size(f)}:#{File.mtime(f).to_i}" }
+        .join(",")
+      @repo_skills_fingerprint = Digest::SHA1.hexdigest(payload)
+    end
+
+    def self.reset_repo_skills_fingerprint!
+      @repo_skills_fingerprint = nil
     end
 
     # Sync agent-written skills back to the team. The adapter (see
