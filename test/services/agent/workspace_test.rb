@@ -273,6 +273,29 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
     end
   end
 
+  test "ingest_team_skills picks up supporting-file changes even when SKILL.md is unchanged" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    # Seed an existing skill — same SKILL.md content the agent would
+    # leave alone this turn, plus an old version of a supporting file.
+    skill_md = "---\nname: rn\ndescription: release notes\n---\n# body\n"
+    existing = @conversation.team.skills.create!(slug: "rn", description: "release notes")
+    existing.replace_skill_md!(skill_md)
+    existing.replace_file!("ref/style.md", "v1: short and concise")
+    existing.save!
+
+    # Agent edits ONLY the supporting file this turn.
+    write_skill_dir(workspace, "rn", skill_md, files: { "ref/style.md" => "v2: punchy verbs only" })
+
+    workspace.ingest_team_skills(slugs: Set["rn"], by: @user)
+
+    existing.reload
+    style = existing.files.find { |f| existing.relative_path(f) == "ref/style.md" }
+    assert_equal "v2: punchy verbs only", style.download,
+                 "supporting-file edit must reach the DB even when SKILL.md was untouched"
+  end
+
   test "ingest_team_skill_from_files upserts from an in-memory map (E2b path)" do
     workspace = Agent::Workspace.scratch(@conversation)
 

@@ -174,13 +174,14 @@ module Agent
       if (desc = Skill.parse_description(body)).present?
         skill.description = desc
       end
-
-      # Identical SKILL.md = no-op. Avoids a touch-without-change
-      # bumping updated_at and re-attaching every file.
-      return if skill.persisted? && skill.content_cache == body && skill.changes.empty?
-
       skill.content_cache = body
 
+      # The slug is here because the adapter saw pi write/edit/bash a
+      # path under it this turn — explicit intent. Re-attach the whole
+      # file map even when SKILL.md happens to be unchanged, because
+      # a supporting file may have changed. Per-file diffing would be
+      # cheaper but adds enough complexity that it's not worth the
+      # rare "agent wrote identical bytes" case.
       skill.files.purge if skill.persisted?
       skill.save!
 
