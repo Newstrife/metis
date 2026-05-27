@@ -76,7 +76,8 @@ module Agent
         when :tool_execution_start
           note_skill_touched(event)
           ui(:tool_call_started, event,
-             tool_call_id: event["toolCallId"], name: event["toolName"], args: event["args"])
+             tool_call_id: event["toolCallId"], name: event["toolName"], args: event["args"],
+             skill_slug: display_skill_slug(event["args"]))
         when :tool_execution_update
           ui(:tool_call_progress, event,
              tool_call_id: event["toolCallId"], output: content_text(event["partialResult"]))
@@ -124,13 +125,23 @@ module Agent
         end
       end
 
-      # Same path shape ApplicationHelper#tool_call_display_name uses
-      # for activity-log relabelling — kept in sync deliberately.
       SKILL_PATH_REGEX = %r{\.pi/skills/([a-z0-9][a-z0-9\-]*)/}.freeze
 
       def skill_slug_from(path)
         m = path.to_s.match(SKILL_PATH_REGEX)
         m && m[1]
+      end
+
+      # First skill slug referenced anywhere in the tool's args, stamped
+      # on tool_call_started so the chat UI can label the call as
+      # "skill: <name>" without re-parsing args in a view helper. Read,
+      # write, edit, bash — any tool touching a skill path is relabelled
+      # in the activity log; tracking (note_skill_touched) is stricter.
+      def display_skill_slug(args)
+        return nil unless args.is_a?(Hash)
+
+        match = args.values.find { |v| v.is_a?(String) && v.match?(SKILL_PATH_REGEX) }
+        match && match[SKILL_PATH_REGEX, 1]
       end
 
       # Image attachments become pi's inline image content.

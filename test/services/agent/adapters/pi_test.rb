@@ -164,6 +164,21 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_equal "call_1", ui[:tool_call_id]
     assert_equal "bash", ui[:name]
     assert_equal({ "command" => "ls" }, ui[:args])
+    assert_nil ui[:skill_slug]
+  end
+
+  test "tool_call_started stamps skill_slug when args reference a skill path" do
+    ui = adapter.translate(pi_event("type" => "tool_execution_start", "toolCallId" => "call_1",
+                                    "toolName" => "read",
+                                    "args" => { "path" => "/metis/workspace/.pi/skills/pptx/SKILL.md" }))
+    assert_equal "pptx", ui[:skill_slug]
+  end
+
+  test "tool_call_started stamps skill_slug for a bash command touching a skill file" do
+    ui = adapter.translate(pi_event("type" => "tool_execution_start", "toolCallId" => "call_1",
+                                    "toolName" => "bash",
+                                    "args" => { "command" => "cat .pi/skills/eli5/SKILL.md" }))
+    assert_equal "eli5", ui[:skill_slug]
   end
 
   test "translates tool_execution_update progress" do

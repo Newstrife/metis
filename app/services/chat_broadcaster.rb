@@ -125,6 +125,7 @@ class ChatBroadcaster
                         locals: {
                           tool_call_id: prev_id, name: prev[:name], args: prev[:args],
                           output: prev[:output], is_error: prev[:is_error],
+                          skill_slug: prev[:skill_slug],
                           status: status, open: false
                         })
   end
@@ -150,16 +151,18 @@ class ChatBroadcaster
   # an undefined variable.
   def record_tool(event, status:)
     call = (@tools[event[:tool_call_id]] ||= {})
-    call[:name]     = event[:name]     if event.data.key?(:name)
-    call[:args]     = event[:args]     if event.data.key?(:args)
-    call[:output]   = event[:output]   if event.data.key?(:output)
-    call[:is_error] = event[:is_error] if event.data.key?(:is_error)
+    call[:name]       = event[:name]       if event.data.key?(:name)
+    call[:args]       = event[:args]       if event.data.key?(:args)
+    call[:output]     = event[:output]     if event.data.key?(:output)
+    call[:is_error]   = event[:is_error]   if event.data.key?(:is_error)
+    call[:skill_slug] = event[:skill_slug] if event.data.key?(:skill_slug)
     {
       tool_call_id: event[:tool_call_id],
       name: call[:name],
       args: call[:args],
       output: call[:output],
       is_error: call[:is_error],
+      skill_slug: call[:skill_slug],
       status: status
     }
   end
