@@ -99,13 +99,11 @@ class SkillsController < ApplicationController
   end
 
   def skill_params
-    params.require(:skill).permit(:slug, :description, :enabled, examples: [])
+    params.require(:skill).permit(:slug, :description, :enabled)
   end
 
-  # SKILL.md lives in Active Storage, not the skills table, so the
-  # form's :skill_md textarea is written through replace_skill_md!
-  # (which mirrors to content_cache). Blank means "don't touch" — the
-  # row may still be saving other fields (slug, enabled).
+  # SKILL.md lives in Active Storage. Blank body means "don't touch"
+  # — other fields (slug, enabled) may still be saving.
   def write_skill_md!(skill, body)
     return if body.nil?
     skill.replace_skill_md!(body.to_s)

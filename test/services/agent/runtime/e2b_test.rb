@@ -243,7 +243,7 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     skill.save!
 
     runtime = Agent::Runtime::E2b.new(conversation: @conversation)
-    signature = runtime.send(:team_skills_signature)
+    signature = Skill.team_signature(@conversation.team)
 
     dest_root = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills"
     marker_path = "#{dest_root}/#{Agent::Runtime::E2b::TEAM_SKILLS_MARKER}"

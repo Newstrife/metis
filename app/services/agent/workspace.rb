@@ -102,29 +102,10 @@ module Agent
       File.write(workspace_dir.join(Identity::FILENAME), content)
     end
 
-    # Project skills into workspace/.pi/skills/ where pi auto-discovers
-    # them. Two sources, layered into one tree:
-    #
-    #   1. Repo skills from SKILLS_SOURCE (versioned in git, identical
-    #      for every team)
-    #   2. Team skills from the conversation's team.skills.enabled
-    #      (DB-authored, per-team)
-    #
-    # The dest is wiped first so a deleted skill (in either source)
-    # disappears next turn — and so any agent writes from the prior
-    # turn are erased before pi sees the tree. That last property is
-    # load-bearing: the agent CAN modify any subdir during a turn,
-    # but the repo copy is restored fresh before the next turn, so
-    # tampering cannot accumulate.
-    #
-    # Slug collisions between repo and team are prevented at save time
-    # by Skill#slug_not_in_repo_tree. The ingest path also filters by
-    # repo slug as a runtime guard (see ingest_team_skills).
-    #
-    # A successful stage stamps SKILLS_MARKER with a fingerprint of
-    # (repo files, enabled team skills). Next turn skips the work if
-    # the fingerprint still matches — mirrors Runtime::E2b's marker so
-    # Docker/Local behave the same way on a no-drift turn.
+    # Project repo and team skills into workspace/.pi/skills/. Dest is wiped
+    # each turn so deletions propagate and agent edits don't accumulate.
+    # SKILLS_MARKER carries a fingerprint of (repo + team); a matching marker
+    # skips the work entirely. Mirrors Runtime::E2b's stage_team_skills.
     def stage_skills
       dest = skills_dir
       signature = staged_skills_signature
@@ -147,19 +128,16 @@ module Agent
 
       return unless dest.directory?
 
-      # Stamp last so a mid-stage crash leaves the old (now-stale)
-      # signature in place — next turn re-stages, self-healing.
+      # Stamp last — a mid-stage crash leaves a stale signature, next turn re-stages.
       File.write(marker, signature)
     end
 
     def staged_skills_signature
-      team = @conversation.team.skills.enabled.order(:slug).pluck(:slug, :updated_at)
-        .map { |slug, ts| "#{slug}:#{ts.to_i}" }.join(",")
-      Digest::SHA1.hexdigest("#{self.class.repo_skills_fingerprint}|#{team}")
+      Digest::SHA1.hexdigest("#{self.class.repo_skills_fingerprint}|#{Skill.team_signature(@conversation.team)}")
     end
 
-    # Memoized for the life of the process — SKILLS_SOURCE is part of
-    # the deployed checkout and doesn't change between turns.
+    # Memoized for the life of the process — SKILLS_SOURCE doesn't change
+    # between turns of a deployed checkout.
     def self.repo_skills_fingerprint
       return @repo_skills_fingerprint if @repo_skills_fingerprint
       return @repo_skills_fingerprint = "" unless SKILLS_SOURCE.directory?
@@ -177,15 +155,9 @@ module Agent
       @repo_skills_fingerprint = nil
     end
 
-    # Sync agent-written skills back to the team. The adapter (see
-    # Agent::Adapters::Pi#note_skill_touched) collects the slug set
-    # from pi's write/edit/bash tool events as they stream — so by
-    # the time we're called, `slugs` is exactly the set of dirs to
-    # ingest. No tree scan, no mtime gate. Repo slugs are filtered
-    # (the repo is read-only — see Workspace.repo_slugs).
-    #
-    # Upsert only — a slug not present here does NOT delete its row.
-    # The operator's UI keeps that responsibility. See docs/skills.md.
+    # Upsert agent-touched team skills. Adapter pre-filters to slugs the agent
+    # actually wrote; repo slugs are excluded as a runtime guard. Never deletes
+    # — operator UI owns that.
     def ingest_team_skills(slugs:, by:)
       return if slugs.empty?
       return unless skills_dir.directory?
@@ -199,10 +171,9 @@ module Agent
       end
     end
 
-    # DB-side of ingest, independent of where the files came from.
-    # Host runtimes (Local/Docker) build the `files` map from disk;
-    # E2b builds it by reading from the sandbox. Both call this.
-    # `files`: Hash of relative path -> bytes. Must include "SKILL.md".
+    # DB-side of ingest. Host runtimes (Local/Docker) build `files` from
+    # disk; E2b reads from the sandbox. `files`: relative path -> bytes,
+    # must include "SKILL.md".
     def ingest_team_skill_from_files(slug:, files:, by:)
       return unless Skill::SLUG_FORMAT.match?(slug)
       return if self.class.repo_slugs.include?(slug)
@@ -219,12 +190,9 @@ module Agent
       end
       skill.content_cache = body
 
-      # The slug is here because the adapter saw pi write/edit/bash a
-      # path under it this turn — explicit intent. Re-attach the whole
-      # file map even when SKILL.md happens to be unchanged, because
-      # a supporting file may have changed. Per-file diffing would be
-      # cheaper but adds enough complexity that it's not worth the
-      # rare "agent wrote identical bytes" case.
+      # Re-attach the whole file map even if SKILL.md is unchanged — a
+      # supporting file may have shifted. Per-file diffing would be cheaper
+      # but the agent-wrote-identical-bytes case is rare.
       skill.files.purge if skill.persisted?
       skill.save!
 

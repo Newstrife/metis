@@ -103,18 +103,12 @@ module Agent
 
       private
 
-      # Pi tools that can write to the filesystem. write/edit name the
-      # target path in `args.path`; bash hides it in `args.command`,
-      # which we regex against the same path shape the activity log
-      # uses to surface "skill: <name>".
       WRITE_TOOL_NAMES = %w[write edit].freeze
+      SKILL_PATH_REGEX = %r{\.pi/skills/([a-z0-9][a-z0-9\-]*)/}.freeze
 
-      # Tell the runtime which skill slug this tool touched, so the
-      # post-turn ingest scans exactly those dirs instead of the whole
-      # tree. See docs/skills.md (Agent authoring).
+      # Tell the runtime which skill slug this tool touched, so post-turn ingest
+      # scans exactly those dirs. See docs/skills.md.
       def note_skill_touched(event)
-        return unless @runtime.respond_to?(:note_skill_touched)
-
         args = event["args"] || {}
         case event["toolName"]
         when *WRITE_TOOL_NAMES
@@ -125,18 +119,13 @@ module Agent
         end
       end
 
-      SKILL_PATH_REGEX = %r{\.pi/skills/([a-z0-9][a-z0-9\-]*)/}.freeze
-
       def skill_slug_from(path)
         m = path.to_s.match(SKILL_PATH_REGEX)
         m && m[1]
       end
 
-      # First skill slug referenced anywhere in the tool's args, stamped
-      # on tool_call_started so the chat UI can label the call as
-      # "skill: <name>" without re-parsing args in a view helper. Read,
-      # write, edit, bash — any tool touching a skill path is relabelled
-      # in the activity log; tracking (note_skill_touched) is stricter.
+      # First skill slug found in any string arg — stamped on tool_call_started
+      # so the activity log can label the call without re-parsing in the view.
       def display_skill_slug(args)
         return nil unless args.is_a?(Hash)
 

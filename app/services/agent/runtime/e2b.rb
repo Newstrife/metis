@@ -307,31 +307,22 @@ module Agent
         end
       end
 
-      # Sandbox-side marker carrying a signature of the last team-skills
-      # state we staged. We read it on resumed sandboxes to skip the
-      # whole stage when nothing has drifted in the DB since last turn.
       TEAM_SKILLS_MARKER = ".team-skills.sig".freeze
 
       def stage_team_skills(sandbox, dest_root)
-        signature = team_skills_signature
+        signature = Skill.team_signature(conversation.team)
         marker_path = "#{dest_root}/#{TEAM_SKILLS_MARKER}"
 
-        # On a resumed sandbox, the previous turn's team-skill state is
-        # still in place. Read the signature it left behind; if it
-        # matches what the DB says now (count + max(updated_at)), the
-        # tree is already correct — skip the whole orphan-cleanup +
-        # rewrite. ~17 RPCs → 1 RPC on the no-drift path.
+        # No-drift path on a resumed sandbox: ~17 RPCs → 1.
         if @sandbox_was_resumed && sandbox.files.exists?(marker_path)
-          stored = sandbox.files.read(marker_path)
-          return if stored == signature
+          return if sandbox.files.read(marker_path) == signature
         end
 
         repo_slugs = Agent::Workspace.repo_slugs
         enabled = conversation.team.skills.enabled.to_a
         enabled_slugs = enabled.map(&:slug).to_set
 
-        # Drop sandbox dirs that aren't repo slugs and aren't currently
-        # enabled team slugs — covers operator-deleted / disabled skills.
+        # Drop sandbox dirs no longer enabled (operator-deleted / disabled).
         if sandbox.files.exists?(dest_root)
           sandbox.files.list(dest_root).each do |entry|
             next if entry.file?
@@ -355,20 +346,8 @@ module Agent
           end
         end
 
-        # Stamp the marker last so a mid-stage failure leaves the
-        # previous (now-stale) signature in place — next turn will see
-        # a mismatch and reapply.
+        # Stamp last — a mid-stage failure leaves a stale signature, next turn reapplies.
         sandbox.files.write(marker_path, signature)
-      end
-
-      # The DB-side signature of "what should be staged" — count of
-      # enabled team skills + a deterministic order-by-slug hash of
-      # (slug, max(file updated_at, skill updated_at)). A change in
-      # count covers add/remove; a change in any timestamp covers an
-      # edit (operator or agent). Cheap to compute, cheap to compare.
-      def team_skills_signature
-        enabled = conversation.team.skills.enabled.order(:slug).pluck(:slug, :updated_at)
-        Digest::SHA1.hexdigest(enabled.map { |slug, ts| "#{slug}:#{ts.to_i}" }.join(","))
       end
 
       # Must run before #pause_sandbox — a paused sandbox's filesystem

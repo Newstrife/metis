@@ -56,23 +56,6 @@ class SkillTest < ActiveSupport::TestCase
     assert_equal 1, Skill.enabled.count
   end
 
-  test "examples are normalized: blanks dropped, strings stripped" do
-    skill = make_skill(examples: [ "  draft a blog post ", "", "  ", "review a PR" ])
-    skill.save!
-    assert_equal [ "draft a blog post", "review a PR" ], skill.examples
-  end
-
-  test "examples cap at MAX_EXAMPLES entries" do
-    skill = make_skill(examples: Array.new(Skill::MAX_EXAMPLES + 1) { |i| "ex#{i}" })
-    assert_not skill.valid?
-    assert_includes skill.errors[:examples].join, "at most"
-  end
-
-  test "examples reject entries over EXAMPLE_MAX_LENGTH" do
-    skill = make_skill(examples: [ "x" * (Skill::EXAMPLE_MAX_LENGTH + 1) ])
-    assert_not skill.valid?
-  end
-
   test "replace_skill_md! attaches SKILL.md and mirrors to content_cache" do
     skill = make_skill.tap(&:save!)
     skill.replace_skill_md!("# Hello")
@@ -120,12 +103,5 @@ class SkillTest < ActiveSupport::TestCase
       assert_equal "# top", File.read(File.join(dir, "SKILL.md"))
       assert_equal "#!/bin/sh\n", File.read(File.join(dir, "scripts/run.sh"))
     end
-  end
-
-  test "refresh_content_cache! resyncs from the attached SKILL.md" do
-    skill = make_skill.tap(&:save!)
-    skill.replace_file!("SKILL.md", "# new")  # bypasses replace_skill_md! so cache is stale
-    skill.refresh_content_cache!
-    assert_equal "# new", skill.reload.content_cache
   end
 end
