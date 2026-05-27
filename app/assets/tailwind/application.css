@@ -830,7 +830,19 @@ turbo-frame#main { display:contents; }
 }
 .file-row .file-name:hover { color:var(--accent-fg); text-decoration:underline; }
 .file-row .file-size { font-family:var(--fm); font-size:11px; color:var(--ink-3); white-space:nowrap; }
-.skill-add-file { display:flex; flex-direction:column; gap:14px; }
+.sec-intro { margin:-4px 0 14px; max-width:60ch; }
+.skill-add-file-wrap { margin-top:4px; }
+.skill-add-file-wrap > summary {
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  list-style:none; user-select:none;
+}
+.skill-add-file-wrap > summary::-webkit-details-marker { display:none; }
+.skill-add-file-wrap[open] > summary { margin-bottom:14px; }
+.skill-add-file {
+  display:flex; flex-direction:column; gap:14px;
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:14px 16px;
+}
 
 /* ───────────── auth (Devise pages) ───────────── */
 body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24px; }
