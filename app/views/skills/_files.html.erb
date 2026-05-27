@@ -1,0 +1,42 @@
+<%# Supporting files attached to the skill (everything but SKILL.md).
+    The agent can author these directly; this panel lets the operator
+    see, download, and replace them. %>
+<% supporting = skill.files.reject { |f| skill.relative_path(f) == Skill::SKILL_MD }
+       .sort_by { |f| skill.relative_path(f) } %>
+
+<section class="skill-files">
+  <h2 class="sec-label">Supporting files</h2>
+
+  <% if supporting.any? %>
+    <ul class="file-rows">
+      <% supporting.each do |file| %>
+        <li class="file-row">
+          <%= link_to skill.relative_path(file), download_file_skill_path(skill, file_id: file.id),
+                class: "file-name", target: "_blank", rel: "noopener" %>
+          <span class="file-size"><%= number_to_human_size(file.byte_size) %></span>
+          <%= button_to "Delete", destroy_file_skill_path(skill, file_id: file.id),
+                method: :delete, class: "btn btn-ghost",
+                form: { data: { turbo_confirm: "Delete #{skill.relative_path(file)}?" } } %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="field-hint">No supporting files yet. Add reference docs, scripts, or examples below.</p>
+  <% end %>
+
+  <%= form_with url: add_file_skill_path(skill), multipart: true, class: "skill-add-file" do |f| %>
+    <div class="field">
+      <%= label_tag :path, "Path" %>
+      <%= text_field_tag :path, nil, placeholder: "ref/style.md", autocomplete: "off" %>
+      <p class="field-hint">Relative path under the skill — e.g. <code>ref/style.md</code> or <code>scripts/run.sh</code>. Reserved: <code>SKILL.md</code>.</p>
+    </div>
+    <div class="field">
+      <%= label_tag :file, "File" %>
+      <%= file_field_tag :file %>
+      <p class="field-hint">Up to <%= Skill::MAX_FILE_SIZE / 1.megabyte %>MB.</p>
+    </div>
+    <div class="form-actions">
+      <%= f.submit "Add file", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</section>

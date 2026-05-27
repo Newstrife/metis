@@ -9,6 +9,14 @@ class Skill < ApplicationRecord
   EXAMPLE_MAX_LENGTH = 200
   MAX_EXAMPLES = 10
 
+  # Supporting-file constraints. Caps are generous for the v1 use case
+  # (a skill is text + small reference files, not a media store) and
+  # narrow enough to keep ingest cheap on E2b's per-file reads.
+  MAX_FILE_SIZE = 2.megabytes
+  MAX_FILE_PATH_LENGTH = 200
+  MAX_FILE_PATH_DEPTH = 4   # SKILL.md = 1; ref/style.md = 2; etc.
+  FILE_PATH_SEGMENT = /\A[A-Za-z0-9][A-Za-z0-9_.-]*\z/
+
   # Starter SKILL.md for the new-skill form. pi reads `name` and
   # `description` from the YAML frontmatter to decide auto-trigger;
   # the body is the instructions it loads on a match.
@@ -52,6 +60,25 @@ class Skill < ApplicationRecord
 
   def self.text_extension?(path)
     TEXT_EXTENSIONS.include?(File.extname(path).downcase)
+  end
+
+  # A supporting-file path is acceptable when: it's a relative path
+  # (no leading `/`, no `..` segments), each segment matches a safe
+  # character set, the total length is bounded, and the depth is
+  # bounded. SKILL.md is reserved — the skill_md textarea owns it; the
+  # files panel manages everything else.
+  def self.valid_file_path?(path)
+    return false unless path.is_a?(String)
+
+    path = path.strip
+    return false if path.empty?
+    return false if path.length > MAX_FILE_PATH_LENGTH
+    return false if path == SKILL_MD
+    return false if path.start_with?("/")
+
+    segments = path.split("/")
+    return false if segments.size > MAX_FILE_PATH_DEPTH
+    segments.all? { |s| s.match?(FILE_PATH_SEGMENT) && s != ".." }
   end
 
   # Pull a `description:` value out of SKILL.md YAML frontmatter.

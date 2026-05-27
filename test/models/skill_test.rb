@@ -81,6 +81,23 @@ class SkillTest < ActiveSupport::TestCase
     assert_equal [ "SKILL.md" ], skill.file_list
   end
 
+  test "valid_file_path? accepts plain relative paths up to MAX_FILE_PATH_DEPTH" do
+    assert Skill.valid_file_path?("notes.md")
+    assert Skill.valid_file_path?("ref/style.md")
+    assert Skill.valid_file_path?("scripts/build/run.sh")
+  end
+
+  test "valid_file_path? rejects unsafe paths" do
+    refute Skill.valid_file_path?(nil)
+    refute Skill.valid_file_path?("")
+    refute Skill.valid_file_path?("SKILL.md")        # reserved
+    refute Skill.valid_file_path?("/abs/path.md")    # absolute
+    refute Skill.valid_file_path?("../escape.md")    # traversal
+    refute Skill.valid_file_path?("has space.md")    # invalid segment
+    refute Skill.valid_file_path?("a/b/c/d/e.md")    # too deep
+    refute Skill.valid_file_path?("a" * 201 + ".md") # too long
+  end
+
   test "replace_file! attaches a tree of files keyed by relative_path" do
     skill = make_skill.tap(&:save!)
     skill.replace_file!("SKILL.md", "# top")

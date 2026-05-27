@@ -77,7 +77,80 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  # --- supporting files ---------------------------------------------
+
+  test "add_file attaches a supporting file" do
+    skill = make_skill
+    upload = fixture_file_upload(make_file("hello, world\n"), "text/plain")
+
+    assert_difference -> { skill.files.reload.count }, 1 do
+      post add_file_skill_path(skill), params: { path: "notes.txt", file: upload }
+    end
+    assert_redirected_to edit_skill_path(skill)
+    assert_includes skill.files.map { |f| skill.relative_path(f) }, "notes.txt"
+  end
+
+  test "add_file rejects an unsafe path" do
+    skill = make_skill
+    upload = fixture_file_upload(make_file("x"), "text/plain")
+
+    assert_no_difference -> { skill.files.reload.count } do
+      post add_file_skill_path(skill), params: { path: "../escape.md", file: upload }
+    end
+    assert_redirected_to edit_skill_path(skill)
+    assert_match(/Invalid path/, flash[:alert])
+  end
+
+  test "add_file rejects a file larger than MAX_FILE_SIZE" do
+    skill = make_skill
+    big = make_file("X" * (Skill::MAX_FILE_SIZE + 1))
+    upload = fixture_file_upload(big, "application/octet-stream")
+
+    post add_file_skill_path(skill), params: { path: "big.bin", file: upload }
+    assert_redirected_to edit_skill_path(skill)
+    assert_match(/too large/i, flash[:alert])
+  end
+
+  test "destroy_file purges the attachment" do
+    skill = make_skill
+    skill.replace_file!("ref/style.md", "tone: terse")
+    skill.save!
+    attachment = skill.files.find { |f| skill.relative_path(f) == "ref/style.md" }
+
+    assert_difference -> { skill.files.reload.count }, -1 do
+      delete destroy_file_skill_path(skill, file_id: attachment.id)
+    end
+  end
+
+  test "download_file streams the blob bytes inline" do
+    skill = make_skill
+    skill.replace_file!("ref/style.md", "tone: terse", "text/markdown")
+    skill.save!
+    attachment = skill.files.find { |f| skill.relative_path(f) == "ref/style.md" }
+
+    get download_file_skill_path(skill, file_id: attachment.id)
+    assert_response :success
+    assert_equal "tone: terse", response.body
+    assert_match %r{\Atext/markdown}, response.content_type
+  end
+
+  test "download_file 404s on a missing attachment id" do
+    skill = make_skill
+    get download_file_skill_path(skill, file_id: 999_999)
+    assert_response :not_found
+  end
+
   private
+
+  # Active Storage's fixture_file_upload wants a path; this writes
+  # `content` to a per-test tempfile under tmp/ and returns its path.
+  def make_file(content)
+    path = Rails.root.join("tmp/test_uploads", "#{SecureRandom.hex(4)}.bin")
+    FileUtils.mkdir_p(path.dirname)
+    File.binwrite(path, content)
+    path.to_s
+  end
+
 
   def current_user_id = @user.id
 end
