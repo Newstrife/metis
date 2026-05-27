@@ -92,6 +92,25 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
 
   # Stub E2B::Sandbox.create / .connect and PiAgent.session for the block.
   # `on_connect` is invoked with the sandbox_id requested.
+  # Point Agent::Workspace::SKILLS_SOURCE at a tmp dir for the block.
+  def with_skills_source
+    Dir.mktmpdir do |tmp|
+      source = Pathname.new(tmp).join("skills")
+      FileUtils.mkdir_p(source)
+      original = Agent::Workspace::SKILLS_SOURCE
+      Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
+      Agent::Workspace.const_set(:SKILLS_SOURCE, source)
+      Agent::Workspace.reset_repo_skills_fingerprint!
+      begin
+        yield source
+      ensure
+        Agent::Workspace.send(:remove_const, :SKILLS_SOURCE)
+        Agent::Workspace.const_set(:SKILLS_SOURCE, original)
+        Agent::Workspace.reset_repo_skills_fingerprint!
+      end
+    end
+  end
+
   def with_e2b(create: nil, connect: nil, session: fake_session, on_connect: nil)
     create_original  = E2B::Sandbox.method(:create)
     connect_original = E2B::Sandbox.method(:connect)
@@ -210,8 +229,12 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     # BAKED_REPO_SKILLS_DIR is NOT in exist_paths — simulates a legacy
     # template that predates the bake. The runtime falls back to
     # per-file upload.
-    with_e2b(create: sandbox) do
-      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("summarize"))
+      File.write(source.join("summarize/SKILL.md"), "# repo skill")
+      with_e2b(create: sandbox) do
+        @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+      end
     end
 
     repo_uploads = sandbox.files.writes.keys.grep(%r{\A#{Agent::Runtime::E2b::WORKSPACE_DIR}/\.pi/skills/[^/]+/SKILL\.md\z})
