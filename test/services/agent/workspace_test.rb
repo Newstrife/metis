@@ -125,7 +125,7 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
     assert_equal "fresh", File.read(workspace.workspace_dir.join(".pi/skills/fresh/SKILL.md"))
   end
 
-  test "stage_skills is a no-op when the repo has no .pi/skills tree" do
+  test "stage_skills is a no-op when the repo has no .pi/skills tree and no team skills" do
     workspace = Agent::Workspace.scratch(@conversation)
     workspace.ensure!
 
@@ -136,7 +136,174 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
     refute File.exist?(workspace.workspace_dir.join(".pi/skills"))
   end
 
+  test "stage_skills writes enabled team skills into .pi/skills/<slug>/ alongside repo skills" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    skill = @conversation.team.skills.create!(slug: "summarize", description: "x")
+    skill.replace_skill_md!("# team skill")
+    skill.save!
+
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("alpha"))
+      File.write(source.join("alpha/SKILL.md"), "# repo skill")
+      workspace.stage_skills
+    end
+
+    dest = workspace.workspace_dir.join(".pi/skills")
+    assert_equal "# repo skill", File.read(dest.join("alpha/SKILL.md"))
+    assert_equal "# team skill", File.read(dest.join("summarize/SKILL.md"))
+  end
+
+  test "stage_skills skips disabled team skills" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    skill = @conversation.team.skills.create!(slug: "off", description: "x", enabled: false)
+    skill.replace_skill_md!("# hidden")
+    skill.save!
+
+    with_skills_source(create: false) { workspace.stage_skills }
+
+    refute File.exist?(workspace.workspace_dir.join(".pi/skills/off"))
+  end
+
+  test "ingest_team_skills creates a Skill row from an agent-written dir" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    write_skill_dir(workspace, "draft-pr", <<~MD, files: { "ref/style.md" => "tone: terse\n" })
+      ---
+      name: draft-pr
+      description: Draft a PR description from a branch diff.
+      ---
+
+      # Body
+    MD
+
+    assert_difference -> { @conversation.team.skills.count }, 1 do
+      workspace.ingest_team_skills(slugs: Set["draft-pr"], by: @user)
+    end
+
+    skill = @conversation.team.skills.find_by!(slug: "draft-pr")
+    assert_equal "Draft a PR description from a branch diff.", skill.description
+    assert_includes skill.content_cache, "# Body"
+    assert_equal [ "SKILL.md", "ref/style.md" ].sort, skill.file_list
+    assert_equal @user, skill.created_by
+  end
+
+  test "ingest_team_skills updates an existing Skill row" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    existing = @conversation.team.skills.create!(slug: "draft-pr", description: "old")
+    existing.replace_skill_md!("# old body")
+    existing.save!
+
+    write_skill_dir(workspace, "draft-pr", <<~MD)
+      ---
+      name: draft-pr
+      description: New shape — lead with why.
+      ---
+
+      # new body
+    MD
+
+    workspace.ingest_team_skills(slugs: Set["draft-pr"], by: @user)
+
+    existing.reload
+    assert_equal "New shape — lead with why.", existing.description
+    assert_includes existing.content_cache, "# new body"
+  end
+
+  test "ingest_team_skills skips dirs with no SKILL.md" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    FileUtils.mkdir_p(workspace.skills_dir.join("no-skill-md"))
+    File.write(workspace.skills_dir.join("no-skill-md/notes.txt"), "x")
+
+    assert_no_difference -> { @conversation.team.skills.count } do
+      workspace.ingest_team_skills(slugs: Set["no-skill-md"], by: @user)
+    end
+  end
+
+  test "ingest_team_skills skips slugs that match a repo skill — repo tree stays read-only" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    with_skills_source do |source|
+      FileUtils.mkdir_p(source.join("writing-rails-code"))
+      File.write(source.join("writing-rails-code/SKILL.md"), "# original")
+
+      # Simulate the agent tampering: write a different SKILL.md into the
+      # repo slug's dir inside the workspace tree.
+      write_skill_dir(workspace, "writing-rails-code", "# tampered")
+
+      assert_no_difference -> { @conversation.team.skills.count } do
+        workspace.ingest_team_skills(slugs: Set["writing-rails-code"], by: @user)
+      end
+    end
+  end
+
+  test "ingest_team_skills skips invalid slugs" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    write_skill_dir(workspace, "Has Spaces", "x")
+
+    assert_no_difference -> { @conversation.team.skills.count } do
+      workspace.ingest_team_skills(slugs: Set["Has Spaces"], by: @user)
+    end
+  end
+
+  test "ingest_team_skills is a no-op when no slugs were touched" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    write_skill_dir(workspace, "untouched", "# body")
+
+    assert_no_difference -> { @conversation.team.skills.count } do
+      workspace.ingest_team_skills(slugs: Set.new, by: @user)
+    end
+  end
+
+  test "ingest_team_skills does NOT delete rows missing from the touched set" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    @conversation.team.skills.create!(slug: "keeper", description: "x")
+
+    assert_no_difference -> { @conversation.team.skills.count } do
+      workspace.ingest_team_skills(slugs: Set["other"], by: @user)
+    end
+  end
+
+  test "ingest_team_skill_from_files upserts from an in-memory map (E2b path)" do
+    workspace = Agent::Workspace.scratch(@conversation)
+
+    assert_difference -> { @conversation.team.skills.count }, 1 do
+      workspace.ingest_team_skill_from_files(
+        slug: "from-sandbox",
+        files: {
+          "SKILL.md" => "---\nname: from-sandbox\ndescription: built from a sandbox read.\n---\n\n# body\n",
+          "ref/note.md" => "supplemental\n"
+        },
+        by: @user
+      )
+    end
+
+    skill = @conversation.team.skills.find_by!(slug: "from-sandbox")
+    assert_equal "built from a sandbox read.", skill.description
+    assert_equal [ "SKILL.md", "ref/note.md" ].sort, skill.file_list
+  end
+
   private
+
+  def write_skill_dir(workspace, slug, body, files: {})
+    dir = workspace.skills_dir.join(slug)
+    FileUtils.mkdir_p(dir)
+    File.write(dir.join("SKILL.md"), body)
+    files.each do |rel, content|
+      path = dir.join(rel)
+      FileUtils.mkdir_p(path.dirname)
+      File.write(path, content)
+    end
+  end
 
   # Point SKILLS_SOURCE at a tmp dir for the block. `create: false` skips
   # creating it, simulating an absent .pi/skills tree.

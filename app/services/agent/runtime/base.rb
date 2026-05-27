@@ -12,6 +12,7 @@ module Agent
       def initialize(conversation:)
         @conversation = conversation
         @artifacts = []
+        @touched_skill_slugs = Set.new
       end
 
       # Files published during the most recent #run. Each entry is
@@ -30,6 +31,25 @@ module Agent
       # paths. Default: none.
       def extension_paths
         []
+      end
+
+      # The set of team-skill slugs the agent's tools touched during
+      # this turn — fed by Agent::Adapters::Pi as it sees
+      # write/edit/bash events. The post-turn ingest_team_skills uses
+      # this set instead of scanning the whole .pi/skills/ tree.
+      attr_reader :touched_skill_slugs
+
+      def note_skill_touched(slug)
+        @touched_skill_slugs << slug if slug.present?
+      end
+
+      # Sync agent-written team skills back. Iterates exactly the
+      # slugs Adapter recorded — no filesystem scan, no mtime gate.
+      # Runtimes that hold workspace files on the host (Local, Docker)
+      # delegate to Workspace; runtimes whose files live inside an
+      # isolated environment (E2b) read from there. See docs/skills.md.
+      def ingest_team_skills(slugs:)
+        # no-op default
       end
 
       # The rendered `.mcp.json` (Agent::McpConfig) for this

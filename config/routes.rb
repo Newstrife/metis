@@ -39,6 +39,7 @@ Rails.application.routes.draw do
     post "profile/detect_timezone", to: "profiles#detect_timezone",
                                     as: :detect_timezone_profile
     resources :connectors, except: :show
+    resources :skills, except: :show
   end
   get "/settings", to: redirect("/settings/profile")
 

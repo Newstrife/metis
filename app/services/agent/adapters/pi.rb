@@ -74,6 +74,7 @@ module Agent
         when :message_end
           ui(:message_finished, event, id: message_id(event), content: message_content(event))
         when :tool_execution_start
+          note_skill_touched(event)
           ui(:tool_call_started, event,
              tool_call_id: event["toolCallId"], name: event["toolName"], args: event["args"])
         when :tool_execution_update
@@ -100,6 +101,37 @@ module Agent
       end
 
       private
+
+      # Pi tools that can write to the filesystem. write/edit name the
+      # target path in `args.path`; bash hides it in `args.command`,
+      # which we regex against the same path shape the activity log
+      # uses to surface "skill: <name>".
+      WRITE_TOOL_NAMES = %w[write edit].freeze
+
+      # Tell the runtime which skill slug this tool touched, so the
+      # post-turn ingest scans exactly those dirs instead of the whole
+      # tree. See docs/skills.md (Agent authoring).
+      def note_skill_touched(event)
+        return unless @runtime.respond_to?(:note_skill_touched)
+
+        args = event["args"] || {}
+        case event["toolName"]
+        when *WRITE_TOOL_NAMES
+          slug = skill_slug_from(args["path"])
+          @runtime.note_skill_touched(slug) if slug
+        when "bash"
+          args["command"].to_s.scan(SKILL_PATH_REGEX).each { |m| @runtime.note_skill_touched(m.first) }
+        end
+      end
+
+      # Same path shape ApplicationHelper#tool_call_display_name uses
+      # for activity-log relabelling — kept in sync deliberately.
+      SKILL_PATH_REGEX = %r{\.pi/skills/([a-z0-9][a-z0-9\-]*)/}.freeze
+
+      def skill_slug_from(path)
+        m = path.to_s.match(SKILL_PATH_REGEX)
+        m && m[1]
+      end
 
       # Image attachments become pi's inline image content.
       def pi_images(images)

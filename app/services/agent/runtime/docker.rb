@@ -62,9 +62,18 @@ module Agent
           yield session
         ensure
           collect_host_artifacts(dir: workspace.artifacts_dir, since: turn_started_at)
+          ingest_team_skills(slugs: touched_skill_slugs)
           session.close
           remove_container
         end
+      end
+
+      # Container writes land on the bind-mounted host workspace; the
+      # host-side ingest reads them in place. Logged-not-raised.
+      def ingest_team_skills(slugs:)
+        workspace.ingest_team_skills(slugs: slugs, by: conversation.user)
+      rescue StandardError => e
+        Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
       end
 
       # Adds the container name, so a turn can be traced even though the

@@ -1,4 +1,5 @@
 require "test_helper"
+require "ostruct"
 
 class Agent::Runtime::E2bTest < ActiveSupport::TestCase
   setup do
@@ -188,6 +189,66 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     paths = @runtime.extension_paths.map(&:to_s)
 
     assert_includes paths, "#{Agent::Runtime::E2b::EXTENSIONS_DIR}/web-tools.ts"
+  end
+
+  test "uploads the team's enabled skills into the sandbox skills tree alongside repo skills" do
+    skill = @conversation.team.skills.create!(slug: "summarize", description: "x")
+    skill.replace_skill_md!("# body")
+    skill.save!
+    sandbox = FakeSandbox.new
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    staged = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/summarize/SKILL.md"
+    assert_equal "# body", sandbox.files.writes[staged]
+  end
+
+  test "ingests touched team skills from the sandbox at turn end" do
+    sandbox = FakeSandbox.new
+    skill_dir = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/code-review"
+    skill_md_path = "#{skill_dir}/SKILL.md"
+    sandbox.files.exist_paths << skill_dir
+    sandbox.files.entries_by_dir[skill_dir] = [
+      OpenStruct.new(path: skill_md_path, file?: true)
+    ]
+    sandbox.files.read_responses[skill_md_path] = <<~MD
+      ---
+      name: code-review
+      description: From the sandbox.
+      ---
+      # body
+    MD
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        # Adapter would normally call this as it sees the write event.
+        @runtime.note_skill_touched("code-review")
+      end
+    end
+
+    skill = @conversation.team.skills.find_by(slug: "code-review")
+    assert_not_nil skill, "touched slug was read from the sandbox + ingested"
+    assert_equal "From the sandbox.", skill.description
+  end
+
+  test "does not ingest sandbox files for slugs the adapter did not record" do
+    sandbox = FakeSandbox.new
+    # Pretend the agent wrote here, but the adapter never recorded the
+    # slug — sandbox state alone must not produce a team row.
+    skill_dir = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/decoy"
+    sandbox.files.exist_paths << skill_dir
+    sandbox.files.entries_by_dir[skill_dir] = [
+      OpenStruct.new(path: "#{skill_dir}/SKILL.md", file?: true)
+    ]
+    sandbox.files.read_responses["#{skill_dir}/SKILL.md"] = "# never"
+
+    with_e2b(create: sandbox) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+    end
+
+    assert_nil @conversation.team.skills.find_by(slug: "decoy")
   end
 
   test "projects the conversation's uploaded files into the sandbox uploads dir" do

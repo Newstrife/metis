@@ -42,6 +42,14 @@
       </svg>
       <span>Connectors</span>
     <% end %>
+    <%= link_to skills_path,
+          class: "nav-item#{' on' if controller_name == 'skills'}" do %>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M3.5 3h9v3h-9zM3.5 9h9v3.5h-9zM2 4.5h1.5M2 11h1.5"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Skills</span>
+    <% end %>
   </nav>
 
   <div class="user">

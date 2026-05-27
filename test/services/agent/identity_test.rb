@@ -128,6 +128,21 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/operator's identity/i, out)
   end
 
+  test "tells the agent where to write team skills so they sync back to the team" do
+    # Without this the agent has no idea that .pi/skills/<slug>/SKILL.md
+    # is the convention pi-side; ingest only matches that path, so a skill
+    # written anywhere else is invisible to the team.
+    out = render
+
+    assert_match(/## Team skills/, out)
+    assert_match(%r{\.pi/skills/<slug>/SKILL\.md}, out)
+    assert_match(/Metis syncs it back/, out)
+    # Repo skills are reserved — instructing the agent against tampering.
+    assert_match(/built-in repo skills/i, out)
+    # Deleting a file should NOT delete the row — keep destructive ops with the operator.
+    assert_match(/delete a skill.*from the UI/im, out)
+  end
+
   test "no longer renders a Tools / Coding tools section — capability inventory was making the agent self-narrow" do
     # Listing git/gh/GH_TOKEN in AGENTS.md was inventory framing — to
     # the model it read as "you are a coding agent." Removed; the

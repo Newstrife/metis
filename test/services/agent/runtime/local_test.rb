@@ -44,6 +44,39 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
     assert paths.all? { |path| File.exist?(path) }, "extension files exist on this host"
   end
 
+  test "run ingests only the slugs the adapter recorded via note_skill_touched" do
+    session = fake_session
+    skill_md = <<~MD
+      ---
+      name: code-review
+      description: Walk the diff for security + invariants.
+      ---
+      # body
+    MD
+
+    with_pi_session(session) do
+      @runtime.run(pi_args: [ "--mode", "rpc" ]) do |_s|
+        # Simulate what the adapter would do mid-turn: agent wrote a
+        # skill, adapter parsed the tool event, called note_skill_touched.
+        dir = @workspace.skills_dir.join("code-review")
+        FileUtils.mkdir_p(dir)
+        File.write(dir.join("SKILL.md"), skill_md)
+        @runtime.note_skill_touched("code-review")
+
+        # An untouched skill on disk must NOT get ingested — the slug
+        # set is the authority.
+        FileUtils.mkdir_p(@workspace.skills_dir.join("decoy"))
+        File.write(@workspace.skills_dir.join("decoy/SKILL.md"), "# never seen")
+      end
+    end
+
+    skill = @conversation.team.skills.find_by(slug: "code-review")
+    assert_not_nil skill, "touched skill was ingested"
+    assert_equal "Walk the diff for security + invariants.", skill.description
+    assert_nil @conversation.team.skills.find_by(slug: "decoy"),
+               "decoy skill on disk is invisible without an adapter signal"
+  end
+
   test "run provisions the workspace and yields the session" do
     session = fake_session
     yielded = nil

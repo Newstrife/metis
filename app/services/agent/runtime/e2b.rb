@@ -67,8 +67,31 @@ module Agent
       ensure
         if sandbox
           collect_sandbox_artifacts(sandbox, since: turn_started_at) if turn_started_at
+          ingest_team_skills(sandbox: sandbox, slugs: touched_skill_slugs)
           pause_sandbox(sandbox)
         end
+      end
+
+      # Pull each touched skill out of the sandbox and upsert it. The
+      # adapter already filtered to .pi/skills/<slug>/ paths, so we
+      # know exactly which dirs to read — no listing of the whole
+      # tree, no mtime gate. Must run before #pause_sandbox: a paused
+      # sandbox's filesystem is unreachable. Logged-not-raised.
+      def ingest_team_skills(sandbox:, slugs:)
+        return if slugs.empty?
+
+        repo_slugs = Agent::Workspace.repo_slugs
+        slugs.each do |slug|
+          next if repo_slugs.include?(slug)
+          next unless Skill::SLUG_FORMAT.match?(slug)
+
+          files = read_sandbox_skill_files(sandbox, slug)
+          next if files.empty?
+
+          workspace.ingest_team_skill_from_files(slug: slug, files: files, by: conversation.user)
+        end
+      rescue StandardError => e
+        Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
       end
 
       # Adds the microVM's id, so a turn can be traced to its sandbox in
@@ -169,6 +192,27 @@ module Agent
         "#{EXTENSIONS_DIR}/#{source.parent.basename}.ts"
       end
 
+      # Read every file under WORKSPACE_DIR/.pi/skills/<slug>/ in the
+      # sandbox into an in-memory map keyed by relative path. One list
+      # RPC + one read per file. Skill dirs are small (SKILL.md plus
+      # a handful of supporting files), so the cost is bounded.
+      def read_sandbox_skill_files(sandbox, slug)
+        root = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}/#{slug}"
+        return {} unless sandbox.files.exists?(root)
+
+        files = {}
+        list_sandbox_files(sandbox, root).each do |entry|
+          rel = entry.path.delete_prefix("#{root}/")
+          files[rel] = sandbox.files.read(entry.path, format: "bytes")
+        end
+        files
+      end
+
+      # Need workspace for the DB-side ingest helper.
+      def workspace
+        @workspace ||= Agent::Workspace.persistent(conversation)
+      end
+
       # Project the conversation's uploaded files into uploads/. Re-
       # staged each turn (the canonical source is the Message
       # attachment, not the sandbox copy). Filenames are basenamed so a
@@ -195,22 +239,35 @@ module Agent
         sandbox.files.write("#{WORKSPACE_DIR}/#{Agent::Identity::FILENAME}", identity_content)
       end
 
-      # Project the repo's .pi/skills/ tree into the sandbox workspace.
-      # pi auto-discovers skills from .pi/skills/ relative to cwd.
-      # Per-turn projected input — the prior turn's tree is wiped first
-      # so a deleted skill in the repo disappears from the sandbox.
+      # Project skills into the sandbox at WORKSPACE_DIR/.pi/skills/.
+      # pi auto-discovers from cwd, so both repo skills (from
+      # SKILLS_SOURCE on the host) and team skills (from the
+      # conversation's enabled Skill rows) land in one tree. The
+      # prior turn's tree is wiped first so deleted skills disappear
+      # and any agent writes from the prior turn are erased — see
+      # Workspace#stage_skills for the same invariant.
       def stage_skills(sandbox)
-        source = Agent::Workspace::SKILLS_SOURCE
-        return unless source.directory?
-
         dest_root = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}"
         sandbox.commands.run("rm -rf #{Shellwords.escape(dest_root)}")
-        Dir.glob(source.join("**/*"), File::FNM_DOTMATCH).each do |path|
-          next if File.directory?(path)
-          next if File.basename(path).match?(/\A\.{1,2}\z/)
 
-          rel = Pathname.new(path).relative_path_from(source).to_s
-          sandbox.files.write("#{dest_root}/#{rel}", File.binread(path))
+        source = Agent::Workspace::SKILLS_SOURCE
+        if source.directory?
+          Dir.glob(source.join("**/*"), File::FNM_DOTMATCH).each do |path|
+            next if File.directory?(path)
+            next if File.basename(path).match?(/\A\.{1,2}\z/)
+
+            rel = Pathname.new(path).relative_path_from(source).to_s
+            sandbox.files.write("#{dest_root}/#{rel}", File.binread(path))
+          end
+        end
+
+        conversation.team.skills.enabled.each do |skill|
+          skill.files.each do |file|
+            rel = Pathname.new(skill.relative_path(file)).cleanpath.to_s
+            next if rel.start_with?("..") || rel.start_with?("/")
+
+            sandbox.files.write("#{dest_root}/#{skill.slug}/#{rel}", file.download)
+          end
         end
       end
 

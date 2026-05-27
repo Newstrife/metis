@@ -19,14 +19,18 @@
           keeps the settings sidebar mounted. %>
       <turbo-frame id="main" data-turbo-action="advance">
         <%= yield %>
+        <%# Flash lives inside the frame so a frame-scoped redirect
+            (form save → re-render the same section) re-renders it.
+            position:fixed takes it out of flow regardless of parent. %>
+        <% if notice || alert %>
+          <div class="flash-toast"
+               data-controller="flash"
+               data-action="mouseenter->flash#pause mouseleave->flash#resume">
+            <% if notice %><div class="flash notice"><%= notice %></div><% end %>
+            <% if alert %><div class="flash alert"><%= alert %></div><% end %>
+          </div>
+        <% end %>
       </turbo-frame>
     </div>
-
-    <% if notice || alert %>
-      <div class="flash-toast">
-        <% if notice %><div class="flash notice"><%= notice %></div><% end %>
-        <% if alert %><div class="flash alert"><%= alert %></div><% end %>
-      </div>
-    <% end %>
   </body>
 </html>
