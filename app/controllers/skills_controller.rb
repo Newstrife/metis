@@ -1,10 +1,21 @@
 class SkillsController < ApplicationController
   layout "settings"
 
+  TABS = %w[team builtin marketplace].freeze
+
   before_action :set_skill, only: %i[edit update destroy add_file destroy_file download_file]
 
   def index
-    @skills = team.skills.order(updated_at: :desc)
+    @tab = TABS.include?(params[:tab]) ? params[:tab] : "team"
+    case @tab
+    when "team"
+      @skills = team.skills.order(updated_at: :desc)
+    when "builtin"
+      @repo_skills = Agent::RepoSkills.all
+    when "marketplace"
+      @featured = Agent::SkillMarketplace::FEATURED
+      @existing_slugs = team.skills.pluck(:slug).to_set
+    end
   end
 
   def new

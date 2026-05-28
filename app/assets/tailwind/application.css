@@ -747,6 +747,34 @@ turbo-frame#main { display:contents; }
 .btn-danger { background:none; color:var(--ink-2); border-color:var(--line-2); }
 .btn-danger:hover { color:var(--danger); border-color:var(--danger-line); }
 
+/* skills tabs */
+.skills-tabs {
+  display:flex; gap:4px; border-bottom:1px solid var(--line);
+  margin:14px 0 18px;
+}
+.skills-tab {
+  font-size:13px; color:var(--ink-3); text-decoration:none;
+  padding:8px 14px; border-radius:8px 8px 0 0;
+  border:1px solid transparent; border-bottom:none;
+  margin-bottom:-1px;
+}
+.skills-tab:hover { color:var(--ink); }
+.skills-tab.is-active {
+  color:var(--ink); background:var(--card);
+  border-color:var(--line); border-bottom:1px solid var(--card);
+}
+
+.conn-desc {
+  font-size:12.5px; color:var(--ink-3); margin-top:2px;
+}
+
+.badge {
+  font-size:11.5px; color:var(--ink-3); background:var(--accent-soft);
+  border-radius:6px; padding:3px 8px;
+}
+
+.inline-form { display:inline; margin:0; }
+
 /* connector list */
 .conn-list { display:flex; flex-direction:column; gap:8px; }
 .conn-row {

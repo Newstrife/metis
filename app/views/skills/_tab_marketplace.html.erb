@@ -1,0 +1,41 @@
+<p class="form-hint">
+  Curated picks from <a href="https://github.com/anthropics/skills" target="_blank" rel="noopener">anthropics/skills</a>.
+  Click <strong>Install</strong> to import into your team. Imported skills
+  show up under <em>Your skills</em> and behave like any other team skill.
+</p>
+
+<div class="conn-list">
+  <% @featured.each do |entry| %>
+    <% slug = File.basename(entry.source) %>
+    <% installed = @existing_slugs.include?(slug) %>
+    <div class="conn-row">
+      <div style="flex:1">
+        <div class="conn-name"><%= entry.label %> <span class="form-hint">— <%= slug %></span></div>
+        <div class="conn-desc"><%= entry.description %></div>
+      </div>
+      <% if installed %>
+        <span class="badge">Installed</span>
+      <% else %>
+        <%= button_to "Install", import_skills_path,
+              params: { url: entry.source },
+              method: :post,
+              class: "btn btn-ghost",
+              form: { class: "inline-form" } %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<div class="conn-form" style="margin-top:1.5rem">
+  <h2 class="form-title">Import another</h2>
+  <%= form_with url: import_skills_path, method: :post, local: true do |f| %>
+    <div style="display:flex; gap:0.5rem;">
+      <%= f.text_field :url, class: "form-input", style: "flex:1",
+            placeholder: "owner/repo/path/to/skill or full GitHub URL" %>
+      <%= f.submit "Import", class: "btn btn-ghost" %>
+    </div>
+    <p class="form-hint">
+      Path must point to a directory containing <code>SKILL.md</code>.
+    </p>
+  <% end %>
+</div>

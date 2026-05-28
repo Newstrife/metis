@@ -1,0 +1,23 @@
+<p class="form-hint">
+  Skills shipped in the repo at <code>.pi/skills/</code>. Read-only —
+  edit them by committing to the repo. Visible to every team.
+</p>
+
+<% if @repo_skills.any? %>
+  <div class="conn-list">
+    <% @repo_skills.each do |listing| %>
+      <div class="conn-row">
+        <div style="flex:1; min-width:0">
+          <div class="conn-name"><%= listing.slug %></div>
+          <div class="conn-desc"><%= truncate(listing.description.to_s, length: 140) %></div>
+        </div>
+        <span class="badge">Built-in</span>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="pane-empty">
+    <p>No built-in skills shipped with this deployment.</p>
+    <p class="form-hint">Drop a directory under <code>.pi/skills/&lt;slug&gt;/</code> with a <code>SKILL.md</code> to ship one.</p>
+  </div>
+<% end %>
