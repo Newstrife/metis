@@ -6,7 +6,10 @@ module Agent
   # and the per-runtime persistence model.
   class Workspace
     SCRATCH_ROOT = Rails.root.join("tmp/agent").freeze
-    PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
+    # In test, route persistent scopes under tmp/ so the suite's
+    # rm_rf teardowns can never alias a dev user's storage/agent/uN
+    # (sequences in the dev and test DBs collide on small ids).
+    PERSISTENT_ROOT = Rails.root.join(Rails.env.test? ? "tmp/agent_persistent_test" : "storage/agent").freeze
     SKILLS_SOURCE = Rails.root.join(".pi/skills").freeze
     SKILLS_SUBPATH = ".pi/skills".freeze
     # Mirrors Runtime::E2b#TEAM_SKILLS_MARKER — see stage_skills.

@@ -15,8 +15,9 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
   end
 
   test "scratch and persistent resolve to different roots" do
-    assert_includes Agent::Workspace.scratch(@conversation).scope_dir.to_s, "tmp/agent"
-    assert_includes Agent::Workspace.persistent(@conversation).scope_dir.to_s, "storage/agent"
+    assert_includes Agent::Workspace.scratch(@conversation).scope_dir.to_s, Agent::Workspace::SCRATCH_ROOT.to_s
+    assert_includes Agent::Workspace.persistent(@conversation).scope_dir.to_s, Agent::Workspace::PERSISTENT_ROOT.to_s
+    refute_equal Agent::Workspace::SCRATCH_ROOT, Agent::Workspace::PERSISTENT_ROOT
   end
 
   test "scopes the session, workspace, and uploads dirs per user and conversation" do
