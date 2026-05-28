@@ -1,6 +1,8 @@
 <%# Profile settings form. Submits to PATCH /profile via the
     "profile_form" turbo frame so save errors re-render in place
-    without nuking the rest of the page. %>
+    without nuking the rest of the page. Two-column layout: short
+    preferences on the left, long-form personalization on the right.
+    Collapses to a single column on mobile via .profile-form's grid. %>
 <%= form_with model: user, url: profile_path, method: :patch,
       data: { turbo_frame: "profile_form" }, class: "profile-form" do |form| %>
   <% if flash[:notice].present? %>
@@ -17,35 +19,65 @@
     </div>
   <% end %>
 
-  <div class="form-row">
-    <%= form.label :display_name, "Display name" %>
-    <%= form.text_field :display_name, autocomplete: "name",
-          placeholder: "How others see you" %>
-    <p class="form-hint">Shown in the sidebar and conversation header.</p>
+  <div class="profile-col">
+    <h2 class="profile-col-title">Preferences</h2>
+
+    <div class="form-row">
+      <%= form.label :display_name, "Display name" %>
+      <%= form.text_field :display_name, autocomplete: "name",
+            placeholder: "How others see you" %>
+      <p class="form-hint">Shown in the sidebar and conversation header.</p>
+    </div>
+
+    <div class="form-row">
+      <%= form.label :timezone, "Timezone" %>
+      <%= form.select :timezone, timezone_options,
+            { include_blank: "Default" },
+            autocomplete: "off" %>
+      <p class="form-hint">Timestamps throughout the app render in this zone.</p>
+    </div>
+
+    <div class="form-row">
+      <%= form.label :language, "Language" %>
+      <%= form.select :language,
+            User::AVAILABLE_LANGUAGES.map { |code| [ language_label(code), code ] },
+            include_blank: "Default" %>
+      <p class="form-hint">More locales arrive as translations land.</p>
+    </div>
+
+    <div class="form-row">
+      <%= form.label :preferred_model, "Default model" %>
+      <%= form.select :preferred_model,
+            grouped_options_for_select(Agent::Catalog.grouped_model_options, user.preferred_model),
+            include_blank: "Default" %>
+      <p class="form-hint">Used for new conversations — still overridable per chat.</p>
+    </div>
+
+    <div class="form-row">
+      <%= form.label :theme, "Theme" %>
+      <%= form.select :theme,
+            User::THEMES.map { |key| [ key.capitalize, key ] },
+            include_blank: "Default" %>
+      <p class="form-hint">Persists across devices. Falls back to your OS preference.</p>
+    </div>
   </div>
 
-  <div class="form-row">
-    <%= form.label :timezone, "Timezone" %>
-    <%= form.select :timezone, timezone_options,
-          { include_blank: "Default" },
-          autocomplete: "off" %>
-    <p class="form-hint">Timestamps throughout the app render in this zone.</p>
-  </div>
+  <div class="profile-col">
+    <h2 class="profile-col-title">Personalization</h2>
 
-  <div class="form-row">
-    <%= form.label :language, "Language" %>
-    <%= form.select :language,
-          User::AVAILABLE_LANGUAGES.map { |code| [ language_label(code), code ] },
-          include_blank: "Default" %>
-    <p class="form-hint">More locales arrive as translations land.</p>
-  </div>
+    <div class="form-row">
+      <%= form.label :about_you, "About you" %>
+      <p class="form-hint">Rendered into every turn — keep it tight, not a memoir.</p>
+      <%= form.text_area :about_you, rows: 6,
+            placeholder: "Your role, what you work on, anything Metis should keep in mind." %>
+    </div>
 
-  <div class="form-row">
-    <%= form.label :preferred_model, "Default model" %>
-    <%= form.select :preferred_model,
-          grouped_options_for_select(Agent::Catalog.grouped_model_options, user.preferred_model),
-          include_blank: "Default" %>
-    <p class="form-hint">Used for new conversations — still overridable per chat.</p>
+    <div class="form-row">
+      <%= form.label :custom_instructions, "Custom instructions" %>
+      <p class="form-hint">How you want Metis to respond. Applied to every conversation.</p>
+      <%= form.text_area :custom_instructions, rows: 10,
+            placeholder: "e.g., Be terse. Don't apologize. Cite file:line when referencing code." %>
+    </div>
   </div>
 
   <div class="form-actions">

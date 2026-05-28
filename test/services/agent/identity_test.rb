@@ -143,6 +143,31 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/delete a skill.*from the UI/im, out)
   end
 
+  test "renders operator preferences from the user's profile when present" do
+    # about_you and custom_instructions on User flow into AGENTS.md as
+    # standing guidance — without this, profile fields are pure UI
+    # without behavioral effect.
+    user = conversation.user
+    user.update!(
+      about_you: "Staff engineer on the payments platform.",
+      custom_instructions: "Be terse. Cite file:line when referencing code."
+    )
+
+    out = render
+
+    assert_match(/## About the operator/, out)
+    assert_match(/payments platform/, out)
+    assert_match(/## Operator instructions/, out)
+    assert_match(/file:line/, out)
+  end
+
+  test "omits operator-preferences sections when the profile fields are blank" do
+    out = render
+
+    refute_match(/## About the operator/, out)
+    refute_match(/## Operator instructions/, out)
+  end
+
   test "no longer renders a Tools / Coding tools section — capability inventory was making the agent self-narrow" do
     # Listing git/gh/GH_TOKEN in AGENTS.md was inventory framing — to
     # the model it read as "you are a coding agent." Removed; the

@@ -17,11 +17,17 @@ class User < ApplicationRecord
   # controller change.
   AVAILABLE_LANGUAGES = %w[en].freeze
 
+  # `system` defers to the OS / browser preference (handled by the
+  # no-flash script in the head). Explicit `light`/`dark` overrides it.
+  THEMES = %w[system light dark].freeze
+
   # Trim whitespace and treat empty strings as nil for every profile
   # field — keeps a stray space in the form from sneaking past the
   # inclusion/length validators below and causing surprises downstream
   # (a display_name like " " is technically "present" but reads blank).
-  normalizes :display_name, :timezone, :language, :preferred_model,
+  normalizes :display_name, :timezone, :language, :preferred_model, :theme,
+             with: ->(value) { value.is_a?(String) ? value.strip.presence : value }
+  normalizes :about_you, :custom_instructions,
              with: ->(value) { value.is_a?(String) ? value.strip.presence : value }
 
   # Profile fields are validated only when the user submits the profile
@@ -33,6 +39,9 @@ class User < ApplicationRecord
             inclusion: { in: ->(_) { ActiveSupport::TimeZone.all.map(&:name) } },
             allow_blank: true
   validates :language, inclusion: { in: AVAILABLE_LANGUAGES }, allow_blank: true
+  validates :theme, inclusion: { in: THEMES }, allow_blank: true
+  validates :about_you, length: { maximum: 2_000 }
+  validates :custom_instructions, length: { maximum: 4_000 }
   validate :preferred_model_known
 
   # What to show in the UI for this user — the display name they picked,

@@ -1026,19 +1026,34 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
 .profile-page h1 { font-family:var(--fh); font-size:22px; font-weight:600; margin:0; }
 .profile-email { color:var(--ink-3); font-size:13px; margin:2px 0 0; }
 
-.profile-form { display:flex; flex-direction:column; gap:18px; max-width:540px; }
+.profile-form {
+  display:grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap:28px 40px; max-width:980px;
+}
+.profile-form .form-flash,
+.profile-form .form-actions { grid-column: 1 / -1; }
+.profile-col { display:flex; flex-direction:column; gap:18px; min-width:0; }
+.profile-col-title {
+  font-family:var(--fh); font-size:13px; font-weight:600;
+  text-transform:uppercase; letter-spacing:0.06em;
+  color:var(--ink-3); margin:0 0 -4px;
+}
 .profile-form .form-row { display:flex; flex-direction:column; gap:6px; }
 .profile-form label {
   font-size:13px; font-weight:600; color:var(--ink-2);
 }
 .profile-form input[type=text],
-.profile-form select {
+.profile-form select,
+.profile-form textarea {
   background:var(--card); border:1px solid var(--line-2); border-radius:10px;
   padding:9px 11px; font-size:14px; color:var(--ink);
   font-family:inherit;
 }
+.profile-form textarea { resize:vertical; line-height:1.5; min-height:96px; }
 .profile-form input[type=text]:focus,
-.profile-form select:focus {
+.profile-form select:focus,
+.profile-form textarea:focus {
   outline:none; border-color:var(--accent);
 }
 .form-hint { color:var(--ink-3); font-size:12.5px; margin:0; }
@@ -1295,8 +1310,12 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .field select,
   .profile-form input[type=text],
   .profile-form select,
+  .profile-form textarea,
   .share-panel-url,
   .chat-title-input { font-size:16px; }
+
+  /* Stack the two profile columns under each other on phones. */
+  .profile-form { grid-template-columns: minmax(0, 1fr); gap:22px; }
 
   /* Touch targets — bump the small icon buttons up toward 44px so
      fingertips can actually hit them. */

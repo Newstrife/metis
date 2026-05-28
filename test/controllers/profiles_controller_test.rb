@@ -62,6 +62,26 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert_match "profile_form", response.body
   end
 
+  test "update saves personalization fields" do
+    patch profile_path, params: { user: {
+      display_name: "Mike",
+      theme: "dark",
+      about_you: "Founder. Hates emoji.",
+      custom_instructions: "Be terse. No filler."
+    } }
+    assert_redirected_to profile_path
+
+    @user.reload
+    assert_equal "dark", @user.theme
+    assert_equal "Founder. Hates emoji.", @user.about_you
+    assert_equal "Be terse. No filler.", @user.custom_instructions
+  end
+
+  test "update rejects an unknown theme" do
+    patch profile_path, params: { user: { display_name: "M", theme: "neon" } }
+    assert_response :unprocessable_entity
+  end
+
   # IANA→Rails-friendly normalization: the browser sends "Europe/Berlin"
   # but the model validation and time_zone_select only know "Berlin".
   # Without normalization the selector silently shows blank after
