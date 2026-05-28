@@ -10,20 +10,16 @@ class User < ApplicationRecord
   has_many :identities, dependent: :destroy
   has_many :oauth_grants, dependent: :destroy
 
-  # Uploaded avatar overrides `avatar_url` (the OAuth-cached URL).
-  # Resolution order is captured in `#avatar_source` below.
+  # An uploaded avatar overrides `avatar_url` (the OAuth-cached URL);
+  # see `AvatarHelper#avatar_for` for the resolution order.
   has_one_attached :avatar
-
-  # Set by the profile form's "Remove avatar" checkbox; purged after save.
-  attr_accessor :remove_avatar
 
   AVATAR_CONTENT_TYPES = %w[image/jpeg image/png image/webp image/gif].freeze
   AVATAR_MAX_BYTES     = 2.megabytes
 
   validate :avatar_acceptable
 
-  after_create  :create_personal_team
-  after_save    :purge_avatar_if_requested
+  after_create :create_personal_team
 
   # Locales the UI is translated into. v1 ships English only; the
   # selector is here so future locales drop in without a schema or
@@ -94,16 +90,6 @@ class User < ApplicationRecord
     /\.users\.noreply\.metis\z/,
     /\A\d+\+[^@]+@users\.noreply\.github\.com\z/
   ].freeze
-
-  # Which source the avatar comes from: `:uploaded` for a user-uploaded
-  # blob (highest priority), `:external` for the OAuth-cached URL,
-  # `:initials` when neither is set (the placeholder div fallback).
-  def avatar_source
-    return :uploaded if avatar.attached?
-    return :external if avatar_url.present?
-
-    :initials
-  end
 
   # Identity-first lookup; email fallback only when the provider
   # has verified the address (otherwise a forged email claim takes
@@ -183,13 +169,6 @@ class User < ApplicationRecord
     PLACEHOLDER_EMAIL_PATTERNS.any? { |re| s.match?(re) }
   end
 
-  # Promote a placeholder noreply email to the real one when the
-  # provider starts returning it (e.g. after a GitHub App gains the
-  # "Email addresses" permission). Never the reverse — a sign-in
-  # without auth.info.email, or with another placeholder, must not
-  # overwrite a real email. Best-effort: a failed backfill (TOCTOU
-  # collision, provider returned a Devise-invalid address) logs and
-  # returns rather than crashing the sign-in.
   # Re-cache the provider's avatar URL on every sign-in so a user who
   # changes their profile picture upstream sees it reflected. Skipped
   # when the user has uploaded their own avatar (the upload wins) and
@@ -202,6 +181,13 @@ class User < ApplicationRecord
     user.update_column(:avatar_url, auth.info.image)
   end
 
+  # Promote a placeholder noreply email to the real one when the
+  # provider starts returning it (e.g. after a GitHub App gains the
+  # "Email addresses" permission). Never the reverse — a sign-in
+  # without auth.info.email, or with another placeholder, must not
+  # overwrite a real email. Best-effort: a failed backfill (TOCTOU
+  # collision, provider returned a Devise-invalid address) logs and
+  # returns rather than crashing the sign-in.
   def self.backfill_real_email(user, auth)
     return unless auth.info.email.present?
     return if placeholder_email?(auth.info.email)
@@ -243,15 +229,5 @@ class User < ApplicationRecord
     unless AVATAR_CONTENT_TYPES.include?(blob.content_type)
       errors.add(:avatar, "must be JPEG, PNG, WebP, or GIF")
     end
-  end
-
-  # The "Remove avatar" checkbox sets `remove_avatar` to "1"; we purge
-  # after save so a successful save commits the removal. `purge_later`
-  # so the storage hit doesn't block the request.
-  def purge_avatar_if_requested
-    return unless ActiveModel::Type::Boolean.new.cast(remove_avatar)
-
-    avatar.purge_later if avatar.attached?
-    update_column(:avatar_url, nil) if avatar_url.present?
   end
 end

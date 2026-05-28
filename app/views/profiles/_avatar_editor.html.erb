@@ -15,7 +15,7 @@
            data-action="change->avatar-editor#upload">
   </label>
 
-  <% if user.avatar_source != :initials %>
+  <% if user.avatar.attached? || user.avatar_url.present? %>
     <button type="button" class="avatar-editor-remove"
             data-action="click->avatar-editor#remove"
             aria-label="Remove avatar" title="Remove avatar">

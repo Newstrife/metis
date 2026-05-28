@@ -29,10 +29,14 @@ class ProfilesController < ApplicationController
   # the user may be mid-edit in) is not disturbed by the AJAX swap.
   def update_avatar
     @user = current_user
-    if ActiveModel::Type::Boolean.new.cast(params.dig(:user, :remove_avatar))
-      @user.update(remove_avatar: "1")
-    elsif (file = params.dig(:user, :avatar)).present?
-      @user.update(avatar: file)
+    avatar = params.dig(:user, :avatar)
+    remove = ActiveModel::Type::Boolean.new.cast(params.dig(:user, :remove_avatar))
+
+    if remove
+      @user.avatar.purge_later if @user.avatar.attached?
+      @user.update_column(:avatar_url, nil) if @user.avatar_url.present?
+    elsif avatar.present?
+      @user.update(avatar: avatar)
     end
 
     respond_to do |format|

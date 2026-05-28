@@ -147,7 +147,6 @@ class UserTest < ActiveSupport::TestCase
                      image: "https://avatars.example.com/u/123.png")
     user = User.from_omniauth(auth)
     assert_equal "https://avatars.example.com/u/123.png", user.avatar_url
-    assert_equal :external, user.avatar_source
   end
 
   test "backfill_avatar_url refreshes the cached URL on subsequent sign-in" do
@@ -174,7 +173,7 @@ class UserTest < ActiveSupport::TestCase
     User.backfill_avatar_url(user, auth)
 
     assert_nil user.avatar_url
-    assert_equal :uploaded, user.avatar_source
+    assert user.avatar.attached?
   end
 
   test "avatar rejects an oversized blob" do
@@ -195,23 +194,6 @@ class UserTest < ActiveSupport::TestCase
     )
     refute user.valid?
     assert user.errors[:avatar].any? { |msg| msg.include?("JPEG") }
-  end
-
-  test "remove_avatar=1 purges both the upload and the cached URL after save" do
-    user = create_user
-    user.update!(avatar_url: "https://avatars.example.com/u/1.png")
-    user.avatar.attach(
-      io: File.open(Rails.root.join("test/fixtures/files/sample.png")),
-      filename: "sample.png", content_type: "image/png"
-    )
-    assert_equal :uploaded, user.avatar_source
-
-    user.update!(remove_avatar: "1")
-    user.reload
-
-    refute user.avatar.attached?
-    assert_nil user.avatar_url
-    assert_equal :initials, user.avatar_source
   end
 
   private

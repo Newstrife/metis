@@ -95,6 +95,20 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "light", @user.reload.theme
   end
 
+  test "update_avatar purges both the upload and the cached URL on remove" do
+    @user.update!(avatar_url: "https://avatars.example.com/u/1.png")
+    @user.avatar.attach(
+      io: File.open(Rails.root.join("test/fixtures/files/sample.png")),
+      filename: "sample.png", content_type: "image/png"
+    )
+
+    patch update_avatar_profile_path, params: { user: { remove_avatar: "1" } }
+    @user.reload
+
+    refute @user.avatar.attached?
+    assert_nil @user.avatar_url
+  end
+
   # IANA→Rails-friendly normalization: the browser sends "Europe/Berlin"
   # but the model validation and time_zone_select only know "Berlin".
   # Without normalization the selector silently shows blank after
