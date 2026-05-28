@@ -1,9 +1,3 @@
-<p class="form-hint">
-  Curated picks from <a href="https://github.com/anthropics/skills" target="_blank" rel="noopener">anthropics/skills</a>.
-  Click <strong>Install</strong> to import into your team. Imported skills
-  show up under <em>Your skills</em> and behave like any other team skill.
-</p>
-
 <div class="conn-list">
   <% @featured.each do |entry| %>
     <% slug = File.basename(entry.source) %>

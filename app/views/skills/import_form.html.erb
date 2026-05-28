@@ -9,27 +9,17 @@
 
   <div class="pane-body">
     <div class="pane-inner">
-      <p class="pane-lead">
-        Pull a skill from a public GitHub directory. The path must point
-        to a directory containing <code>SKILL.md</code>.
-      </p>
-
       <%= form_with url: import_skills_path, method: :post, local: true, class: "conn-form" do |f| %>
         <div class="field">
           <%= f.label :url, "GitHub source" %>
           <%= f.text_field :url, autofocus: true,
-                placeholder: "owner/repo[/path] or full GitHub URL" %>
-          <p class="field-hint">
-            Accepts <code>owner/repo</code>, <code>owner/repo/path/to/skill</code>,
-            <code>https://github.com/owner/repo/tree/&lt;ref&gt;/&lt;path&gt;</code>,
-            or a <code>blob</code> URL pointing at the skill's <code>SKILL.md</code>.
-          </p>
+                placeholder: "owner/repo or a github.com URL" %>
+          <p class="field-hint">Must point to a folder with <code>SKILL.md</code>.</p>
         </div>
 
         <div style="display:flex; gap:0.5rem;">
           <%= f.submit "Import", class: "btn btn-primary" %>
-          <%= link_to "Or pick from the marketplace",
-                skills_path(tab: "marketplace"), class: "btn btn-ghost" %>
+          <%= link_to "Browse marketplace", skills_path(tab: "marketplace"), class: "btn btn-ghost" %>
         </div>
       <% end %>
     </div>
