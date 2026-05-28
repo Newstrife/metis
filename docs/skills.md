@@ -110,6 +110,33 @@ Stimulus controller for the filename auto-fill on the file uploader.
 - **Broadcasting.** `after_commit` broadcasts to `[team, :skills]` —
   concurrent editors see updates live.
 
+## Import from GitHub
+
+Team skills can also be **imported from a public GitHub directory** —
+useful for pulling in skills from [anthropics/skills](https://github.com/anthropics/skills)
+or any community repo whose layout is `<dir>/SKILL.md` (+ optional
+supporting files).
+
+The form lives on `/settings/skills` and accepts:
+
+- `owner/repo` (whole repo is the skill, `SKILL.md` at root)
+- `owner/repo/path/to/skill`
+- A full `https://github.com/owner/repo/tree/<ref>/<path>` URL
+- A `https://github.com/owner/repo/blob/<ref>/<path>/SKILL.md` URL
+  (trailing `SKILL.md` is collapsed to its parent dir)
+
+`Agent::SkillImporter` walks the GitHub Contents API, builds the
+`{rel_path => bytes}` map, and calls `Skill.upsert_from_files` —
+the same DB upsert agent-authored ingest uses. The slug defaults to
+the leaf directory name; repo-slug collision is still rejected by
+the model validation. If the importing user has a GitHub
+`OauthGrant`, its bearer is used to lift the rate limit from
+60/hr to 5000/hr.
+
+Skills are imported as **team skills** — mutable, per-team. The
+operator can edit them post-import like any other team skill.
+Re-importing the same source updates the row in place.
+
 ## Agent authoring
 
 pi can create and modify team skills directly. The operator asks in

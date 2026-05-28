@@ -173,32 +173,13 @@ module Agent
 
     # DB-side of ingest. Host runtimes (Local/Docker) build `files` from
     # disk; E2b reads from the sandbox. `files`: relative path -> bytes,
-    # must include "SKILL.md".
+    # must include "SKILL.md". Swallows errors — a streaming turn must
+    # never crash on a write-back failure.
     def ingest_team_skill_from_files(slug:, files:, by:)
       return unless Skill::SLUG_FORMAT.match?(slug)
       return if self.class.repo_slugs.include?(slug)
 
-      body = files[Skill::SKILL_MD]
-      return if body.blank?
-
-      body = body.dup.force_encoding("UTF-8")
-      skill = @conversation.team.skills.find_or_initialize_by(slug: slug)
-      skill.created_by ||= by
-      skill.updated_by = by
-      if (desc = Skill.parse_description(body)).present?
-        skill.description = desc
-      end
-      skill.content_cache = body
-
-      # Re-attach the whole file map even if SKILL.md is unchanged — a
-      # supporting file may have shifted. Per-file diffing would be cheaper
-      # but the agent-wrote-identical-bytes case is rare.
-      skill.files.purge if skill.persisted?
-      skill.save!
-
-      files.each do |rel, content|
-        skill.replace_file!(rel, content)
-      end
+      Skill.upsert_from_files(team: @conversation.team, slug: slug, files: files, by: by)
     rescue StandardError => e
       Rails.logger.warn("ingest_team_skill(slug=#{slug}) failed for conversation #{@conversation.id}: #{e.message}")
     end

@@ -40,6 +40,9 @@ Rails.application.routes.draw do
                                     as: :detect_timezone_profile
     resources :connectors, except: :show
     resources :skills, except: :show do
+      collection do
+        post "import", action: :import, as: :import
+      end
       member do
         post   "files",                   action: :add_file,      as: :add_file
         delete "files/:file_id",          action: :destroy_file,  as: :destroy_file

@@ -70,6 +70,31 @@ class Skill < ApplicationRecord
     Digest::SHA1.hexdigest(payload)
   end
 
+  # Upsert a team skill from a {relative_path => bytes} file map. Callers:
+  # Workspace ingest (agent-authored) and SkillImporter (URL-imported).
+  # `files` must include SKILL.md. Repo-shadowed slugs are rejected via
+  # the model's slug_not_in_repo_tree validation. Raises on validation
+  # failure; the caller decides how to surface it.
+  def self.upsert_from_files(team:, slug:, files:, by:)
+    body = files[SKILL_MD]
+    raise ArgumentError, "missing #{SKILL_MD}" if body.blank?
+
+    body = body.dup.force_encoding("UTF-8")
+    skill = team.skills.find_or_initialize_by(slug: slug)
+    skill.created_by ||= by
+    skill.updated_by = by
+    if (desc = parse_description(body)).present?
+      skill.description = desc
+    end
+    skill.content_cache = body
+
+    skill.files.purge if skill.persisted?
+    skill.save!
+
+    files.each { |rel, content| skill.replace_file!(rel, content) }
+    skill
+  end
+
   def skill_md_content
     return content_cache if content_cache.present?
 

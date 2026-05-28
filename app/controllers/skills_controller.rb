@@ -44,6 +44,18 @@ class SkillsController < ApplicationController
     redirect_to skills_path, notice: "#{@skill.slug} deleted."
   end
 
+  # Pull a skill from a public GitHub directory and upsert it as a
+  # team skill. URL forms: owner/repo[/path], full github.com tree/blob.
+  def import
+    url = params[:url].to_s.strip
+    return redirect_to skills_path, alert: "Paste a GitHub URL or owner/repo." if url.blank?
+
+    skill = Agent::SkillImporter.from_github(url: url, team: team, by: current_user)
+    redirect_to edit_skill_path(skill), notice: "Imported #{skill.slug}."
+  rescue Agent::SkillImporter::Error, ActiveRecord::RecordInvalid => e
+    redirect_to skills_path, alert: "Import failed: #{e.message}"
+  end
+
   # Attach a new supporting file to the skill. SKILL.md is reserved
   # for the textarea on the edit form; everything else lives here.
   def add_file

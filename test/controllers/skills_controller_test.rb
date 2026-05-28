@@ -77,6 +77,36 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "import delegates to SkillImporter and redirects to the new skill" do
+    fake = team.skills.create!(slug: "imported", description: "from gh")
+    captured = {}
+    with_stub(Agent::SkillImporter, :from_github, ->(url:, team:, by:) {
+      captured.merge!(url: url, team: team, by: by)
+      fake
+    }) do
+      post import_skills_path, params: { url: "acme/skills/imported" }
+    end
+    assert_equal "acme/skills/imported", captured[:url]
+    assert_equal team, captured[:team]
+    assert_equal @user, captured[:by]
+    assert_redirected_to edit_skill_path(fake)
+    assert_match(/Imported imported/, flash[:notice])
+  end
+
+  test "import surfaces importer errors as a flash alert" do
+    with_stub(Agent::SkillImporter, :from_github, ->(**) { raise Agent::SkillImporter::Error, "no SKILL.md" }) do
+      post import_skills_path, params: { url: "acme/empty" }
+    end
+    assert_redirected_to skills_path
+    assert_match(/Import failed: no SKILL.md/, flash[:alert])
+  end
+
+  test "import rejects a blank URL" do
+    post import_skills_path, params: { url: "" }
+    assert_redirected_to skills_path
+    assert_match(/Paste a GitHub URL/, flash[:alert])
+  end
+
   # --- supporting files ---------------------------------------------
 
   test "add_file attaches a supporting file" do

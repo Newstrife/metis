@@ -15,6 +15,19 @@
         you when you ask.
       </p>
 
+      <%= form_with url: import_skills_path, method: :post, local: true, class: "conn-form" do |f| %>
+        <label class="form-label" for="skill_import_url">Import from GitHub</label>
+        <div style="display:flex; gap:0.5rem;">
+          <%= f.text_field :url, id: "skill_import_url", class: "form-input", style: "flex:1",
+                placeholder: "anthropics/skills/document-skills/pdf" %>
+          <%= f.submit "Import", class: "btn btn-ghost" %>
+        </div>
+        <p class="form-hint">
+          Paste a GitHub URL or <code>owner/repo[/path]</code>. The path
+          must point to a directory containing <code>SKILL.md</code>.
+        </p>
+      <% end %>
+
       <% if @skills.any? %>
         <div class="conn-list">
           <% @skills.each do |skill| %>
