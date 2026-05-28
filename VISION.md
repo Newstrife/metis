@@ -22,11 +22,29 @@ across their devices and with their teams.
 
 ## How we got here
 
-Metis started as a chat UI for pi. pi is single-user, terminal-first,
-local. Metis is the opposite environment: server-side, multi-user,
-sandboxed, no human at the terminal to tap through an auth prompt.
-Most of Metis's decisions read as inversions of pi's — *for the same
-reasons pi made them the other way*.
+Metis didn't start from a blank page. Earlier this year we built
+**[Themis](https://pipihosting.github.io/themis/)**, a sibling
+system: a chat UI in front of an agent harness, used daily across
+engineering, operations, customer service, and leadership at a
+company managing 1,000+ properties. Themis is the kind of internal
+platform people stop noticing because it has folded into how they
+work. It runs on the Claude Agent SDK, which means it works only
+against Claude. Inside that company the tradeoff fits — they picked
+a provider and wanted the best harness for it. For a public, open
+project the tradeoff is wrong.
+
+Metis is the public form of the same shape, built on a different
+foundation. The harness underneath is **pi** — open,
+provider-agnostic, easy to sandbox — so the product can run against
+Anthropic, OpenAI, Google, or whatever comes next. The lessons from
+Themis come along; the lock-in does not.
+
+The rest of the design follows from pi being the harness. pi is
+single-user, terminal-first, local. Metis is the opposite
+environment: server-side, multi-user, sandboxed, no human at the
+terminal to tap through an auth prompt. Most of Metis's decisions
+read as inversions of pi's — *for the same reasons pi made them the
+other way*.
 
 ## Rules we hold to
 
