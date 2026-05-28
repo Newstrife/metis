@@ -2,8 +2,11 @@
     "profile_form" turbo frame so save errors re-render in place
     without nuking the rest of the page. Two-column layout: short
     preferences on the left, long-form personalization on the right.
-    Collapses to a single column on mobile via .profile-form's grid. %>
+    Collapses to a single column on mobile via .profile-form's grid.
+    `html: { multipart: true }` because the avatar field uploads a
+    file — Rails form_with does not auto-detect this with Turbo. %>
 <%= form_with model: user, url: profile_path, method: :patch,
+      html: { multipart: true },
       data: { turbo_frame: "profile_form" }, class: "profile-form" do |form| %>
   <% if flash[:notice].present? %>
     <div class="form-flash form-flash-ok"><%= flash[:notice] %></div>
@@ -21,6 +24,34 @@
 
   <div class="profile-col">
     <h2 class="profile-col-title">Preferences</h2>
+
+    <div class="form-row avatar-row">
+      <%= form.label :avatar, "Avatar" %>
+      <div class="avatar-edit">
+        <%= avatar_for user, size: 56, css: "avatar avatar-edit-preview" %>
+        <div class="avatar-edit-actions">
+          <label class="btn btn-secondary avatar-upload-btn">
+            <%= user.avatar_source == :initials ? "Upload image" : "Change image" %>
+            <%= form.file_field :avatar,
+                  accept: "image/png,image/jpeg,image/webp,image/gif",
+                  class: "avatar-upload-input" %>
+          </label>
+          <% if user.avatar_source != :initials %>
+            <label class="avatar-remove">
+              <%= form.check_box :remove_avatar %>
+              <span>Remove avatar</span>
+            </label>
+          <% end %>
+        </div>
+      </div>
+      <p class="form-hint">
+        <% if user.avatar_source == :external %>
+          From your sign-in provider. Upload to override (max 2MB).
+        <% else %>
+          PNG, JPEG, WebP, or GIF — under 2MB.
+        <% end %>
+      </p>
+    </div>
 
     <div class="form-row">
       <%= form.label :display_name, "Display name" %>

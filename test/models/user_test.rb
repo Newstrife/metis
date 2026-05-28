@@ -141,10 +141,83 @@ class UserTest < ActiveSupport::TestCase
     assert_equal winner, result, "race recovery must return the winner's user"
   end
 
+  test "from_omniauth caches the provider's avatar URL on first sign-in" do
+    auth = mock_auth(provider: "github", uid: "av-1",
+                     email: "ava-#{SecureRandom.hex(4)}@example.com",
+                     image: "https://avatars.example.com/u/123.png")
+    user = User.from_omniauth(auth)
+    assert_equal "https://avatars.example.com/u/123.png", user.avatar_url
+    assert_equal :external, user.avatar_source
+  end
+
+  test "backfill_avatar_url refreshes the cached URL on subsequent sign-in" do
+    auth = mock_auth(provider: "github", uid: "av-2",
+                     email: "ava-#{SecureRandom.hex(4)}@example.com",
+                     image: "https://avatars.example.com/old.png")
+    user = User.from_omniauth(auth)
+    assert_equal "https://avatars.example.com/old.png", user.avatar_url
+
+    fresh = mock_auth(provider: "github", uid: "av-2",
+                      email: auth.info.email,
+                      image: "https://avatars.example.com/new.png")
+    User.from_omniauth(fresh)
+    assert_equal "https://avatars.example.com/new.png", user.reload.avatar_url
+  end
+
+  test "backfill_avatar_url does not override an uploaded avatar" do
+    user = create_user
+    user.avatar.attach(
+      io: File.open(Rails.root.join("test/fixtures/files/sample.png")),
+      filename: "sample.png", content_type: "image/png"
+    )
+    auth = mock_auth(image: "https://avatars.example.com/u/999.png")
+    User.backfill_avatar_url(user, auth)
+
+    assert_nil user.avatar_url
+    assert_equal :uploaded, user.avatar_source
+  end
+
+  test "avatar rejects an oversized blob" do
+    user = create_user
+    user.avatar.attach(
+      io: StringIO.new("x" * (User::AVATAR_MAX_BYTES + 1)),
+      filename: "huge.png", content_type: "image/png"
+    )
+    refute user.valid?
+    assert user.errors[:avatar].any? { |msg| msg.include?("under") }
+  end
+
+  test "avatar rejects an unsupported content type" do
+    user = create_user
+    user.avatar.attach(
+      io: StringIO.new("not really a tiff"),
+      filename: "weird.tiff", content_type: "image/tiff"
+    )
+    refute user.valid?
+    assert user.errors[:avatar].any? { |msg| msg.include?("JPEG") }
+  end
+
+  test "remove_avatar=1 purges both the upload and the cached URL after save" do
+    user = create_user
+    user.update!(avatar_url: "https://avatars.example.com/u/1.png")
+    user.avatar.attach(
+      io: File.open(Rails.root.join("test/fixtures/files/sample.png")),
+      filename: "sample.png", content_type: "image/png"
+    )
+    assert_equal :uploaded, user.avatar_source
+
+    user.update!(remove_avatar: "1")
+    user.reload
+
+    refute user.avatar.attached?
+    assert_nil user.avatar_url
+    assert_equal :initials, user.avatar_source
+  end
+
   private
 
-  def mock_auth(provider: "github", uid: "1", email: nil, nickname: "mgc")
+  def mock_auth(provider: "github", uid: "1", email: nil, nickname: "mgc", image: nil)
     OmniAuth::AuthHash.new(provider: provider, uid: uid.to_s,
-                           info: { email: email, nickname: nickname })
+                           info: { email: email, nickname: nickname, image: image })
   end
 end

@@ -10,7 +10,20 @@ class User < ApplicationRecord
   has_many :identities, dependent: :destroy
   has_many :oauth_grants, dependent: :destroy
 
-  after_create :create_personal_team
+  # Uploaded avatar overrides `avatar_url` (the OAuth-cached URL).
+  # Resolution order is captured in `#avatar_source` below.
+  has_one_attached :avatar
+
+  # Set by the profile form's "Remove avatar" checkbox; purged after save.
+  attr_accessor :remove_avatar
+
+  AVATAR_CONTENT_TYPES = %w[image/jpeg image/png image/webp image/gif].freeze
+  AVATAR_MAX_BYTES     = 2.megabytes
+
+  validate :avatar_acceptable
+
+  after_create  :create_personal_team
+  after_save    :purge_avatar_if_requested
 
   # Locales the UI is translated into. v1 ships English only; the
   # selector is here so future locales drop in without a schema or
@@ -82,6 +95,16 @@ class User < ApplicationRecord
     /\A\d+\+[^@]+@users\.noreply\.github\.com\z/
   ].freeze
 
+  # Which source the avatar comes from: `:uploaded` for a user-uploaded
+  # blob (highest priority), `:external` for the OAuth-cached URL,
+  # `:initials` when neither is set (the placeholder div fallback).
+  def avatar_source
+    return :uploaded if avatar.attached?
+    return :external if avatar_url.present?
+
+    :initials
+  end
+
   # Identity-first lookup; email fallback only when the provider
   # has verified the address (otherwise a forged email claim takes
   # over the matching user). Untrusted emails fall through to a
@@ -97,6 +120,7 @@ class User < ApplicationRecord
       identity = Identity.find_by(provider: auth.provider, uid: auth.uid.to_s)
       if identity
         backfill_real_email(identity.user, auth)
+        backfill_avatar_url(identity.user, auth)
         return identity.user
       end
 
@@ -104,6 +128,7 @@ class User < ApplicationRecord
         email = trusted_email(auth) || noreply_email(auth)
         user = find_or_initialize_by(email: email)
         user.password = Devise.friendly_token[0, 32] if user.new_record?
+        user.avatar_url = auth.info.image if auth.info.image.present?
         user.save!
         user.identities.create!(provider: auth.provider, uid: auth.uid.to_s)
         user
@@ -165,6 +190,18 @@ class User < ApplicationRecord
   # overwrite a real email. Best-effort: a failed backfill (TOCTOU
   # collision, provider returned a Devise-invalid address) logs and
   # returns rather than crashing the sign-in.
+  # Re-cache the provider's avatar URL on every sign-in so a user who
+  # changes their profile picture upstream sees it reflected. Skipped
+  # when the user has uploaded their own avatar (the upload wins) and
+  # when the provider stops returning an image.
+  def self.backfill_avatar_url(user, auth)
+    return if user.avatar.attached?
+    return if auth.info.image.blank?
+    return if user.avatar_url == auth.info.image
+
+    user.update_column(:avatar_url, auth.info.image)
+  end
+
   def self.backfill_real_email(user, auth)
     return unless auth.info.email.present?
     return if placeholder_email?(auth.info.email)
@@ -191,5 +228,30 @@ class User < ApplicationRecord
   def create_personal_team
     team = Team.create!(name: email, personal: true)
     memberships.create!(team: team, role: :owner)
+  end
+
+  # Rejects oversize files and unsupported formats *before* the
+  # attachment is persisted. We don't purge the blob here — a record
+  # that fails validation never gets the attachment committed.
+  def avatar_acceptable
+    return unless avatar.attached?
+
+    blob = avatar.blob
+    if blob.byte_size > AVATAR_MAX_BYTES
+      errors.add(:avatar, "must be under #{AVATAR_MAX_BYTES / 1.megabyte}MB")
+    end
+    unless AVATAR_CONTENT_TYPES.include?(blob.content_type)
+      errors.add(:avatar, "must be JPEG, PNG, WebP, or GIF")
+    end
+  end
+
+  # The "Remove avatar" checkbox sets `remove_avatar` to "1"; we purge
+  # after save so a successful save commits the removal. `purge_later`
+  # so the storage hit doesn't block the request.
+  def purge_avatar_if_requested
+    return unless ActiveModel::Type::Boolean.new.cast(remove_avatar)
+
+    avatar.purge_later if avatar.attached?
+    update_column(:avatar_url, nil) if avatar_url.present?
   end
 end

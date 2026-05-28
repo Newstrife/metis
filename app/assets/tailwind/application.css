@@ -197,6 +197,10 @@ turbo-frame#main { display:contents; }
   background:linear-gradient(145deg,#5a7d8f,#3e5d6e); color:#fff;
   display:grid; place-items:center; font-weight:600; font-size:13px;
 }
+/* When the avatar is an actual image, drop the gradient (it would
+   bleed through PNGs with transparency) and clip the photo to the
+   container's rounded square. */
+img.avatar { background:none; object-fit:cover; }
 
 /* ───────────── sidebar user menu ─────────────
    Bottom-of-sidebar identity card + popup. The trigger looks like
@@ -1088,20 +1092,9 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
 }
 .user-link:hover .nm { color:var(--accent-fg); }
 
-/* ───────────── profile page ───────────── */
-.profile-page { padding:32px 40px; gap:24px; overflow-y:auto; }
-.profile-header {
-  display:flex; align-items:center; gap:16px;
-  padding-bottom:18px; border-bottom:1px solid var(--line);
-}
-.profile-avatar {
-  width:56px; height:56px; border-radius:14px; flex:none;
-  background:linear-gradient(145deg,#5a7d8f,#3e5d6e); color:#fff;
-  display:grid; place-items:center; font-weight:600; font-size:20px;
-}
-.profile-page h1 { font-family:var(--fh); font-size:22px; font-weight:600; margin:0; }
-.profile-email { color:var(--ink-3); font-size:13px; margin:2px 0 0; }
-
+/* ───────────── profile page ─────────────
+   The profile page uses the shared `.pane` shell (matches Connectors /
+   Skills); the form is the only profile-specific surface. */
 .profile-form {
   display:grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
@@ -1116,6 +1109,33 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   color:var(--ink-3); margin:0 0 -4px;
 }
 .profile-form .form-row { display:flex; flex-direction:column; gap:6px; }
+.profile-form .avatar-row .form-hint { margin-top:6px; }
+.avatar-edit { display:flex; align-items:center; gap:14px; }
+.avatar-edit-preview {
+  /* Override .avatar's 32px default — the editor shows a larger preview
+     so the user can actually evaluate cropping before saving. */
+  width:56px; height:56px; border-radius:14px; font-size:18px;
+}
+.avatar-edit-actions { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.avatar-upload-btn {
+  display:inline-block; cursor:pointer;
+  padding:7px 12px; font-size:12.5px; font-weight:500;
+  border:1px solid var(--line-2); border-radius:8px;
+  background:var(--card); color:var(--ink-2);
+  transition:background-color .12s, color .12s;
+}
+.avatar-upload-btn:hover { background:var(--bg); color:var(--ink); }
+/* The native file input is unstylable — hide it and let the label
+   above carry the click. */
+.avatar-upload-input {
+  position:absolute; width:1px; height:1px;
+  opacity:0; pointer-events:none;
+}
+.avatar-remove {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--ink-3); cursor:pointer;
+}
+.avatar-remove input { margin:0; }
 .profile-form label {
   font-size:13px; font-weight:600; color:var(--ink-2);
 }
@@ -1338,10 +1358,6 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
 
   /* Pane (settings) bodies — tighten edges. */
   .pane-body { padding:18px 14px; }
-  /* Profile page has no .pane-head, so push the avatar past the
-     floating hamburger instead of giving the whole page a big top gap. */
-  .profile-page { padding:18px 14px; }
-  .profile-header { padding-left:46px; }
 
   /* Slide flash toasts below the hamburger so they don't share the
      top-left corner with it. Also clamp width to viewport. */
