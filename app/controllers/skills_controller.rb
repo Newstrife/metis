@@ -58,16 +58,18 @@ class SkillsController < ApplicationController
   def import_form
   end
 
-  # Pull a skill from a public GitHub directory and upsert it as a
-  # team skill. URL forms: owner/repo[/path], full github.com tree/blob.
+  # Enqueue a background import of a skill from a public GitHub directory.
+  # Sync import did N GitHub round-trips on the request thread; async lets
+  # the click return immediately. URL forms: owner/repo[/path], full
+  # github.com tree/blob. Failures log instead of surfacing — see
+  # ImportSkillJob.
   def import
     url = params[:url].to_s.strip
     return redirect_to skills_path, alert: "Paste a GitHub URL or owner/repo." if url.blank?
 
-    skill = Agent::SkillImporter.from_github(url: url, team: team, by: current_user)
-    redirect_to edit_skill_path(skill), notice: "Imported #{skill.slug}."
-  rescue Agent::SkillImporter::Error, ActiveRecord::RecordInvalid => e
-    redirect_to skills_path, alert: "Import failed: #{e.message}"
+    ImportSkillJob.perform_later(team_id: team.id, by_user_id: current_user.id, url: url)
+    redirect_to skills_path,
+                notice: "Importing #{File.basename(url)} — it'll appear in Your skills shortly."
   end
 
   # Attach a new supporting file to the skill. SKILL.md is reserved

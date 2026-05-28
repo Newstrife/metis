@@ -116,32 +116,19 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_select "input[name='url']"
   end
 
-  test "import delegates to SkillImporter and redirects to the new skill" do
-    fake = team.skills.create!(slug: "imported", description: "from gh")
-    captured = {}
-    with_stub(Agent::SkillImporter, :from_github, ->(url:, team:, by:) {
-      captured.merge!(url: url, team: team, by: by)
-      fake
-    }) do
+  test "import enqueues ImportSkillJob and redirects with a pending notice" do
+    assert_enqueued_with(job: ImportSkillJob,
+                         args: [ { team_id: team.id, by_user_id: @user.id, url: "acme/skills/imported" } ]) do
       post import_skills_path, params: { url: "acme/skills/imported" }
     end
-    assert_equal "acme/skills/imported", captured[:url]
-    assert_equal team, captured[:team]
-    assert_equal @user, captured[:by]
-    assert_redirected_to edit_skill_path(fake)
-    assert_match(/Imported imported/, flash[:notice])
-  end
-
-  test "import surfaces importer errors as a flash alert" do
-    with_stub(Agent::SkillImporter, :from_github, ->(**) { raise Agent::SkillImporter::Error, "no SKILL.md" }) do
-      post import_skills_path, params: { url: "acme/empty" }
-    end
     assert_redirected_to skills_path
-    assert_match(/Import failed: no SKILL.md/, flash[:alert])
+    assert_match(/Importing imported/, flash[:notice])
   end
 
-  test "import rejects a blank URL" do
-    post import_skills_path, params: { url: "" }
+  test "import rejects a blank URL without enqueueing a job" do
+    assert_no_enqueued_jobs only: ImportSkillJob do
+      post import_skills_path, params: { url: "" }
+    end
     assert_redirected_to skills_path
     assert_match(/Paste a GitHub URL/, flash[:alert])
   end
