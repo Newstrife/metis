@@ -84,8 +84,6 @@ module Agent
       # tree, no mtime gate. Must run before #pause_sandbox: a paused
       # sandbox's filesystem is unreachable. Logged-not-raised.
       def ingest_team_skills(sandbox:, slugs:)
-        return if slugs.empty?
-
         repo_slugs = Agent::Workspace.repo_slugs
         slugs.each do |slug|
           next if repo_slugs.include?(slug)
@@ -96,8 +94,25 @@ module Agent
 
           workspace.ingest_team_skill_from_files(slug: slug, files: files, by: conversation.user)
         end
+
+        # Imports are independent of touched-slug writes — drain even on a
+        # turn where no skill files changed.
+        queue_skill_imports(sandbox: sandbox)
       rescue StandardError => e
         Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
+      end
+
+      def queue_skill_imports(sandbox:)
+        path = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}/#{Agent::Workspace::SKILL_IMPORTS_FILE}"
+        return unless sandbox.files.exists?(path)
+
+        Agent::Workspace.enqueue_imports(
+          body: sandbox.files.read(path),
+          team_id: conversation.team_id,
+          by_user_id: conversation.user_id
+        )
+      rescue StandardError => e
+        Rails.logger.warn("queue_skill_imports failed for conversation #{conversation.id}: #{e.message}")
       end
 
       # Adds the microVM's id, so a turn can be traced to its sandbox in

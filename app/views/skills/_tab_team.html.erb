@@ -1,0 +1,13 @@
+<% if @skills.any? %>
+  <div class="conn-list">
+    <% @skills.each do |skill| %>
+      <%= render "skill", skill: skill %>
+    <% end %>
+  </div>
+<% else %>
+  <div class="pane-empty">
+    <p>No team skills yet. Write one yourself, ask the agent to draft
+      one in chat, or pull one from the marketplace.</p>
+    <%= link_to "Create a skill", new_skill_path, class: "btn btn-primary" %>
+  </div>
+<% end %>

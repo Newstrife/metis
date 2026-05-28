@@ -47,19 +47,24 @@ class Skill < ApplicationRecord
     segments.all? { |s| s.match?(FILE_PATH_SEGMENT) && s != ".." }
   end
 
-  # Conservative single-pass parser — avoids a YAML/Psych dep for a two-field shape.
-  def self.parse_description(content)
-    return nil unless content.is_a?(String) && content.start_with?("---")
+  # Pull one field out of SKILL.md's YAML frontmatter. Avoids a Psych
+  # dep for the two-field shape we actually use (name, description).
+  def self.parse_field(body, field)
+    return nil unless body.is_a?(String) && body.start_with?("---")
 
-    match = content.match(/\A---\s*\n(.*?)\n---\s*\n/m)
+    match = body.match(/\A---\s*\n(.*?)\n---\s*\n/m)
     return nil unless match
 
     match[1].each_line do |line|
-      next unless (m = line.match(/\Adescription:\s*(.*)/))
+      next unless (m = line.match(/\A#{Regexp.escape(field)}:\s*(.*)/))
 
       return m[1].strip.gsub(/\A["']|["']\z/, "")
     end
     nil
+  end
+
+  def self.parse_description(content)
+    parse_field(content, "description")
   end
 
   # SHA1 of the team's enabled skills (slug + updated_at). Stable across
@@ -68,6 +73,31 @@ class Skill < ApplicationRecord
     payload = team.skills.enabled.order(:slug).pluck(:slug, :updated_at)
       .map { |slug, ts| "#{slug}:#{ts.to_i}" }.join(",")
     Digest::SHA1.hexdigest(payload)
+  end
+
+  # Upsert a team skill from a {relative_path => bytes} file map. Callers:
+  # Workspace ingest (agent-authored) and SkillImporter (URL-imported).
+  # `files` must include SKILL.md. Repo-shadowed slugs are rejected via
+  # the model's slug_not_in_repo_tree validation. Raises on validation
+  # failure; the caller decides how to surface it.
+  def self.upsert_from_files(team:, slug:, files:, by:)
+    body = files[SKILL_MD]
+    raise ArgumentError, "missing #{SKILL_MD}" if body.blank?
+
+    body = body.dup.force_encoding("UTF-8")
+    skill = team.skills.find_or_initialize_by(slug: slug)
+    skill.created_by ||= by
+    skill.updated_by = by
+    if (desc = parse_description(body)).present?
+      skill.description = desc
+    end
+    skill.content_cache = body
+
+    skill.files.purge if skill.persisted?
+    skill.save!
+
+    files.each { |rel, content| skill.replace_file!(rel, content) }
+    skill
   end
 
   def skill_md_content

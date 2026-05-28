@@ -1,0 +1,22 @@
+<div class="conn-list">
+  <% @featured.each do |entry| %>
+    <% slug = File.basename(entry.source) %>
+    <% installed = @existing_slugs.include?(slug) %>
+    <div class="conn-row">
+      <div style="flex:1">
+        <div class="conn-name"><%= entry.label %> <span class="form-hint">— <%= slug %></span></div>
+        <div class="conn-desc"><%= entry.description %></div>
+      </div>
+      <% if installed %>
+        <span class="badge">Installed</span>
+      <% else %>
+        <%= button_to "Install", import_skills_path,
+              params: { url: entry.source },
+              method: :post,
+              class: "btn btn-ghost",
+              form: { class: "inline-form" } %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+

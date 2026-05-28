@@ -1,33 +1,9 @@
 require "fileutils"
 
 module Agent
-  # Resolves the on-disk scope for a conversation's agent run, and stages
-  # uploads into it.
-  #
-  # A scope holds:
-  #   sessions/             pi's --session-dir (the transcript)
-  #   workspace/            pi's working directory
-  #   workspace/uploads/    staged user uploads — projected each turn from
-  #                         the durable Message attachments, never archived
-  #                         (see docs/session-persistence.md)
-  #   workspace/.mcp.json   MCP connector config — rendered each turn from
-  #                         the conversation's Connectors, never archived
-  #   workspace/AGENTS.md   Agent boot identity — rendered each turn (see
-  #                         Agent::Identity), never archived, pi auto-loads
-  #   workspace/.pi/skills/ Skills pi auto-discovers — staged each turn
-  #                         from the repo's .pi/skills/ tree plus the
-  #                         team's enabled Skill rows. Never archived;
-  #                         the tree is wiped & rewritten on every turn
-  #                         so agent edits don't accumulate (see
-  #                         stage_skills + ingest_team_skills, and
-  #                         docs/skills.md).
-  #
-  # Two roots, because persistence is a per-runtime concern:
-  #   Workspace.scratch    — under tmp/, for a runtime that re-hydrates
-  #                          the scope from the archive each turn (Docker)
-  #   Workspace.persistent — under storage/, for Runtime::Local, which
-  #                          keeps the scope between turns and relies on
-  #                          pi's own file-based session management
+  # Resolves the on-disk scope for a conversation's agent run and stages
+  # per-turn inputs into it. See docs/session-persistence.md for layout
+  # and the per-runtime persistence model.
   class Workspace
     SCRATCH_ROOT = Rails.root.join("tmp/agent").freeze
     PERSISTENT_ROOT = Rails.root.join("storage/agent").freeze
@@ -35,7 +11,9 @@ module Agent
     SKILLS_SUBPATH = ".pi/skills".freeze
     # Mirrors Runtime::E2b#TEAM_SKILLS_MARKER — see stage_skills.
     SKILLS_MARKER = ".staged.sig".freeze
-    # Created lazily by the agent — Metis never provisions it.
+    # Agent-written sentinel — one GitHub source per line, drained by
+    # the runtime into ImportSkillJob enqueues at turn end.
+    SKILL_IMPORTS_FILE = ".imports".freeze
     ARTIFACTS_SUBPATH = "artifacts".freeze
 
     def self.scratch(conversation)
@@ -102,10 +80,7 @@ module Agent
       File.write(workspace_dir.join(Identity::FILENAME), content)
     end
 
-    # Project repo and team skills into workspace/.pi/skills/. Dest is wiped
-    # each turn so deletions propagate and agent edits don't accumulate.
-    # SKILLS_MARKER carries a fingerprint of (repo + team); a matching marker
-    # skips the work entirely. Mirrors Runtime::E2b's stage_team_skills.
+    # Mirrors Runtime::E2b#stage_team_skills — skips when the marker matches.
     def stage_skills
       dest = skills_dir
       signature = staged_skills_signature
@@ -171,41 +146,40 @@ module Agent
       end
     end
 
-    # DB-side of ingest. Host runtimes (Local/Docker) build `files` from
-    # disk; E2b reads from the sandbox. `files`: relative path -> bytes,
-    # must include "SKILL.md".
+    # Drain the agent-written .imports sentinel from disk; Runtime::E2b
+    # reads from the sandbox and calls .enqueue_imports directly.
+    def queue_skill_imports(by:)
+      file = skills_dir.join(SKILL_IMPORTS_FILE)
+      return unless file.file?
+
+      self.class.enqueue_imports(body: file.read, team_id: @conversation.team_id, by_user_id: by.id)
+    rescue StandardError => e
+      Rails.logger.warn("queue_skill_imports failed for conversation #{@conversation.id}: #{e.message}")
+    end
+
+    # Parse the sentinel body (one source per line, # comments, blanks
+    # skipped) and enqueue one ImportSkillJob per unique entry. Shared
+    # between Workspace (Local/Docker, reads from disk) and Runtime::E2b
+    # (reads from the sandbox).
+    def self.enqueue_imports(body:, team_id:, by_user_id:)
+      body.to_s.each_line.map(&:strip)
+        .reject { |l| l.empty? || l.start_with?("#") }
+        .uniq
+        .each { |source| ImportSkillJob.perform_later(team_id: team_id, by_user_id: by_user_id, url: source) }
+    end
+
+    # `files`: relative path -> bytes, must include SKILL.md. Logged-not-raised.
     def ingest_team_skill_from_files(slug:, files:, by:)
       return unless Skill::SLUG_FORMAT.match?(slug)
       return if self.class.repo_slugs.include?(slug)
 
-      body = files[Skill::SKILL_MD]
-      return if body.blank?
-
-      body = body.dup.force_encoding("UTF-8")
-      skill = @conversation.team.skills.find_or_initialize_by(slug: slug)
-      skill.created_by ||= by
-      skill.updated_by = by
-      if (desc = Skill.parse_description(body)).present?
-        skill.description = desc
-      end
-      skill.content_cache = body
-
-      # Re-attach the whole file map even if SKILL.md is unchanged — a
-      # supporting file may have shifted. Per-file diffing would be cheaper
-      # but the agent-wrote-identical-bytes case is rare.
-      skill.files.purge if skill.persisted?
-      skill.save!
-
-      files.each do |rel, content|
-        skill.replace_file!(rel, content)
-      end
+      Skill.upsert_from_files(team: @conversation.team, slug: slug, files: files, by: by)
     rescue StandardError => e
       Rails.logger.warn("ingest_team_skill(slug=#{slug}) failed for conversation #{@conversation.id}: #{e.message}")
     end
 
-    # Set of slugs the repo currently ships at .pi/skills/. Used to
-    # filter ingest (above) and the Skill model's uniqueness
-    # validation, so team skills can never shadow a repo skill.
+    # Slugs shipped at .pi/skills/. Filters ingest + validates that a
+    # team slug never shadows a repo skill.
     def self.repo_slugs
       return Set.new unless SKILLS_SOURCE.directory?
 

@@ -50,7 +50,7 @@ module Agent
 
         ## This turn
 
-        - **Operator** — #{operator_line}
+        - **Operator** — #{user.email}
         - **Team** — #{team.name}
         - **Runtime** — #{runtime_description}
         - **Workspace** — files you write here persist between turns.
@@ -74,6 +74,13 @@ module Agent
         Server config and auth headers are in `.mcp.json`, rendered
         for this turn. The MCP bridge reads it.
 
+        ## Slash commands
+
+        A leading `/<slug>` in the operator's message is a deliberate
+        trigger for that skill — use it even when the description
+        wouldn't auto-match. The rest of the line is the ask. Unknown
+        slug → treat as plain text.
+
         ## Team skills
 
         Team-authored skills live at `.pi/skills/<slug>/SKILL.md`
@@ -92,6 +99,14 @@ module Agent
           fresh from the repo every turn) and the team won't see them.
         - To delete a skill, ask the operator to do it from the UI —
           removing files won't auto-delete the row.
+
+        ### Installing a public skill
+
+        Append the source to `.pi/skills/.imports` (one per line).
+        Don't fetch files yourself with `npx skills add`, `curl`, or
+        `bash` — those skip Metis's persistence and GitHub auth.
+        Sources: `owner/repo[/path]`, `owner/repo@name`, or a
+        github.com URL.
 
         ## Conventions
 
@@ -114,20 +129,11 @@ module Agent
 
     private
 
-    def operator_line
-      user.email
-    end
-
     def runtime_description
       case @runtime_kind
-      when "local"
-        "`local` — host subprocess; not a security boundary"
-      when "docker"
-        "`docker` — namespace-isolated container; fresh per turn, your workspace bind-mounted in"
-      when "e2b"
-        "`e2b` — microVM; same VM resumed each turn via pause/resume"
-      else
-        "`#{@runtime_kind}`"
+      when "local"  then "`local` — host subprocess; not a security boundary"
+      when "docker" then "`docker` — namespace-isolated container; fresh per turn, your workspace bind-mounted in"
+      when "e2b"    then "`e2b` — microVM; same VM resumed each turn via pause/resume"
       end
     end
 

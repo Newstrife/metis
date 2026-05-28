@@ -4,29 +4,22 @@
   <header class="pane-head">
     <h1 class="pane-title">Skills</h1>
     <div style="flex:1"></div>
-    <%= link_to "New skill", new_skill_path, class: "btn btn-ghost" %>
+    <%= link_to "Import", import_form_skills_path, class: "btn btn-ghost" %>
+    <%= link_to "New", new_skill_path, class: "btn btn-ghost" %>
   </header>
 
   <div class="pane-body">
     <div class="pane-inner">
-      <p class="pane-lead">
-        Snippets of guidance you save once. The agent picks the right
-        one whenever your task matches — and can author new ones for
-        you when you ask.
-      </p>
+      <nav class="skills-tabs">
+        <%= link_to "Your skills", skills_path(tab: "team"),
+              class: "skills-tab #{'is-active' if @tab == 'team'}" %>
+        <%= link_to "Built-in", skills_path(tab: "builtin"),
+              class: "skills-tab #{'is-active' if @tab == 'builtin'}" %>
+        <%= link_to "Marketplace", skills_path(tab: "marketplace"),
+              class: "skills-tab #{'is-active' if @tab == 'marketplace'}" %>
+      </nav>
 
-      <% if @skills.any? %>
-        <div class="conn-list">
-          <% @skills.each do |skill| %>
-            <%= render "skill", skill: skill %>
-          <% end %>
-        </div>
-      <% else %>
-        <div class="pane-empty">
-          <p>No team skills yet — write one and the agent picks it up next turn.</p>
-          <%= link_to "Create a skill", new_skill_path, class: "btn btn-primary" %>
-        </div>
-      <% end %>
+      <%= render "tab_#{@tab}" %>
     </div>
   </div>
 </main>

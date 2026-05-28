@@ -11,7 +11,9 @@ module ActiveSupport
     # Single-process until the suite is large enough to benefit. Parallel
     # workers share the filesystem but not DB id sequences, which races
     # tests that touch per-record scratch paths (Agent::Workspace).
-    parallelize(workers: :number_of_processors, threshold: 500)
+    # Keep the threshold well above the current suite size to defer that
+    # work — bump again when we're ready to fix the races.
+    parallelize(workers: :number_of_processors, threshold: 5000)
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all

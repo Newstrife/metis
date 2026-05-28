@@ -2,6 +2,8 @@ require "test_helper"
 require "ostruct"
 
 class Agent::Runtime::E2bTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     @user = User.create!(email: "e2b@example.com", password: "password123")
     @conversation = @user.conversations.create!
@@ -208,6 +210,23 @@ class Agent::Runtime::E2bTest < ActiveSupport::TestCase
     paths = @runtime.extension_paths.map(&:to_s)
 
     assert_includes paths, "#{Agent::Runtime::E2b::EXTENSIONS_DIR}/web-tools.ts"
+  end
+
+  test "drains the .pi/skills/.imports sentinel into ImportSkillJob enqueues" do
+    sandbox = FakeSandbox.new
+    imports_path = "#{Agent::Runtime::E2b::WORKSPACE_DIR}/.pi/skills/.imports"
+    sandbox.files.exist_paths << imports_path
+    sandbox.files.read_responses[imports_path] = <<~TXT
+      anthropics/skills/skills/pdf
+      # comment
+      anthropics/skills/skills/xlsx
+    TXT
+
+    assert_enqueued_jobs 2, only: ImportSkillJob do
+      with_e2b(create: sandbox) do
+        @runtime.run(pi_args: [ "--mode", "rpc" ]) { |_s| nil }
+      end
+    end
   end
 
   test "uploads the team's enabled skills into the sandbox skills tree alongside repo skills" do

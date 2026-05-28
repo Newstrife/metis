@@ -77,6 +77,62 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "index defaults to the team tab" do
+    make_skill(slug: "demo")
+    get skills_path
+    assert_response :success
+    assert_select ".skills-tab.is-active", text: "Your skills"
+    assert_select ".conn-name", text: "demo"
+  end
+
+  test "index built-in tab lists repo skills" do
+    repo = [ Agent::RepoSkills::Listing.new(slug: "system-one", name: "system-one", description: "Built in skill.") ]
+    with_stub(Agent::RepoSkills, :all, -> { repo }) do
+      get skills_path(tab: "builtin")
+    end
+    assert_response :success
+    assert_select ".skills-tab.is-active", text: "Built-in"
+    assert_select ".conn-name", text: "system-one"
+    assert_select ".badge", text: "Built-in"
+  end
+
+  test "index marketplace tab lists featured entries and marks installed ones" do
+    # Skip the repo-slug guard so an existing skill at a featured slug can be created.
+    with_stub(Agent::Workspace, :repo_slugs, -> { Set.new }) do
+      make_skill(slug: "pdf") # collides with FEATURED pdf entry
+      get skills_path(tab: "marketplace")
+    end
+    assert_response :success
+    assert_select ".skills-tab.is-active", text: "Marketplace"
+    assert_select "form[action=?]", import_skills_path, minimum: 1
+    # The pdf entry should show "Installed" instead of the Install button
+    assert_select ".badge", text: "Installed"
+  end
+
+  test "import_form renders the URL input page" do
+    get import_form_skills_path
+    assert_response :success
+    assert_select "form[action=?]", import_skills_path
+    assert_select "input[name='url']"
+  end
+
+  test "import enqueues ImportSkillJob and redirects with a pending notice" do
+    assert_enqueued_with(job: ImportSkillJob,
+                         args: [ { team_id: team.id, by_user_id: @user.id, url: "acme/skills/imported" } ]) do
+      post import_skills_path, params: { url: "acme/skills/imported" }
+    end
+    assert_redirected_to skills_path
+    assert_match(/Importing imported/, flash[:notice])
+  end
+
+  test "import rejects a blank URL without enqueueing a job" do
+    assert_no_enqueued_jobs only: ImportSkillJob do
+      post import_skills_path, params: { url: "" }
+    end
+    assert_redirected_to skills_path
+    assert_match(/Paste a GitHub URL/, flash[:alert])
+  end
+
   # --- supporting files ---------------------------------------------
 
   test "add_file attaches a supporting file" do

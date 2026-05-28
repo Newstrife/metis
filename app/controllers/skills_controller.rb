@@ -1,10 +1,21 @@
 class SkillsController < ApplicationController
   layout "settings"
 
+  TABS = %w[team builtin marketplace].freeze
+
   before_action :set_skill, only: %i[edit update destroy add_file destroy_file download_file]
 
   def index
-    @skills = team.skills.order(updated_at: :desc)
+    @tab = TABS.include?(params[:tab]) ? params[:tab] : "team"
+    case @tab
+    when "team"
+      @skills = team.skills.order(updated_at: :desc)
+    when "builtin"
+      @repo_skills = Agent::RepoSkills.all
+    when "marketplace"
+      @featured = Agent::SkillMarketplace::FEATURED
+      @existing_slugs = team.skills.pluck(:slug).to_set
+    end
   end
 
   def new
@@ -44,8 +55,18 @@ class SkillsController < ApplicationController
     redirect_to skills_path, notice: "#{@skill.slug} deleted."
   end
 
-  # Attach a new supporting file to the skill. SKILL.md is reserved
-  # for the textarea on the edit form; everything else lives here.
+  def import_form
+  end
+
+  def import
+    url = params[:url].to_s.strip
+    return redirect_to skills_path, alert: "Paste a GitHub URL or owner/repo." if url.blank?
+
+    ImportSkillJob.perform_later(team_id: team.id, by_user_id: current_user.id, url: url)
+    redirect_to skills_path,
+                notice: "Importing #{File.basename(url)} — it'll appear in Your skills shortly."
+  end
+
   def add_file
     path = params[:path].to_s.strip
     upload = params[:file]
@@ -76,8 +97,6 @@ class SkillsController < ApplicationController
     redirect_to edit_skill_path(@skill), notice: "Removed #{rel}."
   end
 
-  # Stream the blob inline so previewable text shows up in the browser
-  # tab; the browser falls back to download for binary types.
   def download_file
     attachment = @skill.files.find_by(id: params[:file_id])
     return head :not_found unless attachment
@@ -102,8 +121,7 @@ class SkillsController < ApplicationController
     params.require(:skill).permit(:slug, :description, :enabled)
   end
 
-  # SKILL.md lives in Active Storage. Blank body means "don't touch"
-  # — other fields (slug, enabled) may still be saving.
+  # Blank body means "don't touch" — slug/enabled may still be saving.
   def write_skill_md!(skill, body)
     return if body.nil?
     skill.replace_skill_md!(body.to_s)
