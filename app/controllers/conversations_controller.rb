@@ -3,7 +3,7 @@ class ConversationsController < ApplicationController
 
   layout "chat"
 
-  before_action :set_conversation, only: %i[show cancel archive unarchive update share unshare assign_project]
+  before_action :set_conversation, only: %i[show cancel archive unarchive update share unshare]
   before_action :set_sidebar, only: %i[index show archived]
 
   def index
@@ -81,21 +81,6 @@ class ConversationsController < ApplicationController
       format.turbo_stream { render "conversations/share" }
       format.html { redirect_to @conversation }
     end
-  end
-
-  # PATCH /conversations/:id/project — attach or detach. Blank
-  # project_id detaches; non-blank must belong to the conversation's
-  # own team (scoped finder raises 404 otherwise). The chip is a
-  # Turbo Frame, so the response is the same partial: Turbo finds
-  # the matching frame ID and replaces its contents in place. No
-  # turbo_stream + respond_to gymnastics — the share/unshare pattern
-  # uses streams to retarget DOM by id, but this update is wholly
-  # self-contained inside the frame.
-  def assign_project
-    project_id = params[:project_id].to_s.strip
-    project = project_id.present? ? @conversation.team.projects.find(project_id) : nil
-    @conversation.update!(project: project)
-    render partial: "conversations/project_chip", locals: { conversation: @conversation }
   end
 
   private

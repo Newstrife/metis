@@ -20,7 +20,6 @@
       <div class="chat-sub">
         <span>Started <%= time_ago_in_words(@conversation.created_at) %> ago</span>
         <%= render "context_meter", conversation: @conversation %>
-        <%= render "project_chip", conversation: @conversation %>
       </div>
     </div>
     <div class="chat-actions">

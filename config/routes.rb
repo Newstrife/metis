@@ -20,7 +20,6 @@ Rails.application.routes.draw do
       post :unarchive
       post :share
       delete :share, action: :unshare
-      patch :project, action: :assign_project
     end
     resources :messages, only: :create
   end
