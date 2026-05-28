@@ -74,6 +74,16 @@ module Agent
         Server config and auth headers are in `.mcp.json`, rendered
         for this turn. The MCP bridge reads it.
 
+        ## Slash commands
+
+        When the operator's message starts with `/<slug>` (followed by
+        a space or end-of-line), it's a deliberate trigger for the
+        skill at that slug. Use it — even if the skill's description
+        wouldn't otherwise auto-match the request. The body after the
+        slug is the actual ask. If the slug doesn't match any
+        installed skill, treat the message as plain text and answer
+        normally.
+
         ## Team skills
 
         Team-authored skills live at `.pi/skills/<slug>/SKILL.md`

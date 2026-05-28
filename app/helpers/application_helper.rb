@@ -1,4 +1,20 @@
 module ApplicationHelper
+  # Slash-command palette entries for the composer: team-enabled skills
+  # + repo skills, name + description, source-tagged. Rendered into the
+  # composer as a JSON data attribute and filtered client-side by
+  # SkillPaletteController.
+  def chat_skill_palette
+    team = current_user&.personal_team
+    team_entries = team ? team.skills.enabled.order(:slug).pluck(:slug, :description) : []
+    team_entries = team_entries.map { |slug, desc| { slug: slug, description: desc, source: "team" } }
+
+    repo_entries = Agent::RepoSkills.all.map do |listing|
+      { slug: listing.slug, description: listing.description, source: "builtin" }
+    end
+
+    (team_entries + repo_entries).sort_by { |e| e[:slug] }
+  end
+
   # Render Markdown (GitHub-flavored) message content to safe HTML.
   # Raw HTML in the source is escaped (unsafe: false) and dangerous
   # link schemes are neutralized, so agent output is safe to display.

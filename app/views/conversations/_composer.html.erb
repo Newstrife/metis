@@ -18,11 +18,15 @@
           data: (new_chat ? { turbo_frame: "_top" } : {}) do |form| %>
       <div data-file-upload-target="previews" class="previews"></div>
 
-      <div class="composer">
-        <textarea name="content" rows="2"
-                  data-controller="composer"
-                  data-action="keydown->composer#submitOnEnter input->composer#autoResize"
-                  placeholder="<%= new_chat ? "Ask anything to start a new chat…" : "Message the agent…" %>"></textarea>
+      <div class="composer-shell"
+           data-controller="skill-palette"
+           data-skill-palette-skills-value="<%= chat_skill_palette.to_json %>">
+        <div hidden class="skill-palette" data-skill-palette-target="popup"></div>
+        <div class="composer">
+          <textarea name="content" rows="2"
+                    data-controller="composer"
+                    data-action="keydown->skill-palette#onKeydown keydown->composer#submitOnEnter input->skill-palette#onInput input->composer#autoResize"
+                    placeholder="<%= new_chat ? "Ask anything to start a new chat…" : "Message the agent…" %>"></textarea>
         <div class="composer-bar">
           <label class="attach" title="Attach photos or files" aria-label="Attach photos or files">
             <input type="file" name="attachments[]" multiple
@@ -51,6 +55,7 @@
 
           <div class="composer-spacer"></div>
           <%= render "conversations/composer_actions", conversation: conversation %>
+        </div>
         </div>
       </div>
     <% end %>

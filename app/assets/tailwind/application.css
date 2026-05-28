@@ -577,6 +577,38 @@ turbo-frame#main { display:contents; }
 .model-pick:hover .caret { color:var(--accent-fg); }
 .previews { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
 .previews:empty { display:none; }
+
+/* slash-command palette over the composer */
+.composer-shell { position:relative; }
+.skill-palette {
+  position:absolute; left:0; right:0; bottom:calc(100% + 6px);
+  max-height:280px; overflow-y:auto;
+  background:var(--card); border:1px solid var(--line-2); border-radius:12px;
+  box-shadow:var(--sh-md);
+  z-index:20;
+  padding:4px;
+  scrollbar-width:thin;
+}
+.skill-palette-row {
+  display:block; width:100%; text-align:left;
+  background:none; border:none; border-radius:8px;
+  padding:8px 11px; cursor:pointer; color:var(--ink);
+}
+.skill-palette-row:hover,
+.skill-palette-row.is-active { background:var(--bg); }
+.skill-palette-name {
+  font-family:var(--fm); font-size:13px; font-weight:600;
+  display:flex; align-items:baseline; gap:8px;
+}
+.skill-palette-source {
+  font-family:var(--fb); font-weight:400; font-size:10.5px;
+  color:var(--ink-3); text-transform:uppercase; letter-spacing:.04em;
+}
+.skill-palette-desc {
+  font-size:12px; color:var(--ink-3); margin-top:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
 .composer {
   background:var(--card); border:1px solid var(--line-2); border-radius:18px;
   box-shadow:var(--sh-md); overflow:hidden;
