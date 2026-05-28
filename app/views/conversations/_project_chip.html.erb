@@ -1,0 +1,20 @@
+<%# The project this conversation is attached to (or "no project").
+    Re-rendered in place by ConversationsController#assign_project after
+    a change. Scoped to the conversation's team, not the user's
+    personal team, so a multi-team conversation sees the right list. %>
+<turbo-frame id="<%= dom_id(conversation, :project_chip) %>" class="project-chip">
+  <% projects = conversation.team.projects.recent.to_a %>
+  <% if projects.any? %>
+    <%= form_with url: project_conversation_path(conversation), method: :patch, class: "project-chip-form" do |f| %>
+      <%= f.select :project_id,
+            options_for_select(
+              [ [ "— No project —", "" ] ] + projects.map { |p| [ p.name, p.id ] },
+              conversation.project_id),
+            {},
+            class: "project-chip-select",
+            onchange: "this.form.requestSubmit()" %>
+    <% end %>
+  <% else %>
+    <%= link_to "+ project", new_project_path, class: "project-chip-empty" %>
+  <% end %>
+</turbo-frame>

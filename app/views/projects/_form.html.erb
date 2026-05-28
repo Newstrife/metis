@@ -1,0 +1,62 @@
+<%# One form for everything on /settings/projects/:id — name, about,
+    and the external-refs pickers. New form omits the pickers (we
+    don't have @repo_options / @linear_options yet). %>
+<%= form_with model: project, url: project.persisted? ? project_path(project) : projects_path, class: "conn-form" do |f| %>
+  <% if project.errors.any? %>
+    <div class="flash error"><%= project.errors.full_messages.to_sentence %></div>
+  <% end %>
+
+  <div class="field">
+    <%= f.label :name %>
+    <%= f.text_field :name, placeholder: "Metis", autocomplete: "off" %>
+    <p class="field-hint">A short name you recognize — "Metis", "Q4 planning", "Mom's birthday".</p>
+  </div>
+
+  <div class="field">
+    <%= f.label :about, "About this project" %>
+    <%= f.text_area :about, rows: 5,
+          placeholder: "What's this project about? The agent reads this on every turn in this project." %>
+    <p class="field-hint">Freeform notes — conventions, constraints, who's involved. Shows up in the agent's context.</p>
+  </div>
+
+  <% if local_assigns[:repo_options] %>
+    <h2 class="form-section">External resources</h2>
+    <p class="field-hint" style="margin-bottom: 16px">
+      Tell the agent which external resource this project corresponds to.
+      Every conversation in this project inherits the mapping — the agent
+      stops asking "which repo?" or "which Linear project?".
+    </p>
+
+    <div class="field">
+      <%= label_tag "project_external_refs_github_repo", "GitHub repository" %>
+      <% if repo_options.any? %>
+        <%= select_tag "project[external_refs][github][repo]",
+              options_for_select([ [ "— None —", "" ] ] + repo_options.map { |o| [ o[:label], o[:value] ] },
+                                  project.github_repo) %>
+        <p class="field-hint">When the operator says "the repo," the agent knows this is it.</p>
+      <% else %>
+        <p class="field-hint">
+          <%= link_to "Connect GitHub", connectors_path %> to pick a repository.
+        </p>
+      <% end %>
+    </div>
+
+    <div class="field">
+      <%= label_tag "project_external_refs_linear_project_id", "Linear project" %>
+      <% if linear_options.any? %>
+        <%= select_tag "project[external_refs][linear][project_id]",
+              options_for_select([ [ "— None —", "" ] ] + linear_options.map { |o| [ o[:label], o[:value] ] },
+                                  project.linear_project_id) %>
+        <p class="field-hint">When the operator says "tickets" or "the board," the agent filters Linear queries to this project.</p>
+      <% else %>
+        <p class="field-hint">
+          <%= link_to "Connect Linear", connectors_path %> to pick a project.
+        </p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="form-actions">
+    <%= f.submit(project.persisted? ? "Save" : "Create project", class: "btn btn-primary") %>
+  </div>
+<% end %>

@@ -20,6 +20,7 @@ Rails.application.routes.draw do
       post :unarchive
       post :share
       delete :share, action: :unshare
+      patch :project, action: :assign_project
     end
     resources :messages, only: :create
   end
@@ -43,6 +44,7 @@ Rails.application.routes.draw do
     patch "profile/avatar", to: "profiles#update_avatar",
                             as: :update_avatar_profile
     resources :connectors, except: :show
+    resources :projects, except: :show
     resources :skills, except: :show do
       collection do
         get  "import", action: :import_form, as: :import_form

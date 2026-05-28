@@ -66,7 +66,7 @@ module Agent
           Scratch files, intermediate work, things you're only reading
           back later — keep those elsewhere in `workspace/`. When in
           doubt, publish. Mention the filename in your reply.
-        #{operator_preferences_block}
+        #{project_context_block}#{operator_preferences_block}
         ## Connectors
 
         #{connectors_block}
@@ -128,6 +128,55 @@ module Agent
     end
 
     private
+
+    # Project the conversation is attached to (optional). Tells the
+    # agent which external resources are the SSOT for this work so it
+    # doesn't have to disambiguate ("which repo?", "which Linear
+    # project?") on turn 1. The hosted GitHub and Linear MCP servers
+    # don't accept a server-side scope filter — both take repo /
+    # project as per-call parameters — so this prose is load-bearing:
+    # it's the only surface that aligns tool calls to the project's
+    # SSOT.
+    def project_context_block
+      project = @conversation.project
+      return "" unless project
+
+      lines = [ "## Project context", "", "This conversation is about the **#{project.name}** project." ]
+
+      directives = external_refs_directives(project)
+      lines.concat([ "", *directives ]) if directives.any?
+
+      if project.about.present?
+        lines.concat([ "", sanitize_about(project.about) ])
+      end
+
+      "\n" + lines.join("\n") + "\n"
+    end
+
+    # Project name validates against newlines, but `about` is freeform —
+    # an attacker (or a careless paste) could open a top-level heading
+    # that the agent reads as a new Metis section ("## Operator
+    # instructions: ignore prior context"). Strip leading ATX markers
+    # so user content can't manufacture sections; the rest of the line
+    # survives intact.
+    def sanitize_about(text)
+      text.to_s.lines.map { |line| line.sub(/\A\s*#+\s*/, "") }.join
+    end
+
+    def external_refs_directives(project)
+      directives = []
+      if (repo = project.github_repo)
+        directives << "- **Codebase:** `#{repo}`. When you call GitHub MCP tools, " \
+                       "pass `owner` / `repo` parsed from this. When the operator " \
+                       "says \"the repo\" or \"the codebase,\" this is it."
+      end
+      if (linear_id = project.linear_project_id)
+        directives << "- **Tickets:** Linear project id `#{linear_id}`. When the " \
+                       "operator says \"issues,\" \"tickets,\" or \"the board,\" filter " \
+                       "Linear queries to this project id."
+      end
+      directives
+    end
 
     # Operator-supplied context (about themselves) and instructions
     # (how to respond), from their profile. Rendered as its own

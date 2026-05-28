@@ -1,6 +1,7 @@
 class Conversation < ApplicationRecord
   belongs_to :user
   belongs_to :team
+  belongs_to :project, optional: true
   has_many :messages, dependent: :destroy
 
   # A conversation is owned by a team; default it to the creator's

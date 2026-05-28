@@ -1,0 +1,14 @@
+<%= link_to edit_project_path(project), class: "conn-row" do %>
+  <div class="conn-main">
+    <div class="conn-name"><%= project.name %></div>
+    <% if project.about.present? %>
+      <div class="conn-sub"><%= truncate(project.about, length: 120) %></div>
+    <% end %>
+  </div>
+  <% if project.github_repo %>
+    <span class="tag"><%= project.github_repo %></span>
+  <% end %>
+  <% if project.linear_project_id %>
+    <span class="tag">Linear</span>
+  <% end %>
+<% end %>

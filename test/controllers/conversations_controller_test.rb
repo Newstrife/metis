@@ -206,6 +206,37 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Theirs", conversation.reload.title
   end
 
+  test "assign_project attaches the conversation to one of the user's projects" do
+    project = @user.personal_team.projects.create!(name: "Metis")
+    conversation = @user.conversations.create!
+    sign_in @user
+
+    patch project_conversation_path(conversation), params: { project_id: project.id }
+    assert_response :success
+    assert_equal project, conversation.reload.project
+  end
+
+  test "assign_project with blank project_id detaches the conversation" do
+    project = @user.personal_team.projects.create!(name: "Metis")
+    conversation = @user.conversations.create!(project: project)
+    sign_in @user
+
+    patch project_conversation_path(conversation), params: { project_id: "" }
+    assert_response :success
+    assert_nil conversation.reload.project_id
+  end
+
+  test "cannot attach a conversation to another team's project" do
+    other_team = Team.create!(name: "Other")
+    foreign_project = other_team.projects.create!(name: "Secret")
+    conversation = @user.conversations.create!
+    sign_in @user
+
+    patch project_conversation_path(conversation), params: { project_id: foreign_project.id }
+    assert_response :not_found
+    assert_nil conversation.reload.project_id
+  end
+
   # Temporarily override a constant for the duration of the block.
   # Lets us shrink SIDEBAR_PAGE_SIZE so the sentinel tests don't need
   # to create dozens of conversation fixtures.
