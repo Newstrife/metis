@@ -109,6 +109,13 @@ class SkillsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".badge", text: "Installed"
   end
 
+  test "import_form renders the URL input page" do
+    get import_form_skills_path
+    assert_response :success
+    assert_select "form[action=?]", import_skills_path
+    assert_select "input[name='url']"
+  end
+
   test "import delegates to SkillImporter and redirects to the new skill" do
     fake = team.skills.create!(slug: "imported", description: "from gh")
     captured = {}

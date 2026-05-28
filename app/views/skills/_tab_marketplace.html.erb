@@ -26,16 +26,7 @@
   <% end %>
 </div>
 
-<div class="conn-form" style="margin-top:1.5rem">
-  <h2 class="form-title">Import another</h2>
-  <%= form_with url: import_skills_path, method: :post, local: true do |f| %>
-    <div style="display:flex; gap:0.5rem;">
-      <%= f.text_field :url, class: "form-input", style: "flex:1",
-            placeholder: "owner/repo/path/to/skill or full GitHub URL" %>
-      <%= f.submit "Import", class: "btn btn-ghost" %>
-    </div>
-    <p class="form-hint">
-      Path must point to a directory containing <code>SKILL.md</code>.
-    </p>
-  <% end %>
-</div>
+<p class="form-hint" style="margin-top:1.25rem">
+  Want something not in this list?
+  <%= link_to "Import from any GitHub URL", import_form_skills_path %>.
+</p>

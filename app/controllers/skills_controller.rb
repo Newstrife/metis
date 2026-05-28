@@ -55,6 +55,9 @@ class SkillsController < ApplicationController
     redirect_to skills_path, notice: "#{@skill.slug} deleted."
   end
 
+  def import_form
+  end
+
   # Pull a skill from a public GitHub directory and upsert it as a
   # team skill. URL forms: owner/repo[/path], full github.com tree/blob.
   def import

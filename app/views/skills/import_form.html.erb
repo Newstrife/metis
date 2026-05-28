@@ -1,0 +1,37 @@
+<% content_for :title, "Import skill" %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title">Import skill</h1>
+    <div style="flex:1"></div>
+    <%= link_to "Cancel", skills_path, class: "btn btn-ghost" %>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <p class="pane-lead">
+        Pull a skill from a public GitHub directory. The path must point
+        to a directory containing <code>SKILL.md</code>.
+      </p>
+
+      <%= form_with url: import_skills_path, method: :post, local: true, class: "conn-form" do |f| %>
+        <div class="field">
+          <%= f.label :url, "GitHub source" %>
+          <%= f.text_field :url, autofocus: true,
+                placeholder: "owner/repo[/path] or full GitHub URL" %>
+          <p class="field-hint">
+            Accepts <code>owner/repo</code>, <code>owner/repo/path/to/skill</code>,
+            <code>https://github.com/owner/repo/tree/&lt;ref&gt;/&lt;path&gt;</code>,
+            or a <code>blob</code> URL pointing at the skill's <code>SKILL.md</code>.
+          </p>
+        </div>
+
+        <div style="display:flex; gap:0.5rem;">
+          <%= f.submit "Import", class: "btn btn-primary" %>
+          <%= link_to "Or pick from the marketplace",
+                skills_path(tab: "marketplace"), class: "btn btn-ghost" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</main>

@@ -41,7 +41,8 @@ Rails.application.routes.draw do
     resources :connectors, except: :show
     resources :skills, except: :show do
       collection do
-        post "import", action: :import, as: :import
+        get  "import", action: :import_form, as: :import_form
+        post "import", action: :import,       as: :import
       end
       member do
         post   "files",                   action: :add_file,      as: :add_file
