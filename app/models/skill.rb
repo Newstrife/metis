@@ -47,19 +47,24 @@ class Skill < ApplicationRecord
     segments.all? { |s| s.match?(FILE_PATH_SEGMENT) && s != ".." }
   end
 
-  # Conservative single-pass parser — avoids a YAML/Psych dep for a two-field shape.
-  def self.parse_description(content)
-    return nil unless content.is_a?(String) && content.start_with?("---")
+  # Pull one field out of SKILL.md's YAML frontmatter. Avoids a Psych
+  # dep for the two-field shape we actually use (name, description).
+  def self.parse_field(body, field)
+    return nil unless body.is_a?(String) && body.start_with?("---")
 
-    match = content.match(/\A---\s*\n(.*?)\n---\s*\n/m)
+    match = body.match(/\A---\s*\n(.*?)\n---\s*\n/m)
     return nil unless match
 
     match[1].each_line do |line|
-      next unless (m = line.match(/\Adescription:\s*(.*)/))
+      next unless (m = line.match(/\A#{Regexp.escape(field)}:\s*(.*)/))
 
       return m[1].strip.gsub(/\A["']|["']\z/, "")
     end
     nil
+  end
+
+  def self.parse_description(content)
+    parse_field(content, "description")
   end
 
   # SHA1 of the team's enabled skills (slug + updated_at). Stable across

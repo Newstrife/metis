@@ -102,21 +102,15 @@ module Agent
         Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
       end
 
-      # Drain the sandbox-side .pi/skills/.imports sentinel into
-      # ImportSkillJob enqueues. Same contract as Workspace#queue_skill_imports
-      # for Local/Docker, but the file lives in the microVM so we read
-      # it via the E2B SDK.
       def queue_skill_imports(sandbox:)
         path = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}/#{Agent::Workspace::SKILL_IMPORTS_FILE}"
         return unless sandbox.files.exists?(path)
 
-        body = sandbox.files.read(path)
-        lines = body.each_line.map(&:strip).reject { |l| l.empty? || l.start_with?("#") }
-        lines.uniq.each do |source|
-          ImportSkillJob.perform_later(
-            team_id: conversation.team_id, by_user_id: conversation.user_id, url: source
-          )
-        end
+        Agent::Workspace.enqueue_imports(
+          body: sandbox.files.read(path),
+          team_id: conversation.team_id,
+          by_user_id: conversation.user_id
+        )
       rescue StandardError => e
         Rails.logger.warn("queue_skill_imports failed for conversation #{conversation.id}: #{e.message}")
       end

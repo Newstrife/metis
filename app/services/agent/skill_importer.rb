@@ -3,13 +3,8 @@ require "json"
 require "uri"
 
 module Agent
-  # Import a team skill from a public GitHub directory. Accepts the
-  # shorthand `owner/repo[/path]` and full https://github.com URLs
-  # (tree/ and blob/ variants).
-  #
-  # Authentication is optional — uses the importing user's GitHub
-  # OAuth token when present for the 5000/hr rate limit; falls back
-  # to unauthenticated (60/hr per IP).
+  # Uses the importing user's GitHub OAuth bearer when available
+  # (5000/hr); unauthenticated otherwise (60/hr).
   class SkillImporter
     GITHUB_API = "https://api.github.com".freeze
     MAX_FILES = 50
@@ -44,17 +39,9 @@ module Agent
 
     private
 
-    # Forms accepted:
-    #   owner/repo
-    #   owner/repo/path/to/skill
-    #   owner/repo@name              # skills.sh shorthand → owner/repo/skills/name
-    #   https://github.com/owner/repo
-    #   https://github.com/owner/repo/tree/<ref>/path/to/skill
-    #   https://github.com/owner/repo/blob/<ref>/path/to/skill/SKILL.md
     def parse_source(input)
       shorthand = input.delete_prefix("https://github.com/").delete_prefix("http://github.com/")
-      # skills.sh notation: owner/repo@skill-name → owner/repo/skills/skill-name.
-      # Anthropic + most published bundles put each skill under skills/<name>/.
+      # skills.sh shorthand: owner/repo@name → owner/repo/skills/name.
       shorthand = shorthand.sub("@", "/skills/") if shorthand.include?("@")
 
       parts = shorthand.split("/").reject(&:empty?)

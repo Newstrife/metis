@@ -58,11 +58,6 @@ class SkillsController < ApplicationController
   def import_form
   end
 
-  # Enqueue a background import of a skill from a public GitHub directory.
-  # Sync import did N GitHub round-trips on the request thread; async lets
-  # the click return immediately. URL forms: owner/repo[/path], full
-  # github.com tree/blob. Failures log instead of surfacing — see
-  # ImportSkillJob.
   def import
     url = params[:url].to_s.strip
     return redirect_to skills_path, alert: "Paste a GitHub URL or owner/repo." if url.blank?
@@ -72,8 +67,6 @@ class SkillsController < ApplicationController
                 notice: "Importing #{File.basename(url)} — it'll appear in Your skills shortly."
   end
 
-  # Attach a new supporting file to the skill. SKILL.md is reserved
-  # for the textarea on the edit form; everything else lives here.
   def add_file
     path = params[:path].to_s.strip
     upload = params[:file]
@@ -104,8 +97,6 @@ class SkillsController < ApplicationController
     redirect_to edit_skill_path(@skill), notice: "Removed #{rel}."
   end
 
-  # Stream the blob inline so previewable text shows up in the browser
-  # tab; the browser falls back to download for binary types.
   def download_file
     attachment = @skill.files.find_by(id: params[:file_id])
     return head :not_found unless attachment
@@ -130,8 +121,7 @@ class SkillsController < ApplicationController
     params.require(:skill).permit(:slug, :description, :enabled)
   end
 
-  # SKILL.md lives in Active Storage. Blank body means "don't touch"
-  # — other fields (slug, enabled) may still be saving.
+  # Blank body means "don't touch" — slug/enabled may still be saving.
   def write_skill_md!(skill, body)
     return if body.nil?
     skill.replace_skill_md!(body.to_s)

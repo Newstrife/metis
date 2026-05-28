@@ -50,7 +50,7 @@ module Agent
 
         ## This turn
 
-        - **Operator** — #{operator_line}
+        - **Operator** — #{user.email}
         - **Team** — #{team.name}
         - **Runtime** — #{runtime_description}
         - **Workspace** — files you write here persist between turns.
@@ -76,13 +76,10 @@ module Agent
 
         ## Slash commands
 
-        When the operator's message starts with `/<slug>` (followed by
-        a space or end-of-line), it's a deliberate trigger for the
-        skill at that slug. Use it — even if the skill's description
-        wouldn't otherwise auto-match the request. The body after the
-        slug is the actual ask. If the slug doesn't match any
-        installed skill, treat the message as plain text and answer
-        normally.
+        A leading `/<slug>` in the operator's message is a deliberate
+        trigger for that skill — use it even when the description
+        wouldn't auto-match. The rest of the line is the ask. Unknown
+        slug → treat as plain text.
 
         ## Team skills
 
@@ -103,28 +100,13 @@ module Agent
         - To delete a skill, ask the operator to do it from the UI —
           removing files won't auto-delete the row.
 
-        ### Installing a public skill (Metis path — use this)
+        ### Installing a public skill
 
-        **Always** install third-party skills by appending the source
-        to `.pi/skills/.imports` (one per line). Do not use
-        `npx skills add`, `curl`, or `bash` to fetch the files
-        yourself — those won't persist to the team and ignore Metis's
-        rate-limit lift via the operator's GitHub auth. Metis drains
-        the file at turn end into a background import.
-
-        Accepted source forms (parser normalises them):
-        - `owner/repo`
-        - `owner/repo/path/to/skill`
-        - `owner/repo@skill-name` (skills.sh shorthand → resolves to
-          `owner/repo/skills/skill-name`)
-        - A full `https://github.com/...` URL (tree or blob).
-
-        Typical flow when the operator asks to install a skill found
-        via a marketplace search:
-        1. Confirm the source string with the operator.
-        2. `echo "<source>" >> .pi/skills/.imports`
-        3. Tell the operator the import is queued — the row appears
-           under *Your skills* shortly after the turn ends.
+        Append the source to `.pi/skills/.imports` (one per line).
+        Don't fetch files yourself with `npx skills add`, `curl`, or
+        `bash` — those skip Metis's persistence and GitHub auth.
+        Sources: `owner/repo[/path]`, `owner/repo@name`, or a
+        github.com URL.
 
         ## Conventions
 
@@ -147,20 +129,11 @@ module Agent
 
     private
 
-    def operator_line
-      user.email
-    end
-
     def runtime_description
       case @runtime_kind
-      when "local"
-        "`local` — host subprocess; not a security boundary"
-      when "docker"
-        "`docker` — namespace-isolated container; fresh per turn, your workspace bind-mounted in"
-      when "e2b"
-        "`e2b` — microVM; same VM resumed each turn via pause/resume"
-      else
-        "`#{@runtime_kind}`"
+      when "local"  then "`local` — host subprocess; not a security boundary"
+      when "docker" then "`docker` — namespace-isolated container; fresh per turn, your workspace bind-mounted in"
+      when "e2b"    then "`e2b` — microVM; same VM resumed each turn via pause/resume"
       end
     end
 

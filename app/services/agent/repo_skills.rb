@@ -1,8 +1,5 @@
 module Agent
-  # Read-only view of the repo's .pi/skills/ tree, parsed for slug,
-  # name, and description. Surfaced under the "Built-in" tab on
-  # /settings/skills so operators can see which system skills are
-  # active without having to grep the repo.
+  # Read-only view of the repo's .pi/skills/ tree for the Built-in tab.
   module RepoSkills
     Listing = Struct.new(:slug, :name, :description, keyword_init: true)
 
@@ -23,22 +20,9 @@ module Agent
       body = skill_md.read
       Listing.new(
         slug: path.basename.to_s,
-        name: parse_field(body, "name") || path.basename.to_s,
-        description: parse_field(body, "description")
+        name: Skill.parse_field(body, "name") || path.basename.to_s,
+        description: Skill.parse_field(body, "description")
       )
-    end
-
-    def parse_field(body, field)
-      return nil unless body.start_with?("---")
-      match = body.match(/\A---\s*\n(.*?)\n---\s*\n/m)
-      return nil unless match
-
-      match[1].each_line do |line|
-        if (m = line.match(/\A#{Regexp.escape(field)}:\s*(.*)/))
-          return m[1].strip.gsub(/\A["']|["']\z/, "")
-        end
-      end
-      nil
     end
   end
 end

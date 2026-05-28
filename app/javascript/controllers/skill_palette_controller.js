@@ -13,10 +13,10 @@ import { Controller } from "@hotwired/stimulus"
 // `/<slug>` as a trigger for that skill.
 export default class extends Controller {
   static values = { skills: { type: Array, default: [] } }
-  static targets = ["popup", "textarea"]
+  static targets = ["popup"]
 
   get textarea() {
-    return this.hasTextareaTarget ? this.textareaTarget : this.element.querySelector("textarea")
+    return this.element.querySelector("textarea")
   }
 
   connect() {
