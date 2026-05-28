@@ -39,7 +39,7 @@ gem "csv"
 gem "pagy", "~> 43.5"
 
 # Ruby client for the pi coding agent (drives `pi --mode rpc`)
-gem "pi-agent-rb", path: "../pi-agent-rb", require: "pi_agent"
+gem "pi-agent-rb", "~> 0.1.2", require: "pi_agent"
 
 # E2B secure cloud sandboxes — the isolated runtime for the agent
 gem "e2b"

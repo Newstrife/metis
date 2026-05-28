@@ -43,3 +43,4 @@
 
 # Skills are sourced per-checkout (vendored / team-managed via DB), not vendored in-repo for now.
 /.pi/skills/
+/.claude/skills/

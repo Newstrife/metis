@@ -57,6 +57,8 @@ reasons pi made them the other way*.
    and the catalog branches on transport — so the bar is "MCP
    unavailable or gated," not "CLI feels easier."
 8. **Built to share.** A tool you make is a tool your team can use.
+   Skills are the first shape of this — authored in the UI or by the
+   agent itself, projected per turn ([`docs/skills.md`](docs/skills.md)).
 
 ## What we won't build
 

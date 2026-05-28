@@ -144,11 +144,12 @@ explicit deletion. Without this, deleted conversations leak.
   stale token cached in `~/.netrc` would silently fail. Each turn
   injects a fresh bearer; the sandbox should not persist it.
 - **Per-turn projected inputs** — `workspace/uploads/`,
-  `workspace/.mcp.json`, `workspace/AGENTS.md` — keep being re-staged
-  each turn from their durable Rails sources. The sandbox's copy is
-  always a projection; the conversation's durable state lives in
-  Rails. (Uploads can be incremental: only stage what's new since
-  the last turn touched the sandbox.)
+  `workspace/.mcp.json`, `workspace/AGENTS.md`,
+  `workspace/.pi/skills/` — keep being re-staged each turn from
+  their durable Rails sources. The sandbox's copy is always a
+  projection; the conversation's durable state lives in Rails.
+  Each projector carries its own signature marker to skip the
+  re-stage on a no-drift turn (e.g. `.staged.sig` for skills).
 - **The Adapter / `UiEvent` / `ChatJob` / `ChatBroadcaster` stack.**
   Orthogonal. The runtime-shape change is below the streaming
   protocol; the chat path is unchanged.

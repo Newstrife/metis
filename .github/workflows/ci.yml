@@ -13,9 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Checkout pi-agent-rb (path gem sibling)
-        run: git clone --depth=1 https://github.com/chagel/pi-agent-rb.git ../pi-agent-rb
-
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -34,9 +31,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Checkout pi-agent-rb (path gem sibling)
-        run: git clone --depth=1 https://github.com/chagel/pi-agent-rb.git ../pi-agent-rb
-
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -52,9 +46,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Checkout pi-agent-rb (path gem sibling)
-        run: git clone --depth=1 https://github.com/chagel/pi-agent-rb.git ../pi-agent-rb
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -100,9 +91,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Checkout pi-agent-rb (path gem sibling)
-        run: git clone --depth=1 https://github.com/chagel/pi-agent-rb.git ../pi-agent-rb
-
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
@@ -141,9 +129,6 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Checkout pi-agent-rb (path gem sibling)
-        run: git clone --depth=1 https://github.com/chagel/pi-agent-rb.git ../pi-agent-rb
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

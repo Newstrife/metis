@@ -52,7 +52,7 @@ projected into the pi runtime once per turn.
 |-----------|----------------------|-------------------------------|
 | Connector | `belongs_to :team`   | `.mcp.json` — see `connectors.md` |
 | Project   | `belongs_to :team`   | repo + tracker context — see below |
-| Skill     | `belongs_to :team`   | `pi --skill` paths |
+| Skill     | `belongs_to :team`   | `workspace/.pi/skills/<slug>/` — see [`skills.md`](skills.md) |
 | Upload    | `Message` attachment | `workspace/uploads/` — see `session-persistence.md` |
 
 The shape is flat — resources are not nested inside one another. A

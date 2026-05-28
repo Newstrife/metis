@@ -1,5 +1,9 @@
 # Metis
 
+[![CI](https://github.com/chagel/metis/actions/workflows/ci.yml/badge.svg)](https://github.com/chagel/metis/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/chagel/metis/pulls)
+
 **pi runs on your laptop. Metis runs pi for everyone you work with —
 in a sandbox, on your stack, with your provider.**
 
@@ -17,7 +21,8 @@ sandboxed by default. Coding is one capability, not the boundary.
 ## Stack
 
 - **Rails 8.1**, Ruby 4.0.5, PostgreSQL
-- **pi** agent harness, driven via the `pi-agent-rb` gem
+- **pi** agent harness, driven via the [`pi-agent-rb`](https://github.com/chagel/pi-agent-rb) gem
+- **Any LLM provider [pi supports](https://pi.dev/docs/latest/providers)** — Anthropic, OpenAI, Google, DeepSeek, xAI, Groq, Cerebras, Mistral, OpenRouter, Together, Fireworks, Hugging Face, and more — chosen per conversation
 - **Hotwire** (Turbo + Stimulus, importmap) and **Tailwind** for the live chat UI
 - **Devise** for authentication
 - **Solid Queue / Cache / Cable** for jobs, cache, and Action Cable
@@ -26,12 +31,13 @@ sandboxed by default. Coding is one capability, not the boundary.
 
 - Ruby 4.0.5 — see `.ruby-version` (a version manager such as `mise` is recommended)
 - PostgreSQL
-- **`pi-agent-rb`** checked out as a sibling directory at `../pi-agent-rb`.
-  The `Gemfile` references it as a local path gem, so `bundle` fails without it.
 - **pi** on your `PATH` for the `local` runtime —
   `npm install -g @earendil-works/pi-coding-agent`.
-- Docker — only for the `docker` runtime.
-- An [E2B](https://e2b.dev) account — only for the `e2b` runtime.
+
+Optional, only if you use the matching runtime:
+
+- Docker — for the `docker` runtime.
+- An [E2B](https://e2b.dev) account — for the `e2b` runtime.
 
 ## Setup
 
@@ -65,7 +71,7 @@ pi's runtime and credentials are configured through the environment
 |---|---|
 | `METIS_AGENT_RUNTIME` | `local` (default), `docker`, or `e2b` |
 | `METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL` | default LLM provider/model for pi |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` | provider API keys |
+| Provider API keys — `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, … | see [Providers](#providers) |
 | `METIS_DOCKER_IMAGE` | image for the `docker` runtime (default `metis-pi`) |
 | `E2B_API_KEY` / `METIS_E2B_TEMPLATE` | required by the `e2b` runtime |
 
@@ -87,6 +93,34 @@ pi's runtime and credentials are configured through the environment
   ```sh
   rake "e2b:template[metis-pi]"
   ```
+
+### Providers
+
+Metis runs on **your provider** — there is no Metis-hosted inference.
+Anything [pi supports](https://pi.dev/docs/latest/providers) works
+here, picked per conversation in the new-chat composer. Set whichever
+keys you want available; conversations only see providers your
+deployment is keyed for.
+
+| Env var | Provider |
+|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic (Claude) |
+| `OPENAI_API_KEY` | OpenAI (GPT) |
+| `GEMINI_API_KEY` | Google (Gemini) |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `XAI_API_KEY` | xAI (Grok) |
+| `GROQ_API_KEY` | Groq |
+| `CEREBRAS_API_KEY` | Cerebras |
+| `MISTRAL_API_KEY` | Mistral |
+| `OPENROUTER_API_KEY` | OpenRouter |
+| `TOGETHER_API_KEY` | Together AI |
+| `FIREWORKS_API_KEY` | Fireworks |
+| `HF_TOKEN` | Hugging Face |
+
+Variable names mirror pi's own conventions so the same env that runs
+pi locally works here. The new-chat composer's curated dropdown lives
+in `app/services/agent/catalog.rb` — add provider/model entries there
+to surface them in the UI.
 
 ## Testing
 

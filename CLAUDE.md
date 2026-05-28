@@ -32,9 +32,9 @@ Run `bin/rubocop` and the relevant tests before committing.
 
 ## Critical dependency
 
-`Gemfile` references `pi-agent-rb` as a **local path gem** at `../pi-agent-rb`
-(sibling of this repo). It must be checked out there or `bundle` fails. This
-gem drives `pi --mode rpc` and is the only way the app talks to the pi agent.
+The [`pi-agent-rb`](https://github.com/chagel/pi-agent-rb) gem drives
+`pi --mode rpc` and is the only way the app talks to the pi agent.
+It comes from rubygems via the `Gemfile` — no sibling checkout needed.
 
 Active Record encryption is used for `Message#content` and `Message#reasoning`,
 so encryption keys must be present in Rails credentials for any environment
@@ -105,11 +105,12 @@ storage failure must not crash a turn the user already saw stream.
 pi's `--provider` / `--model` come from the conversation's `settings` (jsonb,
 set by the new-chat composer) or fall back to `config.x.agent` deployment
 defaults (`METIS_AGENT_PROVIDER` / `METIS_AGENT_MODEL`). The `--api-key` is the
-per-provider deployment key in `config.x.agent.api_keys` (`ANTHROPIC_API_KEY` /
-`OPENAI_API_KEY` / `GOOGLE_API_KEY`, read from the environment — `.env` in
-development, loaded by foreman) matched to the chosen provider. Provider API
-keys are a shared, deployment-level resource — there are no per-user keys. All
-unset → pi uses its own config.
+per-provider deployment key in `config.x.agent.api_keys` — env var names mirror
+pi's own conventions (https://pi.dev/docs/latest/providers): `ANTHROPIC_API_KEY`,
+`OPENAI_API_KEY`, `GEMINI_API_KEY` (note: not `GOOGLE_API_KEY` — pi's name),
+`DEEPSEEK_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, etc. Provider API keys are a
+shared, deployment-level resource — there are no per-user keys. All unset → pi
+uses its own config.
 
 ### Connectors (MCP)
 
