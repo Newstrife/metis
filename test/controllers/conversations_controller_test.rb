@@ -25,7 +25,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_difference -> { @user.conversations.count }, 1 do
       assert_enqueued_with(job: ChatJob) do
         post conversations_path,
-             params: { content: "first question", provider: "anthropic", model: "claude-opus-4-7" }
+             params: { content: "first question", provider: "anthropic", model: "claude-opus-4-8" }
       end
     end
 
@@ -47,7 +47,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
   test "new conversation starts with a blank title" do
     sign_in @user
     post conversations_path,
-         params: { content: "Help me debug a Rails test", provider: "anthropic", model: "claude-opus-4-7" }
+         params: { content: "Help me debug a Rails test", provider: "anthropic", model: "claude-opus-4-8" }
 
     assert_nil @user.conversations.last.title
   end
