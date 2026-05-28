@@ -15,7 +15,7 @@
     <% author = @conversation.user %>
     <% if author %>
       <div class="shared-author">
-        <span class="shared-author-avatar" aria-hidden="true"><%= author.initials %></span>
+        <%= avatar_for author, size: 24, css: "shared-author-avatar" %>
         <span class="shared-author-name"><%= author.display_label %></span>
         <span class="shared-author-dot" aria-hidden="true">·</span>
         <span class="shared-author-time">Shared <%= time_ago_in_words(@conversation.updated_at) %> ago</span>

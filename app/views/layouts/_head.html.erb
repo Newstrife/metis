@@ -8,10 +8,13 @@
   <%= csp_meta_tag %>
 
   <script>
-    // Apply the saved color scheme before paint — no flash. Falls back
-    // to the OS setting; the sidebar toggle persists an explicit choice.
+    // Apply the color scheme before paint — no flash. Server-saved
+    // preference wins (so it follows the user across devices); the
+    // sidebar toggle still writes localStorage for instant flips.
     (function () {
-      var saved = localStorage.getItem("metisTheme");
+      var server = <%= raw current_user&.theme.to_json %>;
+      var saved = server === "system" ? null : (server || localStorage.getItem("metisTheme"));
+      if (server && server !== "system") localStorage.setItem("metisTheme", server);
       document.documentElement.dataset.theme =
         saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     })();

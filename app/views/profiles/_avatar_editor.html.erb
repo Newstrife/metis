@@ -1,0 +1,32 @@
+<%# The avatar widget — click the picture to choose a file (uploads
+    immediately), hover and click the X to remove. Posts to
+    PATCH /profile/avatar; the response turbo-streams this same
+    element + the sidebar back in. Lives *outside* the main profile
+    form so the user's in-progress edits aren't disturbed. %>
+<div id="avatar_editor" class="avatar-editor"
+     data-controller="avatar-editor"
+     data-avatar-editor-url-value="<%= update_avatar_profile_path %>">
+  <label class="avatar-editor-trigger" title="Click to change avatar">
+    <%= avatar_for user, size: 72, css: "avatar avatar-editor-preview" %>
+    <input type="file"
+           class="avatar-editor-input"
+           accept="image/png,image/jpeg,image/webp,image/gif"
+           data-avatar-editor-target="input"
+           data-action="change->avatar-editor#upload">
+  </label>
+
+  <% if user.avatar.attached? || user.avatar_url.present? %>
+    <button type="button" class="avatar-editor-remove"
+            data-action="click->avatar-editor#remove"
+            aria-label="Remove avatar" title="Remove avatar">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 4l8 8M4 12l8-8"/>
+      </svg>
+    </button>
+  <% end %>
+
+  <% if user.errors[:avatar].any? %>
+    <p class="avatar-editor-error"><%= user.errors[:avatar].first %></p>
+  <% end %>
+</div>

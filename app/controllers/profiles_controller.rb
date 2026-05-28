@@ -24,6 +24,35 @@ class ProfilesController < ApplicationController
     end
   end
 
+  # Inline avatar upload / remove from the profile page's avatar editor.
+  # Lives at its own endpoint so the rest of the profile form (which
+  # the user may be mid-edit in) is not disturbed by the AJAX swap.
+  def update_avatar
+    @user = current_user
+    avatar = params.dig(:user, :avatar)
+    remove = ActiveModel::Type::Boolean.new.cast(params.dig(:user, :remove_avatar))
+
+    if remove
+      @user.avatar.purge_later if @user.avatar.attached?
+      @user.update_column(:avatar_url, nil) if @user.avatar_url.present?
+    elsif avatar.present?
+      @user.update(avatar: avatar)
+    end
+
+    respond_to do |format|
+      format.turbo_stream
+    end
+  end
+
+  # Live theme switch from the user-menu popup — no full form roundtrip.
+  # Unknown values are silently dropped (theme is a UI affordance, not
+  # something to error on).
+  def update_theme
+    theme = params[:theme].to_s
+    current_user.update!(theme: theme) if User::THEMES.include?(theme)
+    head :no_content
+  end
+
   # Browser sends IANA ("Europe/Berlin"); the model validator + time_zone_select
   # only know Rails-friendly names ("Berlin"), so canonicalize before persisting.
   def detect_timezone
@@ -37,7 +66,8 @@ class ProfilesController < ApplicationController
   private
 
   def profile_params
-    params.require(:user).permit(:display_name, :timezone, :language, :preferred_model)
+    params.require(:user).permit(:display_name, :timezone, :language, :preferred_model,
+                                 :theme, :about_you, :custom_instructions)
   end
 
   # IANA or Rails-friendly \u2192 Rails-friendly (the form the model validator accepts),

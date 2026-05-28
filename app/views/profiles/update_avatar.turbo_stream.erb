@@ -1,0 +1,10 @@
+<%# Refresh the avatar editor (new image + reveal/hide the X button)
+    and the sidebar (the user-menu trigger's tiny avatar mirrors the
+    profile avatar). Both surfaces reference the same `avatar_for`
+    helper, so a single render keeps them in sync. %>
+<%= turbo_stream.replace "avatar_editor" do %>
+  <%= render "avatar_editor", user: @user %>
+<% end %>
+<%= turbo_stream.replace "sidebar" do %>
+  <%= render "settings/sidebar" %>
+<% end %>

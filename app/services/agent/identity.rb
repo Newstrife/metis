@@ -66,7 +66,7 @@ module Agent
           Scratch files, intermediate work, things you're only reading
           back later — keep those elsewhere in `workspace/`. When in
           doubt, publish. Mention the filename in your reply.
-
+        #{operator_preferences_block}
         ## Connectors
 
         #{connectors_block}
@@ -128,6 +128,24 @@ module Agent
     end
 
     private
+
+    # Operator-supplied context (about themselves) and instructions
+    # (how to respond), from their profile. Rendered as its own
+    # section so the agent treats it as standing guidance, not as the
+    # user's first prompt. Empty when neither is set — the heredoc
+    # interpolation collapses to a blank line.
+    def operator_preferences_block
+      sections = []
+      if user.about_you.present?
+        sections << "## About the operator\n\n#{user.about_you}"
+      end
+      if user.custom_instructions.present?
+        sections << "## Operator instructions\n\nStanding instructions from the operator — apply them across the turn:\n\n#{user.custom_instructions}"
+      end
+      return "" if sections.empty?
+
+      "\n" + sections.join("\n\n") + "\n"
+    end
 
     def runtime_description
       case @runtime_kind

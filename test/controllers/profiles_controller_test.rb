@@ -62,6 +62,53 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert_match "profile_form", response.body
   end
 
+  test "update saves personalization fields" do
+    patch profile_path, params: { user: {
+      display_name: "Mike",
+      theme: "dark",
+      about_you: "Founder. Hates emoji.",
+      custom_instructions: "Be terse. No filler."
+    } }
+    assert_redirected_to profile_path
+
+    @user.reload
+    assert_equal "dark", @user.theme
+    assert_equal "Founder. Hates emoji.", @user.about_you
+    assert_equal "Be terse. No filler.", @user.custom_instructions
+  end
+
+  test "update rejects an unknown theme" do
+    patch profile_path, params: { user: { display_name: "M", theme: "neon" } }
+    assert_response :unprocessable_entity
+  end
+
+  test "update_theme persists a valid theme" do
+    patch update_theme_profile_path, params: { theme: "dark" }
+    assert_response :no_content
+    assert_equal "dark", @user.reload.theme
+  end
+
+  test "update_theme silently ignores junk values" do
+    @user.update!(theme: "light")
+    patch update_theme_profile_path, params: { theme: "neon" }
+    assert_response :no_content
+    assert_equal "light", @user.reload.theme
+  end
+
+  test "update_avatar purges both the upload and the cached URL on remove" do
+    @user.update!(avatar_url: "https://avatars.example.com/u/1.png")
+    @user.avatar.attach(
+      io: File.open(Rails.root.join("test/fixtures/files/sample.png")),
+      filename: "sample.png", content_type: "image/png"
+    )
+
+    patch update_avatar_profile_path, params: { user: { remove_avatar: "1" } }
+    @user.reload
+
+    refute @user.avatar.attached?
+    assert_nil @user.avatar_url
+  end
+
   # IANA→Rails-friendly normalization: the browser sends "Europe/Berlin"
   # but the model validation and time_zone_select only know "Berlin".
   # Without normalization the selector silently shows blank after

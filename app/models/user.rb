@@ -10,6 +10,15 @@ class User < ApplicationRecord
   has_many :identities, dependent: :destroy
   has_many :oauth_grants, dependent: :destroy
 
+  # An uploaded avatar overrides `avatar_url` (the OAuth-cached URL);
+  # see `AvatarHelper#avatar_for` for the resolution order.
+  has_one_attached :avatar
+
+  AVATAR_CONTENT_TYPES = %w[image/jpeg image/png image/webp image/gif].freeze
+  AVATAR_MAX_BYTES     = 2.megabytes
+
+  validate :avatar_acceptable
+
   after_create :create_personal_team
 
   # Locales the UI is translated into. v1 ships English only; the
@@ -17,11 +26,17 @@ class User < ApplicationRecord
   # controller change.
   AVAILABLE_LANGUAGES = %w[en].freeze
 
+  # `system` defers to the OS / browser preference (handled by the
+  # no-flash script in the head). Explicit `light`/`dark` overrides it.
+  THEMES = %w[system light dark].freeze
+
   # Trim whitespace and treat empty strings as nil for every profile
   # field — keeps a stray space in the form from sneaking past the
   # inclusion/length validators below and causing surprises downstream
   # (a display_name like " " is technically "present" but reads blank).
-  normalizes :display_name, :timezone, :language, :preferred_model,
+  normalizes :display_name, :timezone, :language, :preferred_model, :theme,
+             with: ->(value) { value.is_a?(String) ? value.strip.presence : value }
+  normalizes :about_you, :custom_instructions,
              with: ->(value) { value.is_a?(String) ? value.strip.presence : value }
 
   # Profile fields are validated only when the user submits the profile
@@ -33,6 +48,9 @@ class User < ApplicationRecord
             inclusion: { in: ->(_) { ActiveSupport::TimeZone.all.map(&:name) } },
             allow_blank: true
   validates :language, inclusion: { in: AVAILABLE_LANGUAGES }, allow_blank: true
+  validates :theme, inclusion: { in: THEMES }, allow_blank: true
+  validates :about_you, length: { maximum: 2_000 }
+  validates :custom_instructions, length: { maximum: 4_000 }
   validate :preferred_model_known
 
   # What to show in the UI for this user — the display name they picked,
@@ -88,6 +106,7 @@ class User < ApplicationRecord
       identity = Identity.find_by(provider: auth.provider, uid: auth.uid.to_s)
       if identity
         backfill_real_email(identity.user, auth)
+        backfill_avatar_url(identity.user, auth)
         return identity.user
       end
 
@@ -95,6 +114,7 @@ class User < ApplicationRecord
         email = trusted_email(auth) || noreply_email(auth)
         user = find_or_initialize_by(email: email)
         user.password = Devise.friendly_token[0, 32] if user.new_record?
+        user.avatar_url = auth.info.image if auth.info.image.present?
         user.save!
         user.identities.create!(provider: auth.provider, uid: auth.uid.to_s)
         user
@@ -149,6 +169,18 @@ class User < ApplicationRecord
     PLACEHOLDER_EMAIL_PATTERNS.any? { |re| s.match?(re) }
   end
 
+  # Re-cache the provider's avatar URL on every sign-in so a user who
+  # changes their profile picture upstream sees it reflected. Skipped
+  # when the user has uploaded their own avatar (the upload wins) and
+  # when the provider stops returning an image.
+  def self.backfill_avatar_url(user, auth)
+    return if user.avatar.attached?
+    return if auth.info.image.blank?
+    return if user.avatar_url == auth.info.image
+
+    user.update_column(:avatar_url, auth.info.image)
+  end
+
   # Promote a placeholder noreply email to the real one when the
   # provider starts returning it (e.g. after a GitHub App gains the
   # "Email addresses" permission). Never the reverse — a sign-in
@@ -182,5 +214,20 @@ class User < ApplicationRecord
   def create_personal_team
     team = Team.create!(name: email, personal: true)
     memberships.create!(team: team, role: :owner)
+  end
+
+  # Rejects oversize files and unsupported formats *before* the
+  # attachment is persisted. We don't purge the blob here — a record
+  # that fails validation never gets the attachment committed.
+  def avatar_acceptable
+    return unless avatar.attached?
+
+    blob = avatar.blob
+    if blob.byte_size > AVATAR_MAX_BYTES
+      errors.add(:avatar, "must be under #{AVATAR_MAX_BYTES / 1.megabyte}MB")
+    end
+    unless AVATAR_CONTENT_TYPES.include?(blob.content_type)
+      errors.add(:avatar, "must be JPEG, PNG, WebP, or GIF")
+    end
   end
 end
