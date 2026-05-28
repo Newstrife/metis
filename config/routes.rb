@@ -40,6 +40,8 @@ Rails.application.routes.draw do
                                     as: :detect_timezone_profile
     patch "profile/theme", to: "profiles#update_theme",
                            as: :update_theme_profile
+    patch "profile/avatar", to: "profiles#update_avatar",
+                            as: :update_avatar_profile
     resources :connectors, except: :show
     resources :skills, except: :show do
       collection do

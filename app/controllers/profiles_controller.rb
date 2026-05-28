@@ -24,6 +24,22 @@ class ProfilesController < ApplicationController
     end
   end
 
+  # Inline avatar upload / remove from the profile page's avatar editor.
+  # Lives at its own endpoint so the rest of the profile form (which
+  # the user may be mid-edit in) is not disturbed by the AJAX swap.
+  def update_avatar
+    @user = current_user
+    if ActiveModel::Type::Boolean.new.cast(params.dig(:user, :remove_avatar))
+      @user.update(remove_avatar: "1")
+    elsif (file = params.dig(:user, :avatar)).present?
+      @user.update(avatar: file)
+    end
+
+    respond_to do |format|
+      format.turbo_stream
+    end
+  end
+
   # Live theme switch from the user-menu popup — no full form roundtrip.
   # Unknown values are silently dropped (theme is a UI affordance, not
   # something to error on).
@@ -47,8 +63,7 @@ class ProfilesController < ApplicationController
 
   def profile_params
     params.require(:user).permit(:display_name, :timezone, :language, :preferred_model,
-                                 :theme, :about_you, :custom_instructions,
-                                 :avatar, :remove_avatar)
+                                 :theme, :about_you, :custom_instructions)
   end
 
   # IANA or Rails-friendly \u2192 Rails-friendly (the form the model validator accepts),

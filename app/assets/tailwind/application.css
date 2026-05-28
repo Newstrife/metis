@@ -193,9 +193,10 @@ turbo-frame#main { display:contents; }
 }
 
 .avatar {
-  width:32px; height:32px; border-radius:10px; flex:none;
+  width:32px; height:32px; border-radius:50%; flex:none;
   background:linear-gradient(145deg,#5a7d8f,#3e5d6e); color:#fff;
   display:grid; place-items:center; font-weight:600; font-size:13px;
+  overflow:hidden;
 }
 /* When the avatar is an actual image, drop the gradient (it would
    bleed through PNGs with transparency) and clip the photo to the
@@ -838,6 +839,10 @@ img.avatar { background:none; object-fit:cover; }
 .pane-head {
   padding:17px 28px 15px; border-bottom:1px solid var(--line);
   display:flex; align-items:center; gap:13px;
+  /* min-height keeps the header the same size whether or not it
+     carries an action button — Connectors has one, Profile / Skills
+     don't, and without this the bare-H1 panes look noticeably shorter. */
+  min-height:73px;
 }
 .pane-title { font-family:var(--fd); font-weight:600; font-size:19px; letter-spacing:-.015em; }
 .pane-body { flex:1; overflow-y:auto; padding:24px 28px; }
@@ -1109,33 +1114,50 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   color:var(--ink-3); margin:0 0 -4px;
 }
 .profile-form .form-row { display:flex; flex-direction:column; gap:6px; }
-.profile-form .avatar-row .form-hint { margin-top:6px; }
-.avatar-edit { display:flex; align-items:center; gap:14px; }
-.avatar-edit-preview {
-  /* Override .avatar's 32px default — the editor shows a larger preview
-     so the user can actually evaluate cropping before saving. */
-  width:56px; height:56px; border-radius:14px; font-size:18px;
+
+/* ───────────── avatar editor ─────────────
+   Click the avatar to upload; hover and click the X to remove. The
+   widget posts to its own endpoint (PATCH /profile/avatar) and turbo-
+   streams itself + the sidebar back in. Sits as a row inside the
+   profile form's Preferences column. */
+.avatar-editor {
+  position:relative; display:inline-block; align-self:flex-start;
 }
-.avatar-edit-actions { display:flex; flex-direction:column; gap:6px; min-width:0; }
-.avatar-upload-btn {
-  display:inline-block; cursor:pointer;
-  padding:7px 12px; font-size:12.5px; font-weight:500;
-  border:1px solid var(--line-2); border-radius:8px;
-  background:var(--card); color:var(--ink-2);
-  transition:background-color .12s, color .12s;
+.avatar-editor-trigger {
+  display:block; cursor:pointer; border-radius:50%;
+  outline:2px solid transparent;
+  transition:outline-color .12s;
 }
-.avatar-upload-btn:hover { background:var(--bg); color:var(--ink); }
-/* The native file input is unstylable — hide it and let the label
-   above carry the click. */
-.avatar-upload-input {
+.avatar-editor-trigger:hover { outline-color:var(--accent); }
+.avatar-editor-preview {
+  /* Override .avatar's 32px default — a touch bigger so the X has
+     room to sit comfortably and uploaded photos are evaluable. */
+  width:48px; height:48px; font-size:18px;
+}
+.avatar-editor-input {
   position:absolute; width:1px; height:1px;
   opacity:0; pointer-events:none;
 }
-.avatar-remove {
-  display:inline-flex; align-items:center; gap:6px;
-  font-size:12px; color:var(--ink-3); cursor:pointer;
+.avatar-editor-remove {
+  position:absolute; top:-4px; right:-4px;
+  width:18px; height:18px; border-radius:50%;
+  background:var(--card); color:var(--ink-2);
+  border:1px solid var(--line);
+  display:grid; place-items:center; cursor:pointer;
+  opacity:0; transform:scale(.85);
+  transition:opacity .12s, transform .12s, color .12s, background-color .12s;
 }
-.avatar-remove input { margin:0; }
+.avatar-editor-remove svg { width:8px; height:8px; }
+.avatar-editor:hover .avatar-editor-remove,
+.avatar-editor-remove:focus-visible {
+  opacity:1; transform:scale(1);
+}
+.avatar-editor-remove:hover {
+  background:var(--danger); color:#fff; border-color:var(--danger);
+}
+.avatar-editor-error {
+  margin:6px 0 0; font-size:12px; color:var(--danger);
+}
 .profile-form label {
   font-size:13px; font-weight:600; color:var(--ink-2);
 }
@@ -1228,9 +1250,10 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   color:var(--ink-2); font-size:13px;
 }
 .shared-author-avatar {
-  width:24px; height:24px; border-radius:8px; flex:none;
+  width:24px; height:24px; border-radius:50%; flex:none;
   background:linear-gradient(145deg,#5a7d8f,#3e5d6e); color:#fff;
   display:grid; place-items:center; font-weight:600; font-size:11px;
+  overflow:hidden;
 }
 .shared-author-name { font-weight:600; color:var(--ink); }
 .shared-author-dot { color:var(--ink-3); }
