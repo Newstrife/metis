@@ -10,12 +10,6 @@
 
   <div class="pane-body">
     <div class="pane-inner">
-      <p class="pane-lead">
-        Snippets of guidance the agent picks up when your task matches.
-        Mix and match three sources: your team's own, what ships in the
-        repo, and a curated marketplace.
-      </p>
-
       <nav class="skills-tabs">
         <%= link_to "Your skills", skills_path(tab: "team"),
               class: "skills-tab #{'is-active' if @tab == 'team'}" %>
