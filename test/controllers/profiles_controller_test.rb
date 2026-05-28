@@ -82,6 +82,19 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "update_theme persists a valid theme" do
+    patch update_theme_profile_path, params: { theme: "dark" }
+    assert_response :no_content
+    assert_equal "dark", @user.reload.theme
+  end
+
+  test "update_theme silently ignores junk values" do
+    @user.update!(theme: "light")
+    patch update_theme_profile_path, params: { theme: "neon" }
+    assert_response :no_content
+    assert_equal "light", @user.reload.theme
+  end
+
   # IANA→Rails-friendly normalization: the browser sends "Europe/Berlin"
   # but the model validation and time_zone_select only know "Berlin".
   # Without normalization the selector silently shows blank after

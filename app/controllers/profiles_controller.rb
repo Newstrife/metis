@@ -24,6 +24,15 @@ class ProfilesController < ApplicationController
     end
   end
 
+  # Live theme switch from the user-menu popup — no full form roundtrip.
+  # Unknown values are silently dropped (theme is a UI affordance, not
+  # something to error on).
+  def update_theme
+    theme = params[:theme].to_s
+    current_user.update!(theme: theme) if User::THEMES.include?(theme)
+    head :no_content
+  end
+
   # Browser sends IANA ("Europe/Berlin"); the model validator + time_zone_select
   # only know Rails-friendly names ("Berlin"), so canonicalize before persisting.
   def detect_timezone

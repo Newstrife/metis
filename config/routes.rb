@@ -38,6 +38,8 @@ Rails.application.routes.draw do
     resource :profile, only: %i[show update]
     post "profile/detect_timezone", to: "profiles#detect_timezone",
                                     as: :detect_timezone_profile
+    patch "profile/theme", to: "profiles#update_theme",
+                           as: :update_theme_profile
     resources :connectors, except: :show
     resources :skills, except: :show do
       collection do
