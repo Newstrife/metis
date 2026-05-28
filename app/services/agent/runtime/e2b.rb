@@ -84,8 +84,6 @@ module Agent
       # tree, no mtime gate. Must run before #pause_sandbox: a paused
       # sandbox's filesystem is unreachable. Logged-not-raised.
       def ingest_team_skills(sandbox:, slugs:)
-        return if slugs.empty?
-
         repo_slugs = Agent::Workspace.repo_slugs
         slugs.each do |slug|
           next if repo_slugs.include?(slug)
@@ -96,8 +94,31 @@ module Agent
 
           workspace.ingest_team_skill_from_files(slug: slug, files: files, by: conversation.user)
         end
+
+        # Imports are independent of touched-slug writes — drain even on a
+        # turn where no skill files changed.
+        queue_skill_imports(sandbox: sandbox)
       rescue StandardError => e
         Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
+      end
+
+      # Drain the sandbox-side .pi/skills/.imports sentinel into
+      # ImportSkillJob enqueues. Same contract as Workspace#queue_skill_imports
+      # for Local/Docker, but the file lives in the microVM so we read
+      # it via the E2B SDK.
+      def queue_skill_imports(sandbox:)
+        path = "#{WORKSPACE_DIR}/#{Agent::Workspace::SKILLS_SUBPATH}/#{Agent::Workspace::SKILL_IMPORTS_FILE}"
+        return unless sandbox.files.exists?(path)
+
+        body = sandbox.files.read(path)
+        lines = body.each_line.map(&:strip).reject { |l| l.empty? || l.start_with?("#") }
+        lines.uniq.each do |source|
+          ImportSkillJob.perform_later(
+            team_id: conversation.team_id, by_user_id: conversation.user_id, url: source
+          )
+        end
+      rescue StandardError => e
+        Rails.logger.warn("queue_skill_imports failed for conversation #{conversation.id}: #{e.message}")
       end
 
       # Adds the microVM's id, so a turn can be traced to its sandbox in

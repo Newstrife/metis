@@ -72,6 +72,7 @@ module Agent
       # host-side ingest reads them in place. Logged-not-raised.
       def ingest_team_skills(slugs:)
         workspace.ingest_team_skills(slugs: slugs, by: conversation.user)
+        workspace.queue_skill_imports(by: conversation.user)
       rescue StandardError => e
         Rails.logger.warn("ingest_team_skills failed for conversation #{conversation.id}: #{e.message}")
       end

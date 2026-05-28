@@ -93,6 +93,29 @@ module Agent
         - To delete a skill, ask the operator to do it from the UI —
           removing files won't auto-delete the row.
 
+        ### Installing a public skill (Metis path — use this)
+
+        **Always** install third-party skills by appending the source
+        to `.pi/skills/.imports` (one per line). Do not use
+        `npx skills add`, `curl`, or `bash` to fetch the files
+        yourself — those won't persist to the team and ignore Metis's
+        rate-limit lift via the operator's GitHub auth. Metis drains
+        the file at turn end into a background import.
+
+        Accepted source forms (parser normalises them):
+        - `owner/repo`
+        - `owner/repo/path/to/skill`
+        - `owner/repo@skill-name` (skills.sh shorthand → resolves to
+          `owner/repo/skills/skill-name`)
+        - A full `https://github.com/...` URL (tree or blob).
+
+        Typical flow when the operator asks to install a skill found
+        via a marketplace search:
+        1. Confirm the source string with the operator.
+        2. `echo "<source>" >> .pi/skills/.imports`
+        3. Tell the operator the import is queued — the row appears
+           under *Your skills* shortly after the turn ends.
+
         ## Conventions
 
         - `uploads/` and `.mcp.json` are projected inputs — rewritten

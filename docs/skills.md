@@ -189,6 +189,23 @@ saves a skill in `/settings/skills` while a turn is running, the
 turn's ingest may overwrite the human's edit (or vice-versa). v1
 accepts this.
 
+### Agent-triggered imports
+
+The agent can also pull skills from GitHub on the operator's behalf
+— same import path as the Marketplace tab. Convention (taught in
+`AGENTS.md`):
+
+- Append one GitHub source per line to `.pi/skills/.imports` —
+  `owner/repo`, `owner/repo/path`, or a `https://github.com/...` URL.
+- Lines starting with `#` are comments; blanks are skipped.
+- The runtime drains the file at turn end and enqueues
+  `ImportSkillJob` per unique source.
+- Failures log; the agent doesn't see them. The operator sees the
+  imported row appear under *Your skills* on the next page load.
+
+The file lives inside `.pi/skills/`, so it's wiped automatically by
+the next turn's `stage_skills` — no manual cleanup needed.
+
 ### Per-runtime coverage
 
 | Runtime | Ingest path |

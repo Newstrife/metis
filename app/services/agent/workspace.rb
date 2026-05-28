@@ -35,6 +35,10 @@ module Agent
     SKILLS_SUBPATH = ".pi/skills".freeze
     # Mirrors Runtime::E2b#TEAM_SKILLS_MARKER — see stage_skills.
     SKILLS_MARKER = ".staged.sig".freeze
+    # Sentinel for agent-requested imports. The agent writes one
+    # GitHub source per line; the runtime drains it at turn end into
+    # ImportSkillJob enqueues. See queue_skill_imports.
+    SKILL_IMPORTS_FILE = ".imports".freeze
     # Created lazily by the agent — Metis never provisions it.
     ARTIFACTS_SUBPATH = "artifacts".freeze
 
@@ -169,6 +173,22 @@ module Agent
 
         ingest_one_skill_from_disk(skills_dir.join(slug), by: by)
       end
+    end
+
+    # Drain the agent-written imports sentinel: one GitHub source per
+    # line, parsed and enqueued as ImportSkillJob. Blank lines + lines
+    # starting with `#` are ignored. The file lives inside skills_dir
+    # so it's wiped automatically next turn by stage_skills.
+    def queue_skill_imports(by:)
+      file = skills_dir.join(SKILL_IMPORTS_FILE)
+      return unless file.file?
+
+      lines = file.read.each_line.map(&:strip).reject { |l| l.empty? || l.start_with?("#") }
+      lines.uniq.each do |source|
+        ImportSkillJob.perform_later(team_id: @conversation.team_id, by_user_id: by.id, url: source)
+      end
+    rescue StandardError => e
+      Rails.logger.warn("queue_skill_imports failed for conversation #{@conversation.id}: #{e.message}")
     end
 
     # DB-side of ingest. Host runtimes (Local/Docker) build `files` from

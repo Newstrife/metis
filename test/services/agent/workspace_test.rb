@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Agent::WorkspaceTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   setup do
     @user = User.create!(email: "ws@example.com", password: "password123")
     @conversation = @user.conversations.create!
@@ -247,6 +249,35 @@ class Agent::WorkspaceTest < ActiveSupport::TestCase
     assert_includes skill.content_cache, "# Body"
     assert_equal [ "SKILL.md", "ref/style.md" ].sort, skill.file_list
     assert_equal @user, skill.created_by
+  end
+
+  test "queue_skill_imports enqueues ImportSkillJob for each URL in the sentinel" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+    FileUtils.mkdir_p(workspace.skills_dir)
+    File.write(workspace.skills_dir.join(".imports"), <<~TXT)
+      anthropics/skills/skills/pdf
+      # comment, skipped
+
+      anthropics/skills/skills/xlsx
+      anthropics/skills/skills/pdf
+    TXT
+
+    assert_enqueued_jobs 2, only: ImportSkillJob do
+      workspace.queue_skill_imports(by: @user)
+    end
+
+    enqueued = ActiveJob::Base.queue_adapter.enqueued_jobs.last(2).map { |j| j[:args].first["url"] }
+    assert_equal [ "anthropics/skills/skills/pdf", "anthropics/skills/skills/xlsx" ], enqueued
+  end
+
+  test "queue_skill_imports is a no-op when the sentinel file is absent" do
+    workspace = Agent::Workspace.scratch(@conversation)
+    workspace.ensure!
+
+    assert_no_enqueued_jobs only: ImportSkillJob do
+      workspace.queue_skill_imports(by: @user)
+    end
   end
 
   test "ingest_team_skills updates an existing Skill row" do

@@ -78,6 +78,20 @@ class Agent::SkillImporterTest < ActiveSupport::TestCase
     end
   end
 
+  test "accepts the skills.sh `owner/repo@name` shorthand" do
+    with_github_routes(
+      "https://api.github.com/repos/awslabs/agent-plugins/contents/skills/aws-architecture-diagram" =>
+        [ file_entry("skills/aws-architecture-diagram/SKILL.md", "https://raw/SKILL.md") ],
+      "https://raw/SKILL.md" => "---\nname: aws-architecture-diagram\n---\nBody"
+    ) do
+      skill = Agent::SkillImporter.from_github(
+        url: "awslabs/agent-plugins@aws-architecture-diagram",
+        team: @team, by: @user
+      )
+      assert_equal "aws-architecture-diagram", skill.slug
+    end
+  end
+
   test "strips trailing SKILL.md from a blob URL" do
     with_github_routes(
       "https://api.github.com/repos/acme/skills/contents/foo?ref=main" =>
