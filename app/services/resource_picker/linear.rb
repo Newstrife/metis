@@ -10,6 +10,10 @@ module ResourcePicker
   module Linear
     KEY              = "linear".freeze
     REF_FIELD        = "project_id".freeze
+    # Linear ids are opaque UUIDs — we also store the human-readable
+    # project name so the placeholder and chip can show something the
+    # operator recognizes. Synced from the picker's selected option.
+    DISPLAY_FIELD    = "project_name".freeze
     CONNECTOR_NAME   = "Linear".freeze
     LABEL            = "Linear project".freeze
     PLACEHOLDER_HINT = "Select a project…".freeze
@@ -33,12 +37,6 @@ module ResourcePicker
     rescue StandardError => error
       Rails.logger.warn("ResourcePicker::Linear failed for user=#{user.id}: #{error.class}: #{error.message}")
       []
-    end
-
-    # Linear project ids are opaque UUIDs — the chip shows the
-    # connector name so the row is glanceable.
-    def chip_text(_value)
-      CONNECTOR_NAME
     end
 
     def directive(value)

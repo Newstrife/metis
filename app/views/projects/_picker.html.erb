@@ -5,12 +5,24 @@
 <% picker = ResourcePicker.for(provider) %>
 <turbo-frame id="<%= project_picker_frame_id(project, provider) %>">
   <% if picker %>
-    <div class="field" data-controller="select-autoopen">
+    <div class="field"
+         data-controller="select-autoopen picker-display-sync">
       <%= label_tag nil, picker::LABEL %>
       <% if options.any? %>
         <%= select_tag "project[external_refs][#{provider}][#{picker::REF_FIELD}]",
-              options_for_select([ [ "— None —", "" ] ] + options.map { |o| [ o[:label], o[:value] ] },
-                                  project.ref_for(provider, picker::REF_FIELD)) %>
+              options_for_select(
+                [ [ "— None —", "" ] ] +
+                  options.map { |o| [ o[:label], o[:value], { data: { display: o[:label] } } ] },
+                project.ref_for(provider, picker::REF_FIELD)),
+              data: {
+                picker_display_sync_target: "select",
+                action: "change->picker-display-sync#sync"
+              } %>
+        <% if picker::DISPLAY_FIELD != picker::REF_FIELD %>
+          <%= hidden_field_tag "project[external_refs][#{provider}][#{picker::DISPLAY_FIELD}]",
+                                project.ref_for(provider, picker::DISPLAY_FIELD).to_s,
+                                data: { picker_display_sync_target: "display" } %>
+        <% end %>
         <p class="field-hint"><%= picker::SUCCESS_HINT %></p>
       <% else %>
         <p class="field-hint">

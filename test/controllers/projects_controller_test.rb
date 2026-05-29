@@ -38,16 +38,20 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".pane-empty", text: /No projects yet/
   end
 
-  test "index lists the team's projects with their external-ref chips" do
+  test "index lists the team's projects with their external-ref chips — display name when stored, value otherwise" do
     team.projects.create!(name: "Metis", external_refs: { "github" => { "repo" => "chagel/metis" } })
-    team.projects.create!(name: "Themis", external_refs: { "linear" => { "project_id" => "abc" } })
+    # Linear stores both id (agent-facing) and project_name (human-facing).
+    team.projects.create!(name: "Themis",
+                           external_refs: { "linear" => { "project_id" => "abc", "project_name" => "Themis Linear" } })
+    # Legacy: pre-display-field rows fall back to the id so the chip still shows something.
+    team.projects.create!(name: "Legacy", external_refs: { "linear" => { "project_id" => "old-uuid" } })
 
     get projects_path
     assert_response :success
     assert_select ".conn-name", text: "Metis"
-    assert_select ".conn-name", text: "Themis"
     assert_select ".tag", text: "chagel/metis"
-    assert_select ".tag", text: "Linear"
+    assert_select ".tag", text: "Themis Linear"
+    assert_select ".tag", text: "old-uuid"
   end
 
   test "create persists name + about and stamps created_by / updated_by" do
@@ -90,6 +94,18 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     project.reload
     refute project.external_refs.key?("github"), "blank fields must not write an empty connector key"
     assert_equal "p-7", project.ref_for("linear", "project_id")
+  end
+
+  test "update accepts the Linear display name field alongside the id and persists both — the placeholder shows the name, not the uuid" do
+    project = team.projects.create!(name: "Metis")
+    patch project_path(project), params: {
+      project: {
+        external_refs: { linear: { project_id: "abc-123", project_name: "Metis Linear" } }
+      }
+    }
+    project.reload
+    assert_equal "abc-123", project.ref_for("linear", "project_id")
+    assert_equal "Metis Linear", project.ref_for("linear", "project_name")
   end
 
   test "update rejects arbitrary nested keys not in the permitted external_refs schema" do
@@ -157,12 +173,12 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
                   text: "p-7"
   end
 
-  test "edit hides every picker when the user has no usable connector — shows a Connect link instead" do
+  test "edit hides the entire External resources section when no connectors are authorized" do
     project = team.projects.create!(name: "Metis")
     get edit_project_path(project)
     assert_select "turbo-frame##{"project_#{project.id}_picker_github"}", count: 0
     assert_select "turbo-frame##{"project_#{project.id}_picker_linear"}", count: 0
-    assert_select "a[href=?]", connectors_path, text: /Connect GitHub or Linear/
+    assert_select "h2.form-section", text: "External resources", count: 0
   end
 
   test "edit shows only the connectors the user has authorized — Linear hidden when no Linear grant" do
@@ -200,11 +216,11 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
                   new_picker_projects_path(provider: "github")
   end
 
-  test "new shows the Connect link when no connectors are authorized" do
+  test "new hides the entire External resources section when no connectors are authorized" do
     get new_project_path
     assert_response :success
     assert_select "turbo-frame#new_picker_github", count: 0
-    assert_select "a[href=?]", connectors_path, text: /Connect GitHub or Linear/
+    assert_select "h2.form-section", text: "External resources", count: 0
   end
 
   test "create accepts external_refs picked on the new form and persists them in one shot" do

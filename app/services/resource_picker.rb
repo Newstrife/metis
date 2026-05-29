@@ -27,8 +27,16 @@ module ResourcePicker
 
   # Strong-params shape for `permit(external_refs: …)` — derived from
   # the registry so adding a connector doesn't need a controller edit.
+  # Permits both the ref field (what the agent uses, e.g. Linear project
+  # id) and the display field (what the human sees, e.g. project name)
+  # when they differ. Picker modules without a separate DISPLAY_FIELD
+  # use the ref field for both.
   def self.strong_params_shape
-    PROVIDERS.keys.to_h { |provider| [ provider.to_sym, [ self.for(provider)::REF_FIELD.to_sym ] ] }
+    PROVIDERS.keys.to_h do |provider|
+      picker = self.for(provider)
+      fields = [ picker::REF_FIELD.to_sym, picker::DISPLAY_FIELD.to_sym ].uniq
+      [ provider.to_sym, fields ]
+    end
   end
 
   # Net::HTTP client preconfigured with SSL + sane timeouts. The

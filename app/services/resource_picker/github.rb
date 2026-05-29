@@ -17,6 +17,9 @@ module ResourcePicker
     # same constants on a new module; nothing else has to change.
     KEY              = "github".freeze
     REF_FIELD        = "repo".freeze
+    # Repo names like "chagel/metis" are human-readable already — the
+    # value IS the display, so DISPLAY_FIELD aliases REF_FIELD.
+    DISPLAY_FIELD    = REF_FIELD
     CONNECTOR_NAME   = "GitHub".freeze
     LABEL            = "GitHub repository".freeze
     PLACEHOLDER_HINT = "Select a repository…".freeze
@@ -38,12 +41,6 @@ module ResourcePicker
     rescue StandardError => error
       Rails.logger.warn("ResourcePicker::Github failed for user=#{user.id}: #{error.class}: #{error.message}")
       []
-    end
-
-    # GitHub repo names like "chagel/metis" are recognizable at a glance,
-    # so the project-row chip uses the value itself.
-    def chip_text(value)
-      value
     end
 
     # Directive prose for the AGENTS.md project layer — load-bearing,
