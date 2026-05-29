@@ -143,6 +143,15 @@ module ApplicationHelper
     LANGUAGE_LABELS[code.to_s] || code.to_s.upcase
   end
 
+  # Turbo-frame DOM id for a project's picker for a connector. Both
+  # the placeholder in the form and the loaded picker partial use this
+  # so Turbo can swap content in place. New (unpersisted) projects
+  # get a stable "new_picker_<provider>" id since there's no record id
+  # to key on yet.
+  def project_picker_frame_id(project, provider)
+    project.persisted? ? "project_#{project.id}_picker_#{provider}" : "new_picker_#{provider}"
+  end
+
   # Display label for a recency bucket. Views can't reach the constant
   # by bare name (lexical scope, not the include chain), so they go
   # through this helper.

@@ -15,10 +15,13 @@ class Project < ApplicationRecord
 
   scope :recent, -> { order(updated_at: :desc) }
 
-  def ref_for(connector_type)
-    external_refs[connector_type.to_s]
+  # external_refs is keyed by connector type with per-connector field
+  # names underneath, e.g. external_refs["github"]["repo"]. Callers
+  # ask through the picker's REF_FIELD constant so adding a connector
+  # doesn't need an accessor here.
+  def ref_for(connector_type, field = nil)
+    values = external_refs[connector_type.to_s]
+    return values if field.nil?
+    values&.dig(field.to_s).presence
   end
-
-  def github_repo       = ref_for("github")&.dig("repo").presence
-  def linear_project_id = ref_for("linear")&.dig("project_id").presence
 end

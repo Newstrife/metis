@@ -37,14 +37,21 @@ class ProjectTest < ActiveSupport::TestCase
     assert_equal({}, project.external_refs)
 
     project.update!(external_refs: { "github" => { "repo" => "chagel/metis" } })
-    assert_equal "chagel/metis", project.github_repo
-    assert_nil project.linear_project_id
+    assert_equal "chagel/metis", project.ref_for("github", "repo")
+    assert_nil project.ref_for("linear", "project_id")
   end
 
-  test "github_repo and linear_project_id read the sparse map without raising on missing keys" do
+  test "ref_for returns the connector sub-hash when called without a field, or the field value when called with one" do
+    project = @team.projects.create!(name: "Metis",
+                                      external_refs: { "github" => { "repo" => "chagel/metis" } })
+    assert_equal({ "repo" => "chagel/metis" }, project.ref_for("github"))
+    assert_equal "chagel/metis", project.ref_for("github", "repo")
+  end
+
+  test "ref_for reads the sparse map without raising on missing keys" do
     project = @team.projects.create!(name: "Bare")
-    assert_nil project.github_repo
-    assert_nil project.linear_project_id
+    assert_nil project.ref_for("github", "repo")
+    assert_nil project.ref_for("linear", "project_id")
   end
 
   test "destroying a project detaches its conversations rather than cascading" do

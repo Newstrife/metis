@@ -77,8 +77,8 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     }
     project.reload
     assert_equal "edited", project.about
-    assert_equal "chagel/metis", project.github_repo
-    assert_equal "p-7", project.linear_project_id
+    assert_equal "chagel/metis", project.ref_for("github", "repo")
+    assert_equal "p-7", project.ref_for("linear", "project_id")
   end
 
   test "update drops connector keys whose values are blank — sparse external_refs is a feature, not an empty hash" do
@@ -89,7 +89,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     }
     project.reload
     refute project.external_refs.key?("github"), "blank fields must not write an empty connector key"
-    assert_equal "p-7", project.linear_project_id
+    assert_equal "p-7", project.ref_for("linear", "project_id")
   end
 
   test "update rejects arbitrary nested keys not in the permitted external_refs schema" do
@@ -189,6 +189,44 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     get edit_project_path(project)
     # No connectors authorized → no pickers, but the hidden input still rides on the form.
     assert_select "input[type=hidden][name=?][value=?]",
+                  "project[external_refs][github][repo]", "chagel/metis"
+  end
+
+  test "new renders pickers when connectors are authorized — uses the collection picker route" do
+    connect_provider("github")
+    get new_project_path
+    # Frame id keys on "new_" since the project isn't persisted yet.
+    assert_select "turbo-frame#new_picker_github:not([src]) a.ref-placeholder[href=?]",
+                  new_picker_projects_path(provider: "github")
+  end
+
+  test "new shows the Connect link when no connectors are authorized" do
+    get new_project_path
+    assert_response :success
+    assert_select "turbo-frame#new_picker_github", count: 0
+    assert_select "a[href=?]", connectors_path, text: /Connect GitHub or Linear/
+  end
+
+  test "create accepts external_refs picked on the new form and persists them in one shot" do
+    connect_provider("github")
+    assert_difference -> { team.projects.count }, 1 do
+      post projects_path, params: {
+        project: { name: "Metis",
+                   external_refs: { github: { repo: "chagel/metis" } } }
+      }
+    end
+    project = team.projects.find_by!(name: "Metis")
+    assert_equal "chagel/metis", project.ref_for("github", "repo")
+  end
+
+  test "new_picker renders the github frame populated from ResourcePicker for an unpersisted project" do
+    connect_provider("github")
+    with_picker_stub(ResourcePicker::Github, [ { value: "chagel/metis", label: "chagel/metis" } ]) do
+      get new_picker_projects_path(provider: "github")
+    end
+    assert_response :success
+    assert_select "turbo-frame#new_picker_github"
+    assert_select "select[name=?] option[value=?]",
                   "project[external_refs][github][repo]", "chagel/metis"
   end
 

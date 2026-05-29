@@ -44,6 +44,11 @@ Rails.application.routes.draw do
                             as: :update_avatar_profile
     resources :connectors, except: :show
     resources :projects, except: :show do
+      collection do
+        # Declared before the member :picker so /projects/new/picker
+        # doesn't get caught by /projects/:id/picker with id="new".
+        get "new/picker", action: :new_picker, as: :new_picker
+      end
       member do
         get :picker
       end

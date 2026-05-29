@@ -8,13 +8,21 @@ module ResourcePicker
   # like `abc-123`) which we feed back to the agent through the
   # AGENTS.md project layer.
   module Linear
+    KEY              = "linear".freeze
+    REF_FIELD        = "project_id".freeze
+    CONNECTOR_NAME   = "Linear".freeze
+    LABEL            = "Linear project".freeze
+    PLACEHOLDER_HINT = "Select a project…".freeze
+    SUCCESS_HINT     = "When the operator says \"tickets\" or \"the board,\" the agent filters Linear queries to this project.".freeze
+    EMPTY_HINT       = "to pick a project".freeze
+
     GRAPHQL_URL = URI("https://api.linear.app/graphql").freeze
     QUERY = "{ projects(first: 100) { nodes { id name } } }".freeze
 
     module_function
 
     def list(user:)
-      token = OauthBroker.bearer_for(user: user, provider: "linear", required_scopes: [ "read" ])
+      token = OauthBroker.bearer_for(user: user, provider: KEY, required_scopes: [ "read" ])
       return [] if token.blank?
 
       response = fetch(token)
@@ -25,6 +33,18 @@ module ResourcePicker
     rescue StandardError => error
       Rails.logger.warn("ResourcePicker::Linear failed for user=#{user.id}: #{error.class}: #{error.message}")
       []
+    end
+
+    # Linear project ids are opaque UUIDs — the chip shows the
+    # connector name so the row is glanceable.
+    def chip_text(_value)
+      CONNECTOR_NAME
+    end
+
+    def directive(value)
+      "**Tickets:** Linear project id `#{value}`. When the " \
+      "operator says \"issues,\" \"tickets,\" or \"the board,\" filter " \
+      "Linear queries to this project id."
     end
 
     def fetch(token)

@@ -164,18 +164,11 @@ module Agent
     end
 
     def external_refs_directives(project)
-      directives = []
-      if (repo = project.github_repo)
-        directives << "- **Codebase:** `#{repo}`. When you call GitHub MCP tools, " \
-                       "pass `owner` / `repo` parsed from this. When the operator " \
-                       "says \"the repo\" or \"the codebase,\" this is it."
+      ResourcePicker.each.filter_map do |provider, picker|
+        value = project.ref_for(provider, picker::REF_FIELD)
+        next unless value
+        "- #{picker.directive(value)}"
       end
-      if (linear_id = project.linear_project_id)
-        directives << "- **Tickets:** Linear project id `#{linear_id}`. When the " \
-                       "operator says \"issues,\" \"tickets,\" or \"the board,\" filter " \
-                       "Linear queries to this project id."
-      end
-      directives
     end
 
     # Operator-supplied context (about themselves) and instructions

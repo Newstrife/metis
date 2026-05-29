@@ -1,12 +1,12 @@
 require "net/http"
 require "openssl"
 
-# Lists the resources a user can pick from one of their team's
-# connector OAuth grants, for the project settings UI. Each picker is
-# a thin wrapper over the provider's API authenticated through
-# OauthBroker.bearer_for. Returns a uniform [{value:, label:}, …]
-# shape so the form partial is connector-agnostic. See
-# docs/projects.md.
+# Single source of truth for connectors a project can map to. Each
+# picker module declares its own metadata (label, ref-field name,
+# placeholder copy, identity directive) so the form, picker partial,
+# Agent::Identity, and strong-params shape all derive from one
+# registry — adding a connector is one new module file + a line in
+# PROVIDERS. See docs/projects.md.
 module ResourcePicker
   PROVIDERS = {
     "github" => :Github,
@@ -16,6 +16,19 @@ module ResourcePicker
   def self.for(connector_type)
     name = PROVIDERS[connector_type.to_s]
     name && const_get(name)
+  end
+
+  # Yields (provider_key, picker_module) pairs in registration order
+  # for views and services that need to walk the catalog generically.
+  def self.each
+    return enum_for(:each) unless block_given?
+    PROVIDERS.each_key { |provider| yield(provider, self.for(provider)) }
+  end
+
+  # Strong-params shape for `permit(external_refs: …)` — derived from
+  # the registry so adding a connector doesn't need a controller edit.
+  def self.strong_params_shape
+    PROVIDERS.keys.to_h { |provider| [ provider.to_sym, [ self.for(provider)::REF_FIELD.to_sym ] ] }
   end
 
   # Net::HTTP client preconfigured with SSL + sane timeouts. The

@@ -12,12 +12,23 @@ module ResourcePicker
   # page (100) — operators with more than 100 active repos can type
   # `owner/name` directly if pagination ever becomes a real problem.
   module Github
+    # Catalog metadata — read by the form, picker partial, Identity,
+    # and strong-params shape. Adding a connector means defining the
+    # same constants on a new module; nothing else has to change.
+    KEY              = "github".freeze
+    REF_FIELD        = "repo".freeze
+    CONNECTOR_NAME   = "GitHub".freeze
+    LABEL            = "GitHub repository".freeze
+    PLACEHOLDER_HINT = "Select a repository…".freeze
+    SUCCESS_HINT     = "When the operator says \"the repo,\" the agent knows this is it.".freeze
+    EMPTY_HINT       = "to pick a repository".freeze
+
     LIST_URL = URI("https://api.github.com/user/repos?per_page=100&sort=updated").freeze
 
     module_function
 
     def list(user:)
-      token = OauthBroker.bearer_for(user: user, provider: "github")
+      token = OauthBroker.bearer_for(user: user, provider: KEY)
       return [] if token.blank?
 
       response = fetch(token)
@@ -27,6 +38,22 @@ module ResourcePicker
     rescue StandardError => error
       Rails.logger.warn("ResourcePicker::Github failed for user=#{user.id}: #{error.class}: #{error.message}")
       []
+    end
+
+    # GitHub repo names like "chagel/metis" are recognizable at a glance,
+    # so the project-row chip uses the value itself.
+    def chip_text(value)
+      value
+    end
+
+    # Directive prose for the AGENTS.md project layer — load-bearing,
+    # since neither GitHub nor Linear hosted MCP accepts a server-side
+    # scope filter. The agent reads this to know which owner/repo to
+    # pass on every tool call.
+    def directive(value)
+      "**Codebase:** `#{value}`. When you call GitHub MCP tools, " \
+      "pass `owner` / `repo` parsed from this. When the operator " \
+      "says \"the repo\" or \"the codebase,\" this is it."
     end
 
     def fetch(token)

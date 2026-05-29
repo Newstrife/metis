@@ -2,7 +2,7 @@ class ProjectsController < ApplicationController
   layout "settings"
 
   before_action :set_project, only: %i[edit update destroy picker]
-  before_action :load_available_providers, only: %i[edit update]
+  before_action :load_available_providers, only: %i[new create edit update]
 
   def index
     @projects = team.projects.recent
@@ -50,11 +50,16 @@ class ProjectsController < ApplicationController
   # for both APIs in series. Unknown providers render an empty frame
   # (the partial's case/when falls through) — better than a 500.
   def picker
-    provider = params[:provider].to_s
-    picker = ResourcePicker.for(provider)
-    options = picker ? picker.list(user: current_user) : []
-    render partial: "projects/picker",
-           locals: { project: @project, provider: provider, options: options }
+    render_picker_for(@project)
+  end
+
+  # GET /settings/projects/new/picker?provider=github — collection
+  # counterpart for the New project form, where the project isn't
+  # persisted yet so the member route can't be used. The unpersisted
+  # project carries no stored external_refs, so the picker renders
+  # with no value selected.
+  def new_picker
+    render_picker_for(team.projects.new)
   end
 
   private
@@ -72,6 +77,14 @@ class ProjectsController < ApplicationController
   # Without both, hitting the picker action would just render an empty
   # state — so we suppress the placeholder upstream and tell the user
   # to connect first instead.
+  def render_picker_for(project)
+    provider = params[:provider].to_s
+    picker = ResourcePicker.for(provider)
+    options = picker ? picker.list(user: current_user) : []
+    render partial: "projects/picker",
+           locals: { project: project, provider: provider, options: options }
+  end
+
   def load_available_providers
     keys = ResourcePicker::PROVIDERS.keys
     installed = team.connectors.where(catalog_key: keys).pluck(:catalog_key)
@@ -80,12 +93,14 @@ class ProjectsController < ApplicationController
   end
 
   # external_refs comes through the form as nested fields keyed by
-  # connector type (github, linear). Each connector's sub-hash is
-  # narrowly permitted to the ref shape that connector type uses —
-  # mass assignment cannot inject arbitrary nested keys.
+  # connector type. The permitted shape is derived from the
+  # ResourcePicker registry, so each connector's sub-hash only allows
+  # that connector's REF_FIELD — mass assignment cannot inject
+  # arbitrary nested keys, and adding a connector means zero edits
+  # here.
   def project_params
     permitted = params.require(:project).permit(:name, :about,
-                                                  external_refs: { github: [ :repo ], linear: [ :project_id ] })
+                                                  external_refs: ResourcePicker.strong_params_shape)
     permitted[:external_refs] = sanitize_external_refs(permitted[:external_refs])
     permitted
   end

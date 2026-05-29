@@ -16,65 +16,61 @@
     <p class="field-hint">Freeform notes — conventions, constraints, who's involved. Shows up in the agent's context.</p>
   </div>
 
-  <% if project.persisted? %>
-    <% available = local_assigns.fetch(:available_providers, []) %>
-    <h2 class="form-section">External resources</h2>
+  <% available = local_assigns.fetch(:available_providers, []) %>
+  <h2 class="form-section">External resources</h2>
 
-    <%# Hidden inputs round-trip the stored external_refs on every save
-        — even when a picker isn't rendered (connector not authorized)
-        the value survives. When a picker IS rendered and the user
-        picks a new value, its <select> wins over the hidden input via
-        DOM order. %>
-    <%= hidden_field_tag "project[external_refs][github][repo]", project.github_repo.to_s %>
-    <%= hidden_field_tag "project[external_refs][linear][project_id]", project.linear_project_id.to_s %>
+  <%# Hidden inputs round-trip the stored external_refs on every save
+      — even when a picker isn't rendered (connector not authorized)
+      the value survives. When a picker IS rendered and the user
+      picks a new value, its <select> wins over the hidden input via
+      DOM order. %>
+  <% ResourcePicker.each do |provider, picker| %>
+    <%= hidden_field_tag "project[external_refs][#{provider}][#{picker::REF_FIELD}]",
+                          project.ref_for(provider, picker::REF_FIELD).to_s %>
+  <% end %>
 
-    <% if available.any? %>
-      <p class="field-hint" style="margin-bottom: 16px">
-        Tell the agent which external resource this project corresponds to.
-        Every conversation in this project inherits the mapping — the agent
-        stops asking "which repo?" or "which Linear project?".
-      </p>
+  <% if available.any? %>
+    <p class="field-hint" style="margin-bottom: 16px">
+      Tell the agent which external resource this project corresponds to.
+      Every conversation in this project inherits the mapping — the agent
+      stops asking "which repo?" or "which Linear project?".
+    </p>
 
-      <%# Each frame stays idle until the user clicks the placeholder
-          inside it — clicks within a frame auto-target that frame, so
-          Turbo swaps the placeholder for the loaded picker without
-          fetching on page render. %>
-      <% if available.include?("github") %>
-        <turbo-frame id="project_<%= project.id %>_picker_github">
-          <div class="field">
-            <%= label_tag nil, "GitHub repository" %>
-            <%= link_to picker_project_path(project, provider: "github"), class: "ref-placeholder" do %>
-              <% if project.github_repo %>
-                <span class="ref-placeholder-value"><%= project.github_repo %></span>
-              <% else %>
-                <span class="ref-placeholder-hint">Select a repository…</span>
-              <% end %>
-              <%= render "ref_placeholder_glyphs" %>
+    <%# Each frame stays idle until the user clicks the placeholder
+        inside it — clicks within a frame auto-target that frame, so
+        Turbo swaps the placeholder for the loaded picker without
+        fetching on page render. The picker URL is the member route
+        on edit, the collection route on new. %>
+    <% picker_url = ->(provider) {
+         project.persisted? ? picker_project_path(project, provider: provider)
+                            : new_picker_projects_path(provider: provider)
+       } %>
+
+    <% ResourcePicker.each do |provider, picker| %>
+      <% next unless available.include?(provider) %>
+      <% current = project.ref_for(provider, picker::REF_FIELD) %>
+
+      <turbo-frame id="<%= project_picker_frame_id(project, provider) %>">
+        <div class="field">
+          <%= label_tag nil, picker::LABEL %>
+          <%= link_to picker_url.call(provider), class: "ref-placeholder" do %>
+            <% if current %>
+              <span class="ref-placeholder-value"><%= current %></span>
+            <% else %>
+              <span class="ref-placeholder-hint"><%= picker::PLACEHOLDER_HINT %></span>
             <% end %>
-          </div>
-        </turbo-frame>
-      <% end %>
-
-      <% if available.include?("linear") %>
-        <turbo-frame id="project_<%= project.id %>_picker_linear">
-          <div class="field">
-            <%= label_tag nil, "Linear project" %>
-            <%= link_to picker_project_path(project, provider: "linear"), class: "ref-placeholder" do %>
-              <% if project.linear_project_id %>
-                <span class="ref-placeholder-value"><%= project.linear_project_id %></span>
-              <% else %>
-                <span class="ref-placeholder-hint">Select a project…</span>
-              <% end %>
-              <%= render "ref_placeholder_glyphs" %>
-            <% end %>
-          </div>
-        </turbo-frame>
-      <% end %>
-    <% else %>
-      <p class="field-hint">
-        <%= link_to "Connect GitHub or Linear", connectors_path %> to map this project to a repository or issue tracker.
-      </p>
+            <%= render "ref_placeholder_glyphs" %>
+          <% end %>
+        </div>
+      </turbo-frame>
     <% end %>
+  <% else %>
+    <% connector_names = ResourcePicker.each.map { |_, picker| picker::CONNECTOR_NAME } %>
+    <p class="field-hint">
+      <%= link_to "Connect #{connector_names.to_sentence(two_words_connector: ' or ', last_word_connector: ', or ')}",
+                   connectors_path %>
+      to map this project to an external resource.
+    </p>
   <% end %>
 
   <div class="form-actions">

@@ -5,10 +5,9 @@
       <div class="conn-sub"><%= truncate(project.about, length: 120) %></div>
     <% end %>
   </div>
-  <% if project.github_repo %>
-    <span class="tag"><%= project.github_repo %></span>
-  <% end %>
-  <% if project.linear_project_id %>
-    <span class="tag">Linear</span>
+  <% ResourcePicker.each do |provider, picker| %>
+    <% value = project.ref_for(provider, picker::REF_FIELD) %>
+    <% next unless value %>
+    <span class="tag"><%= picker.chip_text(value) %></span>
   <% end %>
 <% end %>
