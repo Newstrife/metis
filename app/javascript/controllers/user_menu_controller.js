@@ -1,12 +1,16 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Bottom-of-sidebar user popup: opens the panel, swaps the theme live,
-// persists the new theme via PATCH /profile/theme so it follows the
-// user across devices. The no-flash head script reads the same
-// localStorage + server value on next load.
+// Bottom-of-sidebar user popup: opens the panel, cycles the theme
+// (system → light → dark → system), and persists each change via
+// PATCH /profile/theme so it follows the user across devices. The
+// no-flash head script reads the same localStorage + server value
+// on next load.
 export default class extends Controller {
-  static targets = ["panel", "themeButton"]
-  static values  = { themeUrl: String }
+  static targets = ["panel"]
+  static values  = { themeUrl: String, themePref: String }
+
+  // Cycle order matches the icon order in the partial: monitor → sun → moon.
+  CYCLE = ["system", "light", "dark"]
 
   connect() {
     this.onDocClick = (event) => {
@@ -41,11 +45,16 @@ export default class extends Controller {
     document.removeEventListener("keydown", this.onKey)
   }
 
-  switchTheme(event) {
-    const theme = event.currentTarget.dataset.theme
-    this.#applyTheme(theme)
-    this.#markActive(theme)
-    this.#persist(theme)
+  cycleTheme(event) {
+    event.preventDefault()
+    event.stopPropagation()
+    const current = this.themePrefValue || "system"
+    const next = this.CYCLE[(this.CYCLE.indexOf(current) + 1) % this.CYCLE.length]
+    this.themePrefValue = next
+    // Mirror to the data attribute so the CSS-driven icon swap picks it up.
+    this.element.dataset.themePref = next
+    this.#applyTheme(next)
+    this.#persist(next)
   }
 
   // "system" means honour OS preference — clear the localStorage
@@ -60,12 +69,6 @@ export default class extends Controller {
       localStorage.setItem("metisTheme", theme)
       root.dataset.theme = theme
     }
-  }
-
-  #markActive(theme) {
-    this.themeButtonTargets.forEach((btn) => {
-      btn.classList.toggle("on", btn.dataset.theme === theme)
-    })
   }
 
   #persist(theme) {
