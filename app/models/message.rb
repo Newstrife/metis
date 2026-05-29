@@ -2,7 +2,7 @@ class Message < ApplicationRecord
   enum :role, { user: 0, assistant: 1, tool: 2, system: 3 }
   enum :streaming_status, { pending: 0, streaming: 1, done: 2, errored: 3, canceled: 4 }
 
-  belongs_to :conversation
+  belongs_to :conversation, touch: true
 
   # Composer uploads. Images are sent to the agent inline (pi's vision
   # protocol); other files are staged into the agent's workspace so it

@@ -64,7 +64,6 @@ class ChatJob < ApplicationJob
     persist_context_usage(conversation, adapter)
     persist_agent_model(conversation, adapter)
     persist_runtime(conversation, adapter)
-    conversation.touch
     broadcaster.refresh_usage
     broadcaster.collapse_activity
     broadcaster.refresh_composer

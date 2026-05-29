@@ -9,7 +9,11 @@
   <% if grouped %>
     <% bucket = conversation_time_bucket(conversation.updated_at) %>
     <% if bucket != prev_bucket %>
-      <div class="grp-label"><%= conversation_time_bucket_label(bucket) %></div>
+      <%# The Today label carries a stable id so a replied-to conversation
+          moving to the top (messages/create) can drop the stale header and
+          re-add a single one above its row. %>
+      <%= tag.div conversation_time_bucket_label(bucket), class: "grp-label",
+            id: ("convos-today-label" if bucket == :today) %>
       <% prev_bucket = bucket %>
     <% end %>
   <% end %>

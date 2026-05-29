@@ -22,6 +22,16 @@ class MessagesControllerTest < ActionDispatch::IntegrationTest
     assert @conversation.messages.exists?(role: :assistant, streaming_status: :pending)
   end
 
+  test "replying lifts the conversation to the top of the sidebar list" do
+    post conversation_messages_path(@conversation),
+         params: { content: "Hello agent" }, as: :turbo_stream
+
+    assert_response :success
+    assert_match %r{turbo-stream action="remove" target="conversation_#{@conversation.id}"}, response.body
+    assert_match %r{turbo-stream action="remove" target="convos-today-label"}, response.body
+    assert_match %r{turbo-stream action="prepend" target="convos-list"}, response.body
+  end
+
   test "stamps started_at on the assistant message when the turn starts" do
     post conversation_messages_path(@conversation),
          params: { content: "Hello agent" }, as: :turbo_stream

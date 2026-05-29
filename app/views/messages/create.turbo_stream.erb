@@ -8,3 +8,14 @@
 
 <%= turbo_stream.replace "composer",
       partial: "conversations/composer", locals: { conversation: @conversation } %>
+
+<%# Lift this conversation to the top of the sidebar — replying just made
+    it the most recent. Pull its existing row and the stale Today header,
+    then prepend a single Today header with the row beneath it. The header
+    the row left behind (if it emptied a bucket) self-heals on next load. %>
+<%= turbo_stream.remove dom_id(@conversation) %>
+<%= turbo_stream.remove "convos-today-label" %>
+<%= turbo_stream.prepend "convos-list" do %>
+  <%= tag.div conversation_time_bucket_label(:today), class: "grp-label", id: "convos-today-label" %>
+  <%= render "conversations/convo", conversation: @conversation %>
+<% end %>
