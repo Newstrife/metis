@@ -6,7 +6,7 @@ require "openssl"
 # placeholder copy, identity directive) so the form, picker partial,
 # Agent::Identity, and strong-params shape all derive from one
 # registry — adding a connector is one new module file + a line in
-# PROVIDERS. See docs/projects.md.
+# PROVIDERS.
 module ResourcePicker
   PROVIDERS = {
     "github" => :Github,

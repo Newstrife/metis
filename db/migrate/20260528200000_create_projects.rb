@@ -1,9 +1,9 @@
 # Team-owned named bundles of (about, external_refs). A Conversation
-# may optionally belong_to one (see docs/projects.md). external_refs
-# is sparse, keyed by connector catalog_key, and tells the agent
-# which external resource (GitHub repo, Linear project, ...) is the
-# SSOT for this project — surfaced to the agent through the project
-# layer of AGENTS.md (Agent::Identity).
+# may optionally belong_to one. external_refs is sparse, keyed by
+# connector catalog_key, and tells the agent which external resource
+# (GitHub repo, Linear project, ...) is the SSOT for this project —
+# surfaced to the agent through the project layer of AGENTS.md
+# (Agent::Identity).
 class CreateProjects < ActiveRecord::Migration[8.1]
   def change
     create_table :projects do |t|

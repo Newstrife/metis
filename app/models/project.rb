@@ -1,4 +1,3 @@
-# See docs/projects.md.
 class Project < ApplicationRecord
   NAME_MAX = 80
 
