@@ -11,6 +11,8 @@ An open, self-hostable agent platform built on **pi**, a fast, open
 agent harness. Streaming web chat, multi-user from day one, the agent
 sandboxed by default. Coding is one capability, not the boundary.
 
+![Metis chat UI](docs/metis-2605.png)
+
 - **[`VISION.md`](VISION.md)** — what Metis is, the rules we hold to,
   what we won't build.
 - **[`PLAN.md`](PLAN.md)** — current status, roadmap, and open
