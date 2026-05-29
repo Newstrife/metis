@@ -25,7 +25,7 @@
       new value, its <select> (and the synced display hidden input)
       win over these via DOM order. %>
   <% ResourcePicker.each do |provider, picker| %>
-    <% [ picker::REF_FIELD, picker::DISPLAY_FIELD ].uniq.each do |field| %>
+    <% ResourcePicker.fields_for(picker).each do |field| %>
       <%= hidden_field_tag "project[external_refs][#{provider}][#{field}]",
                             project.ref_for(provider, field).to_s %>
     <% end %>
@@ -42,13 +42,7 @@
     <%# Each frame stays idle until the user clicks the placeholder
         inside it — clicks within a frame auto-target that frame, so
         Turbo swaps the placeholder for the loaded picker without
-        fetching on page render. The picker URL is the member route
-        on edit, the collection route on new. %>
-    <% picker_url = ->(provider) {
-         project.persisted? ? picker_project_path(project, provider: provider)
-                            : new_picker_projects_path(provider: provider)
-       } %>
-
+        fetching on page render. %>
     <% ResourcePicker.each do |provider, picker| %>
       <% next unless available.include?(provider) %>
       <%# Display falls back to the ref value for connectors where they're
@@ -60,7 +54,8 @@
       <turbo-frame id="<%= project_picker_frame_id(project, provider) %>">
         <div class="field">
           <%= label_tag nil, picker::LABEL %>
-          <%= link_to picker_url.call(provider), class: "ref-placeholder" do %>
+          <%= link_to picker_projects_path(provider: provider, project_id: project.id),
+                       class: "ref-placeholder" do %>
             <% if display %>
               <span class="ref-placeholder-value"><%= display %></span>
             <% else %>

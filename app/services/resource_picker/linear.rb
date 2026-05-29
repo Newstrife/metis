@@ -50,10 +50,11 @@ module ResourcePicker
       name.present? ? "Linear project \"#{name}\" (id `#{id}`)" : "Linear project id `#{id}`"
     end
 
-    def directive(value)
-      "**Tickets:** Linear project id `#{value}`. When the " \
-      "operator says \"issues,\" \"tickets,\" or \"the board,\" filter " \
-      "Linear queries to this project id."
+    def directive_clause(project)
+      id = project.ref_for(KEY, REF_FIELD)
+      id && "**Tickets:** Linear project id `#{id}`. When the " \
+            "operator says \"issues,\" \"tickets,\" or \"the board,\" filter " \
+            "Linear queries to this project id."
     end
 
     def fetch(token)

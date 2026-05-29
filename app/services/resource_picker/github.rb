@@ -50,14 +50,15 @@ module ResourcePicker
       value && "GitHub repo `#{value}`"
     end
 
-    # Directive prose for the AGENTS.md project layer — load-bearing,
-    # since neither GitHub nor Linear hosted MCP accepts a server-side
-    # scope filter. The agent reads this to know which owner/repo to
-    # pass on every tool call.
-    def directive(value)
-      "**Codebase:** `#{value}`. When you call GitHub MCP tools, " \
-      "pass `owner` / `repo` parsed from this. When the operator " \
-      "says \"the repo\" or \"the codebase,\" this is it."
+    # Directive prose for the attached-project context block — load-
+    # bearing, since neither GitHub nor Linear hosted MCP accepts a
+    # server-side scope filter. The agent reads this to know which
+    # owner/repo to pass on every tool call.
+    def directive_clause(project)
+      value = project.ref_for(KEY, REF_FIELD)
+      value && "**Codebase:** `#{value}`. When you call GitHub MCP tools, " \
+              "pass `owner` / `repo` parsed from this. When the operator " \
+              "says \"the repo\" or \"the codebase,\" this is it."
     end
 
     def fetch(token)

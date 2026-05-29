@@ -152,9 +152,9 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
     # A select-shaped placeholder is the user's tap target inside each frame.
     assert_select "turbo-frame##{"project_#{project.id}_picker_github"} a.ref-placeholder[href=?]",
-                  picker_project_path(project, provider: "github")
+                  picker_projects_path(provider: "github", project_id: project.id)
     assert_select "turbo-frame##{"project_#{project.id}_picker_linear"} a.ref-placeholder[href=?]",
-                  picker_project_path(project, provider: "linear")
+                  picker_projects_path(provider: "linear", project_id: project.id)
     # Empty state shows a hint, not a value.
     assert_select "turbo-frame##{"project_#{project.id}_picker_github"} .ref-placeholder-hint", text: /Select a repository/
     assert_select "turbo-frame##{"project_#{project.id}_picker_linear"} .ref-placeholder-hint", text: /Select a project/
@@ -212,14 +212,14 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     connect_provider("github")
     get new_project_path
     # Frame id keys on "new_" since the project isn't persisted yet.
-    assert_select "turbo-frame#new_picker_github:not([src]) a.ref-placeholder[href=?]",
-                  new_picker_projects_path(provider: "github")
+    assert_select "turbo-frame#new_project_picker_github:not([src]) a.ref-placeholder[href=?]",
+                  picker_projects_path(provider: "github")
   end
 
   test "new hides the entire External resources section when no connectors are authorized" do
     get new_project_path
     assert_response :success
-    assert_select "turbo-frame#new_picker_github", count: 0
+    assert_select "turbo-frame#new_project_picker_github", count: 0
     assert_select "h2.form-section", text: "External resources", count: 0
   end
 
@@ -235,13 +235,13 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "chagel/metis", project.ref_for("github", "repo")
   end
 
-  test "new_picker renders the github frame populated from ResourcePicker for an unpersisted project" do
+  test "picker without a project_id renders the frame against an unpersisted project — used by the new form" do
     connect_provider("github")
     with_picker_stub(ResourcePicker::Github, [ { value: "chagel/metis", label: "chagel/metis" } ]) do
-      get new_picker_projects_path(provider: "github")
+      get picker_projects_path(provider: "github")
     end
     assert_response :success
-    assert_select "turbo-frame#new_picker_github"
+    assert_select "turbo-frame#new_project_picker_github"
     assert_select "select[name=?] option[value=?]",
                   "project[external_refs][github][repo]", "chagel/metis"
   end
@@ -260,7 +260,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   test "picker renders the github frame populated from ResourcePicker" do
     project = team.projects.create!(name: "Metis")
     with_picker_stub(ResourcePicker::Github, [ { value: "chagel/metis", label: "chagel/metis" } ]) do
-      get picker_project_path(project, provider: "github")
+      get picker_projects_path(provider: "github", project_id: project.id)
     end
     assert_response :success
     assert_select "turbo-frame#project_#{project.id}_picker_github"
@@ -271,7 +271,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   test "picker renders the linear frame populated from ResourcePicker" do
     project = team.projects.create!(name: "Metis")
     with_picker_stub(ResourcePicker::Linear, [ { value: "p-7", label: "Metis" } ]) do
-      get picker_project_path(project, provider: "linear")
+      get picker_projects_path(provider: "linear", project_id: project.id)
     end
     assert_response :success
     assert_select "select[name=?] option[value=?]",
@@ -280,7 +280,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
   test "picker with an unknown provider returns an empty frame instead of erroring" do
     project = team.projects.create!(name: "Metis")
-    get picker_project_path(project, provider: "notion")
+    get picker_projects_path(provider: "notion", project_id: project.id)
     assert_response :success
     assert_select "turbo-frame#project_#{project.id}_picker_notion"
   end
@@ -288,7 +288,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   test "picker on another team's project is not accessible" do
     other = Team.create!(name: "Other")
     foreign = other.projects.create!(name: "Secret")
-    get picker_project_path(foreign, provider: "github")
+    get picker_projects_path(provider: "github", project_id: foreign.id)
     assert_response :not_found
   end
 end

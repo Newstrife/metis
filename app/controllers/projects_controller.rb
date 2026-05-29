@@ -1,7 +1,7 @@
 class ProjectsController < ApplicationController
   layout "settings"
 
-  before_action :set_project, only: %i[edit update destroy picker]
+  before_action :set_project, only: %i[edit update destroy]
   before_action :load_available_providers, only: %i[new create edit update]
 
   def index
@@ -44,22 +44,18 @@ class ProjectsController < ApplicationController
     redirect_to projects_path, notice: "#{name} deleted."
   end
 
-  # GET /settings/projects/:id/picker?provider=github — turbo-frame
-  # endpoint hit eagerly by the edit form. Each provider's resources
-  # are fetched on its own request so the page doesn't block waiting
-  # for both APIs in series. Unknown providers render an empty frame
-  # (the partial's case/when falls through) — better than a 500.
+  # GET /settings/projects/picker?provider=github(&project_id=X) —
+  # turbo-frame endpoint hit on demand by the form. project_id is an
+  # optional hint for "what's currently selected" so one route serves
+  # both edit (with a project) and new (without). Unknown provider
+  # renders an empty frame (the partial bails out) — better than a 500.
   def picker
-    render_picker_for(@project)
-  end
-
-  # GET /settings/projects/new/picker?provider=github — collection
-  # counterpart for the New project form, where the project isn't
-  # persisted yet so the member route can't be used. The unpersisted
-  # project carries no stored external_refs, so the picker renders
-  # with no value selected.
-  def new_picker
-    render_picker_for(team.projects.new)
+    project = params[:project_id].present? ? team.projects.find(params[:project_id]) : team.projects.new
+    provider = params[:provider].to_s
+    picker = ResourcePicker.for(provider)
+    options = picker ? picker.list(user: current_user) : []
+    render partial: "projects/picker",
+           locals: { project: project, provider: provider, options: options }
   end
 
   private
@@ -77,14 +73,6 @@ class ProjectsController < ApplicationController
   # Without both, hitting the picker action would just render an empty
   # state — so we suppress the placeholder upstream and tell the user
   # to connect first instead.
-  def render_picker_for(project)
-    provider = params[:provider].to_s
-    picker = ResourcePicker.for(provider)
-    options = picker ? picker.list(user: current_user) : []
-    render partial: "projects/picker",
-           locals: { project: project, provider: provider, options: options }
-  end
-
   def load_available_providers
     keys = ResourcePicker::PROVIDERS.keys
     installed = team.connectors.where(catalog_key: keys).pluck(:catalog_key)

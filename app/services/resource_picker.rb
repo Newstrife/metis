@@ -25,18 +25,17 @@ module ResourcePicker
     PROVIDERS.each_key { |provider| yield(provider, self.for(provider)) }
   end
 
+  # The form fields a picker contributes to external_refs[provider] —
+  # at least REF_FIELD, plus DISPLAY_FIELD when it differs (Linear
+  # stores both id and project_name; GitHub aliases them).
+  def self.fields_for(picker)
+    [ picker::REF_FIELD, picker::DISPLAY_FIELD ].uniq
+  end
+
   # Strong-params shape for `permit(external_refs: …)` — derived from
   # the registry so adding a connector doesn't need a controller edit.
-  # Permits both the ref field (what the agent uses, e.g. Linear project
-  # id) and the display field (what the human sees, e.g. project name)
-  # when they differ. Picker modules without a separate DISPLAY_FIELD
-  # use the ref field for both.
   def self.strong_params_shape
-    PROVIDERS.keys.to_h do |provider|
-      picker = self.for(provider)
-      fields = [ picker::REF_FIELD.to_sym, picker::DISPLAY_FIELD.to_sym ].uniq
-      [ provider.to_sym, fields ]
-    end
+    each.to_h { |provider, picker| [ provider.to_sym, fields_for(picker).map(&:to_sym) ] }
   end
 
   # Net::HTTP client preconfigured with SSL + sane timeouts. The

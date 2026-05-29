@@ -168,10 +168,9 @@ module Agent
     end
 
     def external_refs_directives(project)
-      ResourcePicker.each.filter_map do |provider, picker|
-        value = project.ref_for(provider, picker::REF_FIELD)
-        next unless value
-        "- #{picker.directive(value)}"
+      ResourcePicker.each.filter_map do |_, picker|
+        clause = picker.directive_clause(project)
+        clause && "- #{clause}"
       end
     end
 

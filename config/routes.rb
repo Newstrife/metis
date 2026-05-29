@@ -45,11 +45,10 @@ Rails.application.routes.draw do
     resources :connectors, except: :show
     resources :projects, except: :show do
       collection do
-        # Declared before the member :picker so /projects/new/picker
-        # doesn't get caught by /projects/:id/picker with id="new".
-        get "new/picker", action: :new_picker, as: :new_picker
-      end
-      member do
+        # Stateless picker — project_id is an optional query param
+        # ("what's already selected") rather than a path segment, so
+        # one route serves both the edit form (with a project) and
+        # the new form (without one).
         get :picker
       end
     end
