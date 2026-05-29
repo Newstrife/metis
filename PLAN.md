@@ -20,16 +20,28 @@ build live in [`VISION.md`](VISION.md); architecture in
   as connector authorization), team-of-one tenancy.
 - **Connectors** — `Connector` + `ConnectorCredential` shipped;
   marketplace UI; `.mcp.json` staged per turn through
-  `pi-mcp-adapter`; GitHub is the first OAuth-shaped connector.
+  `pi-mcp-adapter`. Catalogue today: **GitHub** and **Linear** over
+  OAuth + MCP, **Gmail / Google Calendar / Google Drive** over the
+  `gws` CLI + skills fallback (Google's MCP path excludes personal
+  accounts — see [`docs/connectors.md`](docs/connectors.md)).
 - **Skills** — pi auto-discovers them from `workspace/.pi/skills/`.
   Two sources project into one tree: the repo's `.pi/skills/` and
   team-managed `Skill` rows authored from `/settings/skills`. The
-  agent can also create and edit team skills mid-conversation;
-  Metis ingests them at turn end. See
+  agent can create and edit team skills mid-conversation; Metis
+  ingests them at turn end. Team skills can be **imported from
+  GitHub** (e.g. `anthropics/skills`) from the Marketplace tab or
+  by the agent itself via `.pi/skills/.imports`. See
   [`docs/skills.md`](docs/skills.md).
+- **Projects** (v1) — `Project` belongs to a team, binds external
+  refs (GitHub repo, Linear project) per connector, and composes
+  into a conversation. The team's project catalogue is rendered
+  into per-turn `AGENTS.md` for lookup-by-mention; on-demand
+  resource pickers open the bound repo/project in one click.
 - **Credential pass-through** — `GH_TOKEN` and
   `GOOGLE_WORKSPACE_CLI_TOKEN` projected per turn so `git`/`gh` and
   `gws` act as the operator inside the sandbox.
+- **Profile** — avatars (OAuth or upload), personalization fields,
+  user-menu popup with live theme switch.
 
 ## Roadmap
 
@@ -37,19 +49,19 @@ Themes, roughly in dependency order:
 
 | Theme | Goal |
 |---|---|
-| **More connectors** | Slack, Notion, Linear, Metabase — each configuration on top of `pi-mcp-adapter`. |
+| **More connectors** | Slack, Notion, Metabase next — each configuration on top of `pi-mcp-adapter`. GitHub and Linear shipped; Google via `gws` fallback. |
 | **Dual GitHub persona** | Add an installation-token (`ghs_`) path alongside the existing user-to-server (`ghu_`) one so the agent can act as the operator (commits, PRs, comments authored as them) *or* as `metis-on-pi[bot]` (CI helpers, scheduled PR reviews, anything that shouldn't carry a person's name). Same GitHub App, two token paths; per-turn choice. See [`docs/connectors.md`](docs/connectors.md). |
-| **Projects** | User-managed R&D contexts — bind a GitHub repo + a Linear project, composed into a conversation ([`docs/tenancy.md`](docs/tenancy.md)). |
+| **Projects v2** | Build on the v1 scaffold: richer external-ref types, project-scoped skills/connectors, project-level conversation defaults. |
 | **Real teams** | Beyond team-of-one: invitations, memberships UI, shared connectors and conversations. |
-| **Skill sharing** | Export / import / registry — same question PLAN open #2 raises for connectors and extensions. |
+| **Skill sharing** | Beyond GitHub import — export, registry, or git-backed publishing. Same question open #2 raises for connectors and extensions. |
 | **Web UI** | A design system in the Hotwire stack — consistent component set + design tokens. |
 
 ## Next
 
-- [ ] **A second connector.** Pick the most useful — likely Linear or
-  Metabase — and prove the "configuration, not code" claim.
-- [ ] **Project resource.** First scaffolding from
-  [`docs/tenancy.md`](docs/tenancy.md).
+- [ ] **Slack or Notion connector.** Continue proving "configuration,
+  not code" beyond GitHub + Linear.
+- [ ] **Projects in daily use.** Drive a real workflow through a
+  bound repo + Linear project; let the friction shape v2.
 
 ## Open questions
 
