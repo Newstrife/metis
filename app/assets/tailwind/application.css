@@ -861,6 +861,35 @@ img.avatar { background:none; object-fit:cover; }
 .btn-primary:hover { opacity:.85; }
 .btn-ghost { background:var(--bg); color:var(--ink-2); }
 .btn-ghost:hover { color:var(--ink); }
+
+/* Looks like the closed state of a native select — visual continuity
+   for when the user clicks and the picker partial swaps a real <select>
+   into the same turbo-frame slot. */
+.ref-placeholder {
+  display:flex; align-items:center; gap:12px;
+  font-family:var(--fb); font-size:13.5px; color:var(--ink);
+  background:var(--card); border:1px solid var(--line-2); border-radius:10px;
+  padding:9px 12px; text-decoration:none; cursor:pointer;
+  transition:border-color .14s, box-shadow .14s, opacity .14s;
+}
+.ref-placeholder:hover { border-color:var(--ink-3); }
+.ref-placeholder:focus-visible {
+  outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow);
+}
+.ref-placeholder-value { font-family:var(--fm); flex:1; min-width:0;
+                          overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ref-placeholder-hint  { color:var(--ink-3); flex:1; }
+.ref-placeholder-chevron,
+.ref-placeholder-spinner { width:12px; height:12px; color:var(--ink-3); flex:none; }
+.ref-placeholder-spinner { display:none; animation:ref-spin .7s linear infinite; }
+@keyframes ref-spin { to { transform:rotate(360deg); } }
+
+/* Turbo flips [aria-busy="true"] on the frame for the duration of the
+   request; this is what makes the click feel acknowledged the moment
+   it happens, not 1-3s later when GitHub/Linear finally answers. */
+turbo-frame[aria-busy="true"] .ref-placeholder { cursor:progress; opacity:.7; pointer-events:none; }
+turbo-frame[aria-busy="true"] .ref-placeholder-chevron { display:none; }
+turbo-frame[aria-busy="true"] .ref-placeholder-spinner { display:block; }
 .btn-danger { background:none; color:var(--ink-2); border-color:var(--line-2); }
 .btn-danger:hover { color:var(--danger); border-color:var(--danger-line); }
 

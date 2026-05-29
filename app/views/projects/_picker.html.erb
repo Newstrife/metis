@@ -1,0 +1,36 @@
+<%# Returned by ProjectsController#picker into a turbo-frame on the
+    edit form. One partial covers every connector type via case/when
+    — keeps the wrapper consistent and the field-label / hint copy
+    in one place. %>
+<turbo-frame id="project_<%= project.id %>_picker_<%= provider %>">
+  <% case provider
+     when "github" %>
+       <div class="field" data-controller="select-autoopen">
+         <%= label_tag "project_external_refs_github_repo", "GitHub repository" %>
+         <% if options.any? %>
+           <%= select_tag "project[external_refs][github][repo]",
+                 options_for_select([ [ "— None —", "" ] ] + options.map { |o| [ o[:label], o[:value] ] },
+                                     project.github_repo) %>
+           <p class="field-hint">When the operator says "the repo," the agent knows this is it.</p>
+         <% else %>
+           <p class="field-hint">
+             <%= link_to "Connect GitHub", connectors_path %> to pick a repository.
+           </p>
+         <% end %>
+       </div>
+  <% when "linear" %>
+       <div class="field" data-controller="select-autoopen">
+         <%= label_tag "project_external_refs_linear_project_id", "Linear project" %>
+         <% if options.any? %>
+           <%= select_tag "project[external_refs][linear][project_id]",
+                 options_for_select([ [ "— None —", "" ] ] + options.map { |o| [ o[:label], o[:value] ] },
+                                     project.linear_project_id) %>
+           <p class="field-hint">When the operator says "tickets" or "the board," the agent filters Linear queries to this project.</p>
+         <% else %>
+           <p class="field-hint">
+             <%= link_to "Connect Linear", connectors_path %> to pick a project.
+           </p>
+         <% end %>
+       </div>
+  <% end %>
+</turbo-frame>

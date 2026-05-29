@@ -10,6 +10,28 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
 
   def team = @user.personal_team
 
+  # ResourcePicker::Github / ::Linear are modules with `module_function`
+  # methods, which Minitest's `stub` can't reach (it needs a class).
+  # Swap the singleton method for the block's duration.
+  def with_picker_stub(picker_module, return_value)
+    original = picker_module.method(:list)
+    picker_module.define_singleton_method(:list) { |**| return_value }
+    yield
+  ensure
+    picker_module.define_singleton_method(:list, original)
+  end
+
+  # Provision a connector for the team + an OAuth grant for the user —
+  # both must exist for the project edit page to surface that
+  # provider's picker.
+  def connect_provider(provider)
+    team.connectors.create!(name: provider, transport: :http, catalog_key: provider,
+                             definition: { "url" => "https://example/#{provider}" })
+    @user.oauth_grants.create!(provider: provider, access_token: "token-#{provider}",
+                                refresh_token: "rt", expires_at: 1.hour.from_now,
+                                scopes: provider == "linear" ? "read write issues:create" : "repo read:user")
+  end
+
   test "index renders the empty-state copy when the team has no projects" do
     get projects_path
     assert_response :success
@@ -98,6 +120,121 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     other = Team.create!(name: "Other")
     foreign = other.projects.create!(name: "Secret")
     get edit_project_path(foreign)
+    assert_response :not_found
+  end
+
+  test "edit renders the form immediately and defers picker loading to a click — no src= on the frames, no outbound HTTP" do
+    connect_provider("github")
+    connect_provider("linear")
+    project = team.projects.create!(name: "Metis")
+    get edit_project_path(project)
+    assert_response :success
+
+    # Frames exist as targets but don't auto-fetch.
+    assert_select "turbo-frame##{"project_#{project.id}_picker_github"}:not([src])"
+    assert_select "turbo-frame##{"project_#{project.id}_picker_linear"}:not([src])"
+
+    # A select-shaped placeholder is the user's tap target inside each frame.
+    assert_select "turbo-frame##{"project_#{project.id}_picker_github"} a.ref-placeholder[href=?]",
+                  picker_project_path(project, provider: "github")
+    assert_select "turbo-frame##{"project_#{project.id}_picker_linear"} a.ref-placeholder[href=?]",
+                  picker_project_path(project, provider: "linear")
+    # Empty state shows a hint, not a value.
+    assert_select "turbo-frame##{"project_#{project.id}_picker_github"} .ref-placeholder-hint", text: /Select a repository/
+    assert_select "turbo-frame##{"project_#{project.id}_picker_linear"} .ref-placeholder-hint", text: /Select a project/
+  end
+
+  test "edit shows the current external_refs values inside the placeholder without firing the picker" do
+    connect_provider("github")
+    connect_provider("linear")
+    project = team.projects.create!(name: "Metis",
+                                     external_refs: { "github" => { "repo" => "chagel/metis" },
+                                                       "linear" => { "project_id" => "p-7" } })
+    get edit_project_path(project)
+    assert_select "turbo-frame##{"project_#{project.id}_picker_github"} .ref-placeholder-value",
+                  text: "chagel/metis"
+    assert_select "turbo-frame##{"project_#{project.id}_picker_linear"} .ref-placeholder-value",
+                  text: "p-7"
+  end
+
+  test "edit hides every picker when the user has no usable connector — shows a Connect link instead" do
+    project = team.projects.create!(name: "Metis")
+    get edit_project_path(project)
+    assert_select "turbo-frame##{"project_#{project.id}_picker_github"}", count: 0
+    assert_select "turbo-frame##{"project_#{project.id}_picker_linear"}", count: 0
+    assert_select "a[href=?]", connectors_path, text: /Connect GitHub or Linear/
+  end
+
+  test "edit shows only the connectors the user has authorized — Linear hidden when no Linear grant" do
+    connect_provider("github")
+    project = team.projects.create!(name: "Metis")
+    get edit_project_path(project)
+    assert_select "turbo-frame##{"project_#{project.id}_picker_github"}"
+    assert_select "turbo-frame##{"project_#{project.id}_picker_linear"}", count: 0
+  end
+
+  test "edit hides the picker when the team has an OAuth grant but the connector isn't installed for the team" do
+    # Grant present, Connector record absent — installation gate filters out.
+    @user.oauth_grants.create!(provider: "github", access_token: "t",
+                                refresh_token: "r", expires_at: 1.hour.from_now,
+                                scopes: "repo read:user")
+    project = team.projects.create!(name: "Metis")
+    get edit_project_path(project)
+    assert_select "turbo-frame##{"project_#{project.id}_picker_github"}", count: 0
+  end
+
+  test "edit always emits the hidden inputs for external_refs so existing values survive a save when pickers are hidden" do
+    project = team.projects.create!(name: "Metis",
+                                     external_refs: { "github" => { "repo" => "chagel/metis" } })
+    get edit_project_path(project)
+    # No connectors authorized → no pickers, but the hidden input still rides on the form.
+    assert_select "input[type=hidden][name=?][value=?]",
+                  "project[external_refs][github][repo]", "chagel/metis"
+  end
+
+  test "edit form carries hidden inputs for current external_refs so a save before picker frames load round-trips the values" do
+    project = team.projects.create!(name: "Metis",
+                                     external_refs: { "github" => { "repo" => "chagel/metis" },
+                                                       "linear" => { "project_id" => "p-7" } })
+    get edit_project_path(project)
+    assert_select "input[type=hidden][name=?][value=?]",
+                  "project[external_refs][github][repo]", "chagel/metis"
+    assert_select "input[type=hidden][name=?][value=?]",
+                  "project[external_refs][linear][project_id]", "p-7"
+  end
+
+  test "picker renders the github frame populated from ResourcePicker" do
+    project = team.projects.create!(name: "Metis")
+    with_picker_stub(ResourcePicker::Github, [ { value: "chagel/metis", label: "chagel/metis" } ]) do
+      get picker_project_path(project, provider: "github")
+    end
+    assert_response :success
+    assert_select "turbo-frame#project_#{project.id}_picker_github"
+    assert_select "select[name=?] option[value=?]",
+                  "project[external_refs][github][repo]", "chagel/metis"
+  end
+
+  test "picker renders the linear frame populated from ResourcePicker" do
+    project = team.projects.create!(name: "Metis")
+    with_picker_stub(ResourcePicker::Linear, [ { value: "p-7", label: "Metis" } ]) do
+      get picker_project_path(project, provider: "linear")
+    end
+    assert_response :success
+    assert_select "select[name=?] option[value=?]",
+                  "project[external_refs][linear][project_id]", "p-7"
+  end
+
+  test "picker with an unknown provider returns an empty frame instead of erroring" do
+    project = team.projects.create!(name: "Metis")
+    get picker_project_path(project, provider: "notion")
+    assert_response :success
+    assert_select "turbo-frame#project_#{project.id}_picker_notion"
+  end
+
+  test "picker on another team's project is not accessible" do
+    other = Team.create!(name: "Other")
+    foreign = other.projects.create!(name: "Secret")
+    get picker_project_path(foreign, provider: "github")
     assert_response :not_found
   end
 end

@@ -1,6 +1,3 @@
-<%# One form for everything on /settings/projects/:id — name, about,
-    and the external-refs pickers. New form omits the pickers (we
-    don't have @repo_options / @linear_options yet). %>
 <%= form_with model: project, url: project.persisted? ? project_path(project) : projects_path, class: "conn-form" do |f| %>
   <% if project.errors.any? %>
     <div class="flash error"><%= project.errors.full_messages.to_sentence %></div>
@@ -19,41 +16,65 @@
     <p class="field-hint">Freeform notes — conventions, constraints, who's involved. Shows up in the agent's context.</p>
   </div>
 
-  <% if local_assigns[:repo_options] %>
+  <% if project.persisted? %>
+    <% available = local_assigns.fetch(:available_providers, []) %>
     <h2 class="form-section">External resources</h2>
-    <p class="field-hint" style="margin-bottom: 16px">
-      Tell the agent which external resource this project corresponds to.
-      Every conversation in this project inherits the mapping — the agent
-      stops asking "which repo?" or "which Linear project?".
-    </p>
 
-    <div class="field">
-      <%= label_tag "project_external_refs_github_repo", "GitHub repository" %>
-      <% if repo_options.any? %>
-        <%= select_tag "project[external_refs][github][repo]",
-              options_for_select([ [ "— None —", "" ] ] + repo_options.map { |o| [ o[:label], o[:value] ] },
-                                  project.github_repo) %>
-        <p class="field-hint">When the operator says "the repo," the agent knows this is it.</p>
-      <% else %>
-        <p class="field-hint">
-          <%= link_to "Connect GitHub", connectors_path %> to pick a repository.
-        </p>
-      <% end %>
-    </div>
+    <%# Hidden inputs round-trip the stored external_refs on every save
+        — even when a picker isn't rendered (connector not authorized)
+        the value survives. When a picker IS rendered and the user
+        picks a new value, its <select> wins over the hidden input via
+        DOM order. %>
+    <%= hidden_field_tag "project[external_refs][github][repo]", project.github_repo.to_s %>
+    <%= hidden_field_tag "project[external_refs][linear][project_id]", project.linear_project_id.to_s %>
 
-    <div class="field">
-      <%= label_tag "project_external_refs_linear_project_id", "Linear project" %>
-      <% if linear_options.any? %>
-        <%= select_tag "project[external_refs][linear][project_id]",
-              options_for_select([ [ "— None —", "" ] ] + linear_options.map { |o| [ o[:label], o[:value] ] },
-                                  project.linear_project_id) %>
-        <p class="field-hint">When the operator says "tickets" or "the board," the agent filters Linear queries to this project.</p>
-      <% else %>
-        <p class="field-hint">
-          <%= link_to "Connect Linear", connectors_path %> to pick a project.
-        </p>
+    <% if available.any? %>
+      <p class="field-hint" style="margin-bottom: 16px">
+        Tell the agent which external resource this project corresponds to.
+        Every conversation in this project inherits the mapping — the agent
+        stops asking "which repo?" or "which Linear project?".
+      </p>
+
+      <%# Each frame stays idle until the user clicks the placeholder
+          inside it — clicks within a frame auto-target that frame, so
+          Turbo swaps the placeholder for the loaded picker without
+          fetching on page render. %>
+      <% if available.include?("github") %>
+        <turbo-frame id="project_<%= project.id %>_picker_github">
+          <div class="field">
+            <%= label_tag nil, "GitHub repository" %>
+            <%= link_to picker_project_path(project, provider: "github"), class: "ref-placeholder" do %>
+              <% if project.github_repo %>
+                <span class="ref-placeholder-value"><%= project.github_repo %></span>
+              <% else %>
+                <span class="ref-placeholder-hint">Select a repository…</span>
+              <% end %>
+              <%= render "ref_placeholder_glyphs" %>
+            <% end %>
+          </div>
+        </turbo-frame>
       <% end %>
-    </div>
+
+      <% if available.include?("linear") %>
+        <turbo-frame id="project_<%= project.id %>_picker_linear">
+          <div class="field">
+            <%= label_tag nil, "Linear project" %>
+            <%= link_to picker_project_path(project, provider: "linear"), class: "ref-placeholder" do %>
+              <% if project.linear_project_id %>
+                <span class="ref-placeholder-value"><%= project.linear_project_id %></span>
+              <% else %>
+                <span class="ref-placeholder-hint">Select a project…</span>
+              <% end %>
+              <%= render "ref_placeholder_glyphs" %>
+            <% end %>
+          </div>
+        </turbo-frame>
+      <% end %>
+    <% else %>
+      <p class="field-hint">
+        <%= link_to "Connect GitHub or Linear", connectors_path %> to map this project to a repository or issue tracker.
+      </p>
+    <% end %>
   <% end %>
 
   <div class="form-actions">
