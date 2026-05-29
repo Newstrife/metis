@@ -43,6 +43,15 @@ Rails.application.routes.draw do
     patch "profile/avatar", to: "profiles#update_avatar",
                             as: :update_avatar_profile
     resources :connectors, except: :show
+    resources :projects, except: :show do
+      collection do
+        # Stateless picker — project_id is an optional query param
+        # ("what's already selected") rather than a path segment, so
+        # one route serves both the edit form (with a project) and
+        # the new form (without one).
+        get :picker
+      end
+    end
     resources :skills, except: :show do
       collection do
         get  "import", action: :import_form, as: :import_form

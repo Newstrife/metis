@@ -6,7 +6,7 @@ class Agent::CatalogTest < ActiveSupport::TestCase
 
     assert_includes groups.map(&:first), "Anthropic"
     anthropic = groups.find { |label, _| label == "Anthropic" }.last
-    assert_includes anthropic, [ "Claude Opus 4.7", "claude-opus-4-7" ]
+    assert_includes anthropic, [ "Claude Opus 4.8", "claude-opus-4-8" ]
   end
 
   test "provider_for resolves the provider that offers a model" do

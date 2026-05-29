@@ -10,7 +10,7 @@ module Agent
       {
         id: "anthropic", label: "Anthropic",
         models: [
-          { id: "claude-opus-4-7",   label: "Claude Opus 4.7" },
+          { id: "claude-opus-4-8",   label: "Claude Opus 4.8" },
           { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
           { id: "claude-haiku-4-5",  label: "Claude Haiku 4.5" }
         ]
@@ -33,7 +33,7 @@ module Agent
 
     # Models grouped by provider for a single <select>, in the shape
     # grouped_options_for_select wants:
-    #   [["Anthropic", [["Claude Opus 4.7", "claude-opus-4-7"], ...]], ...]
+    #   [["Anthropic", [["Claude Opus 4.8", "claude-opus-4-8"], ...]], ...]
     def self.grouped_model_options
       PROVIDERS.map do |provider|
         models = provider[:models].map { |model| [ model[:label], model[:id] ] }

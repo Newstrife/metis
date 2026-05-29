@@ -1,0 +1,14 @@
+<%= link_to edit_project_path(project), class: "conn-row" do %>
+  <div class="conn-main">
+    <div class="conn-name"><%= project.name %></div>
+    <% if project.about.present? %>
+      <div class="conn-sub"><%= truncate(project.about, length: 120) %></div>
+    <% end %>
+  </div>
+  <% ResourcePicker.each do |provider, picker| %>
+    <% display = project.ref_for(provider, picker::DISPLAY_FIELD).presence ||
+                 project.ref_for(provider, picker::REF_FIELD) %>
+    <% next unless display %>
+    <span class="tag"><%= display %></span>
+  <% end %>
+<% end %>
