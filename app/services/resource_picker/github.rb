@@ -43,6 +43,13 @@ module ResourcePicker
       []
     end
 
+    # One-clause summary for the team-projects catalog in AGENTS.md.
+    # Returns nil when this project has no GitHub ref.
+    def summary_clause(project)
+      value = project.ref_for(KEY, REF_FIELD)
+      value && "GitHub repo `#{value}`"
+    end
+
     # Directive prose for the AGENTS.md project layer — load-bearing,
     # since neither GitHub nor Linear hosted MCP accepts a server-side
     # scope filter. The agent reads this to know which owner/repo to

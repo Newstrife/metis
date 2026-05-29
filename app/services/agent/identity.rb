@@ -66,7 +66,11 @@ module Agent
           Scratch files, intermediate work, things you're only reading
           back later — keep those elsewhere in `workspace/`. When in
           doubt, publish. Mention the filename in your reply.
-        #{project_context_block}#{operator_preferences_block}
+
+        #{project_context_block}
+        #{team_projects_block}
+        #{operator_preferences_block}
+
         ## Connectors
 
         #{connectors_block}
@@ -169,6 +173,49 @@ module Agent
         next unless value
         "- #{picker.directive(value)}"
       end
+    end
+
+    # Lookup-by-mention catalog — the agent reads this and matches the
+    # operator's words ("show me the latest PR on metis") against the
+    # team's saved projects, reaching for the mapping without asking.
+    # The attached project (if any) is already in #project_context_block
+    # with stronger framing, so skip it here to avoid duplication.
+    TEAM_PROJECTS_RENDERED_MAX = 25
+    TEAM_PROJECT_ABOUT_TRUNCATE = 140
+
+    def team_projects_block
+      projects = team_projects_for_catalog
+      return "" if projects.empty?
+
+      lines = [
+        "## Projects",
+        "",
+        "The operator has these projects saved. When their message references " \
+        "one — by name, by codebase, or obvious context — reach for the mapping " \
+        "without asking. That's the point of saving them."
+      ]
+      lines << ""
+      projects.each { |project| lines << team_project_line(project) }
+
+      "\n" + lines.join("\n") + "\n"
+    end
+
+    def team_projects_for_catalog
+      scope = @conversation.team.projects.recent
+      scope = scope.where.not(id: @conversation.project_id) if @conversation.project_id
+      scope.limit(TEAM_PROJECTS_RENDERED_MAX).to_a
+    end
+
+    def team_project_line(project)
+      clauses = ResourcePicker.each.filter_map { |_, picker| picker.summary_clause(project) }
+      line = "- **#{project.name}**"
+      line += " — #{clauses.join(", ")}" if clauses.any?
+      line += "." if clauses.any?
+      if project.about.present?
+        about = sanitize_about(project.about).strip.tr("\n", " ").squeeze(" ").truncate(TEAM_PROJECT_ABOUT_TRUNCATE)
+        line += " #{about}" if about.present?
+      end
+      line
     end
 
     # Operator-supplied context (about themselves) and instructions

@@ -39,6 +39,17 @@ module ResourcePicker
       []
     end
 
+    # One-clause summary for the team-projects catalog in AGENTS.md.
+    # Includes the project_name when stored so the agent has a human
+    # handle to match against the operator's wording; falls back to
+    # the id alone for legacy rows.
+    def summary_clause(project)
+      id = project.ref_for(KEY, REF_FIELD)
+      return nil unless id
+      name = project.ref_for(KEY, DISPLAY_FIELD)
+      name.present? ? "Linear project \"#{name}\" (id `#{id}`)" : "Linear project id `#{id}`"
+    end
+
     def directive(value)
       "**Tickets:** Linear project id `#{value}`. When the " \
       "operator says \"issues,\" \"tickets,\" or \"the board,\" filter " \
