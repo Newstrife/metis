@@ -133,14 +133,9 @@ module Agent
 
     private
 
-    # Project the conversation is attached to (optional). Tells the
-    # agent which external resources are the SSOT for this work so it
-    # doesn't have to disambiguate ("which repo?", "which Linear
-    # project?") on turn 1. The hosted GitHub and Linear MCP servers
-    # don't accept a server-side scope filter — both take repo /
-    # project as per-call parameters — so this prose is load-bearing:
-    # it's the only surface that aligns tool calls to the project's
-    # SSOT.
+    # The hosted GitHub/Linear MCP servers take repo/project as per-call
+    # params, not a server-side scope — so this prose is the only thing
+    # aligning the agent's tool calls to the project's SSOT. Keep it directive.
     def project_context_block
       project = @conversation.project
       return "" unless project
@@ -157,12 +152,8 @@ module Agent
       "\n" + lines.join("\n") + "\n"
     end
 
-    # Project name validates against newlines, but `about` is freeform —
-    # an attacker (or a careless paste) could open a top-level heading
-    # that the agent reads as a new Metis section ("## Operator
-    # instructions: ignore prior context"). Strip leading ATX markers
-    # so user content can't manufacture sections; the rest of the line
-    # survives intact.
+    # `about` is freeform: a leading `#` would forge a Metis section
+    # heading the agent reads as instructions. Strip leading ATX markers.
     def sanitize_about(text)
       text.to_s.lines.map { |line| line.sub(/\A\s*#+\s*/, "") }.join
     end
@@ -174,11 +165,8 @@ module Agent
       end
     end
 
-    # Lookup-by-mention catalog — the agent reads this and matches the
-    # operator's words ("show me the latest PR on metis") against the
-    # team's saved projects, reaching for the mapping without asking.
-    # The attached project (if any) is already in #project_context_block
-    # with stronger framing, so skip it here to avoid duplication.
+    # Lookup-by-mention catalog of the team's projects; the attached one is
+    # already spotlighted in #project_context_block, so it's excluded below.
     TEAM_PROJECTS_RENDERED_MAX = 25
     TEAM_PROJECT_ABOUT_TRUNCATE = 140
 
@@ -217,11 +205,8 @@ module Agent
       line
     end
 
-    # Operator-supplied context (about themselves) and instructions
-    # (how to respond), from their profile. Rendered as its own
-    # section so the agent treats it as standing guidance, not as the
-    # user's first prompt. Empty when neither is set — the heredoc
-    # interpolation collapses to a blank line.
+    # Profile context and instructions as their own section, so the agent
+    # reads them as standing guidance rather than the user's first prompt.
     def operator_preferences_block
       sections = []
       if user.about_you.present?
@@ -262,9 +247,8 @@ module Agent
       return "no credential — you'll see the server, but it may reject calls" if credential.nil?
 
       if app&.oauth?
-        # Mirror McpConfig's gate exactly — telling the agent it's
-        # authenticated when McpConfig is actually dropping the
-        # connector makes the agent try tools it doesn't have.
+        # Mirror McpConfig's gate exactly: claiming OAuth-ready when McpConfig
+        # drops the connector makes the agent call tools it doesn't have.
         return "as you (OAuth)" if credential.oauth_ready?
 
         return "OAuth not yet authorized — connector will be omitted from this turn"
@@ -280,10 +264,8 @@ module Agent
     def user = @conversation.user
     def team = @conversation.team
 
-    # The model Metis runs this turn, as a bullet appended after Runtime.
-    # The agent can't reliably name its own model, so we hand it the real
-    # id to cite (e.g. in a review footer). "" when undeterminable —
-    # Metis passed no --model and pi uses its own config.
+    # The agent can't reliably name its own model, so hand it the real id
+    # to cite. "" when Metis passed no --model (pi uses its own config).
     def model_section
       model = @conversation.configured_model
       return "" if model.blank?

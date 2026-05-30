@@ -24,7 +24,8 @@ below.
 
 Deliberately scoped to runtime identity and behavior, not product guardrails:
 
-Sections appear in the rendered file in this order:
+Sections appear in the rendered file in this order (project/operator
+sections render only when set):
 
 - **Identity** — *"You are Metis."* (pi is the harness loading the
   file, but the rendered prompt deliberately doesn't name it — to the
@@ -33,14 +34,24 @@ Sections appear in the rendered file in this order:
 - **Soul** — the behavioral contract for the runtime agent: direct,
   resourceful, judgment-bearing, privacy-preserving, careful with
   external actions, and clear about what changed.
-- **This turn** — operator email, team name, runtime kind and its
-  isolation posture, workspace persistence model, uploads location.
+- **This turn** — operator email, team name, runtime kind + isolation
+  posture, the running model id, and the workspace channels
+  (persistence, `uploads/`, `artifacts/`).
+- **Project context / Projects** — the conversation's attached project
+  (its external-resource SSOT) and a lookup-by-mention catalog of the
+  team's other saved projects.
+- **Operator preferences** — the user's profile `about_you` /
+  `custom_instructions`, framed as standing guidance.
 - **Connectors** — each enabled connector with how the agent acts on
   it (*as you (OAuth)*, *team-shared credential*, *no credential —
   server visible but may reject*).
+- **Slash commands** — how a leading `/<slug>` maps to a skill.
+- **Team skills** — where to write team skills
+  (`.pi/skills/<slug>/SKILL.md`) so Metis syncs them back, and how to
+  install public ones.
 - **Conventions** — projected inputs rewrite each turn; sandbox
-  boundary; identity-bearing connectors carry the operator's handle,
-  not a bot's.
+  boundary; identity-bearing connectors carry the operator's handle;
+  honour a subdirectory project's own `AGENTS.md` / `CLAUDE.md`.
 
 What it deliberately does **not** include: metis's product guardrails
 (the "what we won't build" rules from [`../VISION.md`](../VISION.md)).
