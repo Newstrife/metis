@@ -95,6 +95,19 @@ class Conversation < ApplicationRecord
     agent_model["name"].presence || settings["model"].presence
   end
 
+  # The model / provider Metis passes pi for a turn: the conversation's
+  # own choice, else the deployment default (config.x.agent). This is the
+  # single source for both the `--model`/`--provider` flags (Adapters::Pi)
+  # and the model line in AGENTS.md — the agent can't reliably name its
+  # own model, so we hand it the real id.
+  def configured_model
+    settings["model"].presence || Rails.application.config.x.agent.model.presence
+  end
+
+  def configured_provider
+    settings["provider"].presence || Rails.application.config.x.agent.provider.presence
+  end
+
   # The runtime the last turn ran on (local, e2b), or nil before any.
   def runtime_label
     runtime_state["runtime"].presence

@@ -52,7 +52,7 @@ module Agent
 
         - **Operator** — #{user.email}
         - **Team** — #{team.name}
-        - **Runtime** — #{runtime_description}
+        - **Runtime** — #{runtime_description}#{model_section}
         - **Workspace** — files you write here persist between turns.
           Anything outside (system installs, `$HOME`) doesn't.
         - **Uploads** — the operator's attached files are in
@@ -279,5 +279,19 @@ module Agent
 
     def user = @conversation.user
     def team = @conversation.team
+
+    # The model Metis runs this turn, as a bullet appended after Runtime.
+    # The agent can't reliably name its own model, so we hand it the real
+    # id to cite (e.g. in a review footer). "" when undeterminable —
+    # Metis passed no --model and pi uses its own config.
+    def model_section
+      model = @conversation.configured_model
+      return "" if model.blank?
+
+      provider = @conversation.configured_provider
+      label = provider.present? && !model.include?("/") ? "#{provider}/#{model}" : model
+      "\n- **Model** — `#{label}` — the model you are running as. Cite this " \
+        "exact id when you need to name your model; don't guess it."
+    end
   end
 end

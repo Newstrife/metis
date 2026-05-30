@@ -38,6 +38,14 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/`local`.*not a security/i, render(runtime_kind: "local"))
   end
 
+  test "names the running model so the agent can cite it accurately" do
+    conversation.update!(settings: { "model" => "anthropic/claude-opus-4-8" })
+
+    out = render
+    assert_match(%r{\*\*Model\*\* — `anthropic/claude-opus-4-8`}, out)
+    assert_match(/don't guess it/i, out)
+  end
+
   test "tells the agent that working-tree files persist between turns" do
     # All three runtimes are now persistent enough that this holds:
     # Local on the host filesystem, Docker via the bind mount, E2b via

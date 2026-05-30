@@ -63,6 +63,28 @@ class ConversationTest < ActiveSupport::TestCase
     assert_nil @conversation.runtime_label
   end
 
+  test "configured_model/provider prefer the conversation's own settings" do
+    conversation = @user.conversations.create!(
+      settings: { "provider" => "openai", "model" => "gpt-5.5" }
+    )
+    assert_equal "gpt-5.5", conversation.configured_model
+    assert_equal "openai", conversation.configured_provider
+  end
+
+  test "configured_model/provider fall back to the deployment default" do
+    agent = Rails.application.config.x.agent
+    prev_model, prev_provider = agent.model, agent.provider
+    agent.model = "anthropic/claude-opus-4-8"
+    agent.provider = "anthropic"
+    @conversation.update!(settings: {})
+
+    assert_equal "anthropic/claude-opus-4-8", @conversation.configured_model
+    assert_equal "anthropic", @conversation.configured_provider
+  ensure
+    agent.model = prev_model
+    agent.provider = prev_provider
+  end
+
   test "runtime_label is the runtime the last turn ran on" do
     @conversation.update!(runtime_state: { "runtime" => "e2b", "sandbox_id" => "sbx-7" })
     assert_equal "e2b", @conversation.runtime_label

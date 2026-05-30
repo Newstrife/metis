@@ -157,17 +157,14 @@ module Agent
       # the provider. All unset -> no flags, and pi falls back to its own
       # configuration.
       def credential_args
-        settings = conversation.settings || {}
-        defaults = Rails.application.config.x.agent
-
-        model = settings["model"].presence || defaults.model
-        provider = settings["provider"].presence || defaults.provider
+        model = conversation.configured_model
+        provider = conversation.configured_provider
 
         args = []
         args += [ "--model", model ] if model.present?
         if provider.present?
           args += [ "--provider", provider ]
-          key = defaults.api_keys.to_h[provider]
+          key = Rails.application.config.x.agent.api_keys.to_h[provider]
           args += [ "--api-key", key ] if key.present?
         end
         args
