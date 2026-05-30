@@ -26,13 +26,14 @@ module GithubApp
       # A usable installation token, cached across turns. Raises Error
       # when the deployment can't mint (unconfigured) or GitHub rejects
       # the request — callers treat that as "drop this connector".
-      # `installation_id` may be nil — then we resolve the App's sole
-      # installation (the common single-org case). Ambiguous deployments
-      # (0 or >1 installs) raise, asking for an explicit id.
+      # `installation_id` may be nil — then we use the deployment's
+      # GITHUB_APP_INSTALLATION_ID, else resolve the App's sole
+      # installation (the common single-org case). A deployment with >1
+      # installs and no override raises, naming the env var to set.
       def for(installation_id = nil)
         raise Error, "GitHub App auth not configured" unless Config.app_auth_configured?
 
-        id = installation_id.presence || sole_installation_id
+        id = installation_id.presence || Config.installation_id || sole_installation_id
         Rails.cache.fetch("github_app/installation_token/#{id}", expires_in: CACHE_TTL) do
           mint(id)
         end
@@ -52,7 +53,7 @@ module GithubApp
           raise Error, "GitHub App has no installations" if ids.empty?
           if ids.size > 1
             raise Error, "GitHub App has #{ids.size} installations (#{ids.join(', ')}); " \
-                         "set an explicit installation id"
+                         "set GITHUB_APP_INSTALLATION_ID to choose one"
           end
 
           ids.first

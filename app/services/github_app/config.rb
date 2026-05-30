@@ -77,6 +77,14 @@ module GithubApp
       def app_auth_configured?
         app_id.present? && private_key.present?
       end
+
+      # Which installation to mint `github_bot` tokens for. Optional —
+      # when the App is installed in exactly one place it's auto-resolved.
+      # Set it (to the numeric id from GET /app/installations) only when
+      # the App is installed on more than one account/org, to pick which.
+      def installation_id
+        ENV["GITHUB_APP_INSTALLATION_ID"].presence
+      end
     end
   end
 end

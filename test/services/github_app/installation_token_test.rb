@@ -36,6 +36,18 @@ class GithubApp::InstallationTokenTest < ActiveSupport::TestCase
     end
   end
 
+  test "uses GITHUB_APP_INSTALLATION_ID over resolution when set" do
+    configured do
+      with_env("GITHUB_APP_INSTALLATION_ID" => "999") do
+        # installation_ids is left unstubbed — the override must short-circuit
+        # before any network lookup.
+        with_stub(GithubApp::InstallationToken, :mint, ->(id) { "ghs_#{id}" }) do
+          assert_equal "ghs_999", GithubApp::InstallationToken.for
+        end
+      end
+    end
+  end
+
   test "raises when there is no installation to resolve" do
     configured do
       with_stub(GithubApp::InstallationToken, :installation_ids, -> { [] }) do
@@ -45,11 +57,11 @@ class GithubApp::InstallationTokenTest < ActiveSupport::TestCase
     end
   end
 
-  test "raises and asks for an explicit id when the installation is ambiguous" do
+  test "raises naming the env var when the installation is ambiguous" do
     configured do
       with_stub(GithubApp::InstallationToken, :installation_ids, -> { [ "1", "2" ] }) do
         error = assert_raises(GithubApp::InstallationToken::Error) { GithubApp::InstallationToken.for }
-        assert_match(/explicit installation id/, error.message)
+        assert_match(/GITHUB_APP_INSTALLATION_ID/, error.message)
       end
     end
   end

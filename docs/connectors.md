@@ -177,7 +177,9 @@ on file anywhere.
     `GithubApp::InstallationToken` (JWT → `POST /app/installations/
     :id/access_tokens`), cached ~50 min; the install id is
     **auto-resolved** from the App's sole installation
-    (`GET /app/installations`, cached — ambiguous resolution raises).
+    (`GET /app/installations`, cached). When the App is installed in
+    more than one place, set `GITHUB_APP_INSTALLATION_ID` to pick which
+    (auto-resolution otherwise raises, naming the var).
     No bearer is stored. `McpConfig` stages this **second** server
     automatically — no credential row, no toggle — whenever the
     deployment is App-auth configured (`GITHUB_APP_ID` +
@@ -228,7 +230,12 @@ on file anywhere.
     fallback (anything carrying the `-----` banner is used verbatim).
     Absent these two, `app_auth_configured?` is false and the
     `github_bot` server simply isn't staged (the `github` user-to-server
-    path is unaffected).
+    path is unaffected). `GITHUB_APP_INSTALLATION_ID` is optional — set
+    it only when the App is installed in more than one account/org, to
+    say which one `github_bot` acts through.
+    - Loaded by **foreman from `.env` at startup**, so adding these
+      requires a `bin/dev` restart — a standalone `bin/rails runner`
+      won't see them (no `dotenv-rails`).
   - App settings: enable **"User-to-server token expiration"**
     (Settings → Optional features); without it GitHub issues no
     refresh token and renewals fail when the 8-hour access token

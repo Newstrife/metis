@@ -51,6 +51,15 @@ class GithubApp::ConfigTest < ActiveSupport::TestCase
     end
   end
 
+  test "installation_id reads the optional override from the environment" do
+    with_env("GITHUB_APP_INSTALLATION_ID" => "135300504") do
+      assert_equal "135300504", GithubApp::Config.installation_id
+    end
+    with_env("GITHUB_APP_INSTALLATION_ID" => "") do
+      assert_nil GithubApp::Config.installation_id
+    end
+  end
+
   test "app_auth_configured? is true only with both id and private key" do
     with_env("GITHUB_APP_ID" => "123", "GITHUB_APP_PRIVATE_KEY" => "pem") do
       assert_predicate GithubApp::Config, :app_auth_configured?
