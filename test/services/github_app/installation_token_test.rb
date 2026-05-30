@@ -66,6 +66,19 @@ class GithubApp::InstallationTokenTest < ActiveSupport::TestCase
     end
   end
 
+  test "funnels network/signing/parse failures into Error" do
+    # bot_entry rescues only Error and runs every turn — a GitHub blip
+    # must not bubble out as a raw Net::OpenTimeout and break the turn.
+    configured do
+      with_env("GITHUB_APP_INSTALLATION_ID" => "42") do
+        with_stub(GithubApp::InstallationToken, :mint, ->(_id) { raise Net::OpenTimeout, "timed out" }) do
+          error = assert_raises(GithubApp::InstallationToken::Error) { GithubApp::InstallationToken.for }
+          assert_match(/Net::OpenTimeout/, error.message)
+        end
+      end
+    end
+  end
+
   test "returns the minted token" do
     configured do
       with_stub(GithubApp::InstallationToken, :mint, ->(_id) { "ghs_minted" }) do

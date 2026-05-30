@@ -37,6 +37,14 @@ module GithubApp
         Rails.cache.fetch("github_app/installation_token/#{id}", expires_in: CACHE_TTL) do
           mint(id)
         end
+      rescue Error
+        raise
+      rescue StandardError => error
+        # Network (Net::*Timeout, Errno::*), signing (OpenSSL::PKey::RSAError),
+        # and parsing (JSON::ParserError) failures all become Error, so the
+        # one caller (McpConfig#bot_entry, run every turn) needs to rescue
+        # only Error — a GitHub blip can't crash an unrelated turn.
+        raise Error, "#{error.class}: #{error.message}"
       end
 
       private
@@ -78,10 +86,11 @@ module GithubApp
       end
 
       def parse(response)
-        body = JSON.parse(response.body) rescue {}
-        raise Error, "github installation token status #{response.code}: #{body["message"]}" unless response.code == "201"
+        unless response.code == "201"
+          raise Error, "github installation token status #{response.code}: #{response.body.to_s.truncate(200)}"
+        end
 
-        body.fetch("token")
+        JSON.parse(response.body).fetch("token")
       end
 
       # A 9-minute App JWT signed with the deployment's private key. iat

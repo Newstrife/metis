@@ -185,6 +185,11 @@ on file anywhere.
     deployment is App-auth configured (`GITHUB_APP_ID` +
     `GITHUB_APP_PRIVATE_KEY`) and the team has a `github` connector. A
     mint failure just omits it; it never crashes the turn.
+    - **Authority scope**: the bearer is **installation-wide** — it can
+      reach every repo the App is installed on for that account/org,
+      independent of the operator's own access. That's broader than the
+      user-scoped `github` token; it matters once teams land (a member
+      could act, via the bot, on repos their own grant can't touch).
 
   The split exists because some work wants bot attribution, not
   impersonation — chiefly **agent-authored PR reviews**: GitHub forbids
