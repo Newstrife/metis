@@ -30,4 +30,45 @@ class GithubApp::ConfigTest < ActiveSupport::TestCase
       assert_not_predicate GithubApp::Config, :configured?
     end
   end
+
+  PEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----\n".freeze
+
+  test "private_key decodes a base64-encoded PEM (the canonical form)" do
+    with_env("GITHUB_APP_PRIVATE_KEY" => Base64.strict_encode64(PEM)) do
+      assert_equal PEM, GithubApp::Config.private_key
+    end
+  end
+
+  test "private_key accepts a raw PEM unchanged" do
+    with_env("GITHUB_APP_PRIVATE_KEY" => PEM) do
+      assert_equal PEM, GithubApp::Config.private_key
+    end
+  end
+
+  test "private_key unescapes a \\n-escaped PEM" do
+    with_env("GITHUB_APP_PRIVATE_KEY" => PEM.gsub("\n", '\n')) do
+      assert_equal PEM, GithubApp::Config.private_key
+    end
+  end
+
+  test "installation_id reads the optional override from the environment" do
+    with_env("GITHUB_APP_INSTALLATION_ID" => "135300504") do
+      assert_equal "135300504", GithubApp::Config.installation_id
+    end
+    with_env("GITHUB_APP_INSTALLATION_ID" => "") do
+      assert_nil GithubApp::Config.installation_id
+    end
+  end
+
+  test "app_auth_configured? is true only with both id and private key" do
+    with_env("GITHUB_APP_ID" => "123", "GITHUB_APP_PRIVATE_KEY" => "pem") do
+      assert_predicate GithubApp::Config, :app_auth_configured?
+    end
+    with_env("GITHUB_APP_ID" => "123", "GITHUB_APP_PRIVATE_KEY" => "") do
+      assert_not_predicate GithubApp::Config, :app_auth_configured?
+    end
+    with_env("GITHUB_APP_ID" => "", "GITHUB_APP_PRIVATE_KEY" => "pem") do
+      assert_not_predicate GithubApp::Config, :app_auth_configured?
+    end
+  end
 end

@@ -84,10 +84,18 @@ Each one of these is a temptation already present in the code or the
 backlog. Recording them keeps the project from drifting into shapes we
 have considered and rejected.
 
-- **A second agent backend.** `Agent::Adapters` is *not* a
-  pluggable-agent seam — it translates pi's wire into a canonical UI
-  vocabulary (`Agent::UiEvent`). A different agent would be a different
-  product, not a different adapter.
+- **A second agent backend.** `Agent::Adapters` translates pi's wire
+  into a canonical UI vocabulary (`Agent::UiEvent`), and that seam *is*
+  agent-neutral — `text_delta`, `tool_call_*`, `turn_finished` map onto
+  Claude Code, Codex, or OpenCode just as well as pi. The lock-in is
+  below it. `Runtime#run` takes `pi_args` and opens a `PiAgent::Session`;
+  MCP (`.mcp.json` via the pi-mcp-adapter extension), skills
+  (`.pi/skills/` + path-regex detection), identity (`AGENTS.md`
+  auto-load), and credentials (`--provider/--model/--api-key`) are all
+  pi-protocol projections; and `pi-agent-rb` is the only driver gem we
+  have. A second agent is not a new adapter — it's a second set of those
+  subsystems plus a driver gem per agent. That's a different product, and
+  the focus is making pi excellent, not making the harness swappable.
 - **A Rails-side MCP runtime.** Metis is the **host** — it holds
   credentials and stages `.mcp.json` per turn. pi speaks the protocol.
   Re-implementing MCP in Rails duplicates pi.

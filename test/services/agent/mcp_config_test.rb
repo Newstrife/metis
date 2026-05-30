@@ -171,4 +171,46 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     assert_equal [], rendered["mcpServers"].keys,
                  "connector with no catalog entry must be dropped, not rendered without auth"
   end
+
+  # A second `github_bot` server (installation token) is staged next to
+  # the user's own `github` server when the deployment is App-auth
+  # configured, so the agent can act as the bot for PR reviews.
+  def add_github_connector
+    add_connector(name: "github", transport: :http,
+                  definition: { "url" => "https://mcp.example/" }, catalog_key: "github")
+  end
+
+  test "stages a github_bot server with a minted installation token when configured" do
+    add_github_connector
+    with_stub(GithubApp::Config, :app_auth_configured?, -> { true }) do
+      with_stub(GithubApp::InstallationToken, :for, ->(id = nil) { "ghs_bot" }) do
+        assert_equal({ "Authorization" => "Bearer ghs_bot" },
+                     rendered["mcpServers"]["github_bot"]["headers"])
+      end
+    end
+  end
+
+  test "no github_bot server when the deployment lacks App auth" do
+    add_github_connector
+    with_stub(GithubApp::Config, :app_auth_configured?, -> { false }) do
+      assert_not_includes rendered["mcpServers"].keys, "github_bot"
+    end
+  end
+
+  test "no github_bot server when the team has no github connector" do
+    add_connector(name: "fs", definition: { "command" => "npx" })
+    with_stub(GithubApp::Config, :app_auth_configured?, -> { true }) do
+      assert_not_includes rendered["mcpServers"].keys, "github_bot"
+    end
+  end
+
+  test "the github_bot server is omitted when minting fails" do
+    add_github_connector
+    failing = ->(_id = nil) { raise GithubApp::InstallationToken::Error, "no install" }
+    with_stub(GithubApp::Config, :app_auth_configured?, -> { true }) do
+      with_stub(GithubApp::InstallationToken, :for, failing) do
+        assert_not_includes rendered["mcpServers"].keys, "github_bot"
+      end
+    end
+  end
 end

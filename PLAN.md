@@ -50,7 +50,7 @@ Themes, roughly in dependency order:
 | Theme | Goal |
 |---|---|
 | **More connectors** | Slack, Notion, Metabase next — each configuration on top of `pi-mcp-adapter`. GitHub and Linear shipped; Google via `gws` fallback. |
-| **Dual GitHub persona** | Add an installation-token (`ghs_`) path alongside the existing user-to-server (`ghu_`) one so the agent can act as the operator (commits, PRs, comments authored as them) *or* as `metis-on-pi[bot]` (CI helpers, scheduled PR reviews, anything that shouldn't carry a person's name). Same GitHub App, two token paths; per-turn choice. See [`docs/connectors.md`](docs/connectors.md). |
+| **Dual GitHub persona** | **Shipped**: two GitHub MCP servers staged at once — `github` (`ghu_`, acts as the operator) and `github_bot` (`ghs_`, acts as `<slug>[bot]`). `GithubApp::InstallationToken` mints the bot bearer with the install id auto-resolved from the App's sole install; `McpConfig` stages `github_bot` automatically when `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` are set. The reviewing-code skill posts PR reviews via `github_bot` (GitHub forbids approving your own PR), everything else via `github`. No team/shared-credential concept. See [`docs/connectors.md`](docs/connectors.md). |
 | **Projects v2** | Build on the v1 scaffold: richer external-ref types, project-scoped skills/connectors, project-level conversation defaults. |
 | **Real teams** | Beyond team-of-one: invitations, memberships UI, shared connectors and conversations. |
 | **Skill sharing** | Beyond GitHub import — export, registry, or git-backed publishing. Same question open #2 raises for connectors and extensions. |
@@ -62,18 +62,3 @@ Themes, roughly in dependency order:
   not code" beyond GitHub + Linear.
 - [ ] **Projects in daily use.** Drive a real workflow through a
   bound repo + Linear project; let the friction shape v2.
-
-## Open questions
-
-1. **MCP runtime cost.** Metis runs pi per-turn in a fresh runtime; a
-   naive bridge re-spawns and re-auths every MCP server each turn.
-   Connection reuse, a warm runtime pool, or remote (HTTP/SSE) MCP
-   servers — which mix?
-2. **Sharing mechanism.** How does "build a tool and share it" work —
-   export/import, a hosted registry, git-backed? Applies to skills,
-   extensions, and connectors alike.
-3. **Hosting model.** Self-host only, or a Metis-hosted SaaS too?
-   Affects billing and how hard tenant isolation must be.
-4. **Connector trust.** Who vets marketplace connectors. Secret
-   scoping (shared vs per-member) is settled
-   ([`docs/connectors.md`](docs/connectors.md)).
