@@ -62,18 +62,3 @@ Themes, roughly in dependency order:
   not code" beyond GitHub + Linear.
 - [ ] **Projects in daily use.** Drive a real workflow through a
   bound repo + Linear project; let the friction shape v2.
-
-## Open questions
-
-1. **MCP runtime cost.** Metis runs pi per-turn in a fresh runtime; a
-   naive bridge re-spawns and re-auths every MCP server each turn.
-   Connection reuse, a warm runtime pool, or remote (HTTP/SSE) MCP
-   servers — which mix?
-2. **Sharing mechanism.** How does "build a tool and share it" work —
-   export/import, a hosted registry, git-backed? Applies to skills,
-   extensions, and connectors alike.
-3. **Hosting model.** Self-host only, or a Metis-hosted SaaS too?
-   Affects billing and how hard tenant isolation must be.
-4. **Connector trust.** Who vets marketplace connectors. Secret
-   scoping (shared vs per-member) is settled
-   ([`docs/connectors.md`](docs/connectors.md)).
