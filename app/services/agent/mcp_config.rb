@@ -21,6 +21,8 @@ module Agent
         entry = server_entry(connector)
         [ connector.name, entry ] if entry
       end
+      bot = bot_entry
+      entries << bot if bot
       { "mcpServers" => entries.to_h }
     end
 
@@ -102,6 +104,30 @@ module Agent
     rescue OauthBroker::Error => error
       Rails.logger.error("McpConfig: OAuth refresh failed for connector " \
                           "#{connector.id}: #{error.message}")
+      nil
+    end
+
+    # A second GitHub server, `github_bot`, bearing a freshly minted
+    # installation token so the agent can act as `<slug>[bot]` — used by
+    # the reviewing-code skill to post PR reviews (GitHub forbids
+    # approving your own PR, so the personal `github` server can't).
+    # Staged alongside the user's own `github` server whenever the
+    # deployment is App-auth configured and the user has GitHub
+    # connected. The install id is auto-resolved. nil (not configured,
+    # no github connector, or a mint failure) just omits it — never
+    # crashes the turn. See docs/connectors.md.
+    def bot_entry
+      return unless GithubApp::Config.app_auth_configured?
+
+      github = connectors.find { |connector| connector.catalog_app&.oauth_provider == "github" }
+      return unless github
+
+      token = GithubApp::InstallationToken.for
+      entry = github.definition.deep_dup
+      entry["headers"] = (entry["headers"] || {}).merge(github.catalog_app.credential_map_for(token))
+      [ "github_bot", entry ]
+    rescue GithubApp::InstallationToken::Error => error
+      Rails.logger.error("McpConfig: github_bot server skipped — #{error.message}")
       nil
     end
   end

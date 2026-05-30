@@ -166,14 +166,33 @@ on file anywhere.
 ### Per-provider notes
 
 * **GitHub**: metis is wired for a **GitHub App** (not a classic OAuth
-  App). Today metis uses only the App's user-to-server (`ghu_`) token
-  path — the agent acts as the operator, commits carry their handle,
-  PR comments are signed by them. The App also supports an
-  installation-token (`ghs_`) path that would act as `<app>[bot]`;
-  metis doesn't mint these today but plans to (see `PLAN.md` →
-  "Dual GitHub persona") for the cases where bot identity is the
-  right one (scheduled CI helpers, agent-authored PR reviews on
-  someone else's PR). One App, two token paths, picked per turn.
+  App), and exposes **both** of its token paths as **two MCP servers
+  the agent reaches at once** — it picks by purpose, not by config:
+  - **`github`** — user-to-server (`ghu_`). The agent acts as the
+    operator: commits carry their handle, PRs and comments are signed by
+    them. Bearer is the member's live OAuth access token, projected from
+    their `OauthGrant`. This is the everyday GitHub surface.
+  - **`github_bot`** — installation (`ghs_`), acting as `<slug>[bot]`.
+    Minted server-to-server from the App's id + private key by
+    `GithubApp::InstallationToken` (JWT → `POST /app/installations/
+    :id/access_tokens`), cached ~50 min; the install id is
+    **auto-resolved** from the App's sole installation
+    (`GET /app/installations`, cached — ambiguous resolution raises).
+    No bearer is stored. `McpConfig` stages this **second** server
+    automatically — no credential row, no toggle — whenever the
+    deployment is App-auth configured (`GITHUB_APP_ID` +
+    `GITHUB_APP_PRIVATE_KEY`) and the team has a `github` connector. A
+    mint failure just omits it; it never crashes the turn.
+
+  The split exists because some work wants bot attribution, not
+  impersonation — chiefly **agent-authored PR reviews**: GitHub forbids
+  approving your own PR, so a review posted through `github` can only
+  comment, while `github_bot` can approve / request changes. The
+  reviewing-code skill routes review posting to `github_bot` and leaves
+  everything else on `github`. Both are the operator's own deployment —
+  there is no team or shared-credential concept here (teams aren't built
+  yet); the two servers are just two identities the single operator can
+  act through.
 
   User-to-server has GitHub-App semantics — it preserves user identity
   (commits author as the operator), but it can only access resources
@@ -201,7 +220,15 @@ on file anywhere.
     `GITHUB_APP_SLUG` (the part after `apps/` in the install URL;
     without it metis skips the install redirect and the connect flow
     ends at the marketplace, leaving the user to find the install
-    page themselves).
+    page themselves). For the installation (`ghs_`) path also set
+    `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` — the App's RSA key,
+    base64-encoded to one line (`base64 < key.pem | tr -d '\n'`) so a
+    multiline PEM can't break dotenv. `GithubApp::Config.private_key`
+    base64-decodes it, and still accepts a raw or `\n`-escaped PEM as a
+    fallback (anything carrying the `-----` banner is used verbatim).
+    Absent these two, `app_auth_configured?` is false and the
+    `github_bot` server simply isn't staged (the `github` user-to-server
+    path is unaffected).
   - App settings: enable **"User-to-server token expiration"**
     (Settings → Optional features); without it GitHub issues no
     refresh token and renewals fail when the 8-hour access token

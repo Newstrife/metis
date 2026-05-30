@@ -1,3 +1,5 @@
+require "base64"
+
 module GithubApp
   # GitHub App OAuth credentials, supplied per deployment as environment
   # variables (.env in development, foreman-loaded). The GitHub App is
@@ -46,6 +48,34 @@ module GithubApp
       # the OAuth credentials in the environment.
       def configured?
         ENV["GITHUB_APP_CLIENT_ID"].present? && ENV["GITHUB_APP_CLIENT_SECRET"].present?
+      end
+
+      # The App's numeric id (Settings → General → App ID). Drives the
+      # server-to-server side: signing the JWT that mints installation
+      # tokens. Separate from the user-to-server OAuth client_id above.
+      def app_id
+        ENV["GITHUB_APP_ID"].presence
+      end
+
+      # The App's RSA private key (PEM). Env vars can't hold the PEM's
+      # real newlines, and pasting a multiline key breaks dotenv — so the
+      # canonical form is **base64 of the whole .pem**, one opaque line
+      # (`base64 < key.pem | tr -d '\n'`). For resilience we still accept
+      # a raw PEM (if real newlines survived) or a `\n`-escaped one — a
+      # value carrying the PEM `-----` banner is used as-is (escapes
+      # unwound), anything else is base64-decoded.
+      def private_key
+        raw = ENV["GITHUB_APP_PRIVATE_KEY"].presence
+        return unless raw
+        return raw.gsub('\n', "\n") if raw.include?("-----")
+
+        Base64.decode64(raw).presence
+      end
+
+      # True once the deployment can mint installation tokens — i.e. it
+      # has the App's id and private key, not just the OAuth secrets.
+      def app_auth_configured?
+        app_id.present? && private_key.present?
       end
     end
   end
