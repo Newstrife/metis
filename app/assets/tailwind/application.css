@@ -338,7 +338,9 @@ img.avatar { background:none; object-fit:cover; }
 .ctx { display:flex; align-items:center; gap:6px; }
 .ctx-group { display:inline-flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .ctx-track { width:46px; height:5px; border-radius:5px; background:var(--line-2); overflow:hidden; }
-.ctx-fill { display:block; height:100%; background:var(--gold); border-radius:5px; }
+.ctx-fill { display:block; height:100%; background:var(--gold); border-radius:5px; transition:width .3s; }
+.ctx.hot { color:var(--danger); }
+.ctx.hot .ctx-fill { background:var(--danger); }
 .tag {
   font-family:var(--fm); font-size:11px; color:var(--ink-2);
   background:var(--bg); border-radius:7px; padding:3px 8px;

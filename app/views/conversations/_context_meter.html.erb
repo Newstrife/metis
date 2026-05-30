@@ -11,9 +11,11 @@
   <% if runtime["runtime"].present? %>
     <span class="tag rt" title="<%= runtime["sandbox_id"] %>"><%= runtime["runtime"] %></span>
   <% end %>
-  <% if window.positive? %>
-    <% percent = usage["percent"].to_f.clamp(0, 100) %>
-    <span class="ctx" title="<%= format_tokens(usage["tokens"]) %> / <%= format_tokens(window) %> tokens">
+  <%# Only surface usage once it's meaningful (themis convention: ≥40%);
+      a near-empty "ctx 2%" is just noise. Tint hot above 80%. %>
+  <% percent = usage["percent"].to_f.clamp(0, 100) if window.positive? %>
+  <% if percent && percent >= 40 %>
+    <span class="ctx<%= " hot" if percent >= 80 %>" title="<%= format_tokens(usage["tokens"]) %> / <%= format_tokens(window) %> tokens">
       <span class="ctx-track"><span class="ctx-fill" style="width: <%= percent %>%"></span></span>
       ctx <%= percent.round %>%
     </span>
