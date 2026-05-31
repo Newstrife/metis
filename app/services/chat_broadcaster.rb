@@ -27,6 +27,25 @@ class ChatBroadcaster
     finish
   end
 
+  # Appends the "running" dot to this conversation's sidebar row.
+  # The dot is broadcast on the user's stream so it appears even when
+  # the user is viewing a different conversation.
+  def start_sidebar_indicator
+    Turbo::StreamsChannel.broadcast_append_to(
+      @conversation.user,
+      target: dom_id(@conversation),
+      html: sidebar_indicator_html
+    )
+  end
+
+  # Removes the sidebar running dot once the turn ends or errors.
+  def stop_sidebar_indicator
+    Turbo::StreamsChannel.broadcast_remove_to(
+      @conversation.user,
+      target: dom_id(@conversation, :running)
+    )
+  end
+
   # Called by ChatJob once a turn's token/context usage is persisted:
   # repaints the conversation's context meter and this message's token
   # footer.
@@ -175,5 +194,9 @@ class ChatBroadcaster
     Turbo::StreamsChannel.public_send(
       "broadcast_#{action}_to", @conversation, target: target, partial: partial, locals: locals
     )
+  end
+
+  def sidebar_indicator_html
+    %(<span class="convo-running" id="#{dom_id(@conversation, :running)}" aria-label="Running"></span>)
   end
 end

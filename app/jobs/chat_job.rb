@@ -27,6 +27,7 @@ class ChatJob < ApplicationJob
 
   def run(conversation, user_message, assistant_message, broadcaster, adapter)
     assistant_message.update!(streaming_status: :streaming)
+    broadcaster.start_sidebar_indicator
     text = +""
     reasoning = +""
     tools = {}
@@ -66,6 +67,7 @@ class ChatJob < ApplicationJob
     persist_runtime(conversation, adapter)
     broadcaster.refresh_usage
     broadcaster.collapse_activity
+    broadcaster.stop_sidebar_indicator
     broadcaster.refresh_composer
   end
 
@@ -177,6 +179,7 @@ class ChatJob < ApplicationJob
 
     assistant_message.reload.update!(streaming_status: :errored, finished_at: Time.current)
     broadcaster&.fail(message)
+    broadcaster&.stop_sidebar_indicator
     broadcaster&.refresh_composer
   rescue ActiveRecord::RecordNotFound
     # Message vanished while we were running — nothing to recover.
