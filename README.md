@@ -81,8 +81,15 @@ a fast, open agent harness. The lessons come along; the lock-in does not.
 
 ## Quickstart
 
-Prerequisites: **Ruby 4.0.5** (see `.ruby-version`; `mise` recommended),
-**PostgreSQL**, and **pi** on your `PATH` for the default `local` runtime
+First, set at least one provider key (e.g. `ANTHROPIC_API_KEY`) in `.env`
+so the agent can talk to a model — both setups below load it. Then pick
+**native** or **Docker**; either serves the app at http://localhost:3000.
+
+### Native
+
+Run the app directly on your machine. Prerequisites: **Ruby 4.0.5** (see
+`.ruby-version`; `mise` recommended), **PostgreSQL**, and **pi** on your
+`PATH` for the default `local` runtime
 (`npm install -g @earendil-works/pi-coding-agent`).
 
 ```sh
@@ -90,23 +97,19 @@ bin/setup        # install deps, prepare the database, install the MCP bridge in
 bin/dev          # Puma + Tailwind via foreman → http://localhost:3000
 ```
 
-Set at least one provider key (e.g. `ANTHROPIC_API_KEY`) in `.env` —
-`bin/dev` loads it via foreman. See
-[`docs/configuration.md`](docs/configuration.md) for runtimes, providers,
-and every variable.
-
 ### Docker
 
-No local Ruby/Node/pi needed — `compose.yaml` bakes pi, the MCP bridge,
-and the gws CLI into the dev image and runs the agent on the `local`
-runtime inside the container:
+Nothing local to install but Docker — `compose.yaml` bakes Ruby, pi, the
+MCP bridge, and the gws CLI into the dev image, runs Postgres alongside,
+and serves the agent on the `local` runtime inside the container.
 
 ```sh
-docker compose up --build   # first run (rebuild after a Gemfile change)
-docker compose up           # → http://localhost:3000
+docker compose up --build   # first run, or after a Gemfile change
+docker compose up           # subsequent runs
 ```
 
-Code is bind-mounted for live reload; provider keys come from `.env`.
+Either way, see [`docs/configuration.md`](docs/configuration.md) for
+runtimes, providers, and every variable.
 
 > Metis encrypts `Message#content` and `Message#reasoning` with Active
 > Record Encryption; the keys must be present in Rails credentials for
