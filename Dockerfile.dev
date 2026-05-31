@@ -1,0 +1,58 @@
+# syntax=docker/dockerfile:1
+
+# Development image for the Docker Compose dev environment (compose.yaml).
+# Unlike the production Dockerfile, this bakes in everything a turn on the
+# :local runtime needs: Node, the pi binary, the pi-mcp-adapter bridge, and
+# the gws CLI — pi runs as a subprocess of this container (Runtime::Local).
+#
+# Build context is the repo root; only Gemfile(.lock) is copied — the app
+# code is bind-mounted at runtime by compose.
+
+ARG RUBY_VERSION=4.0.5
+FROM docker.io/library/ruby:$RUBY_VERSION-slim
+
+WORKDIR /rails
+
+ENV BUNDLE_PATH="/usr/local/bundle" \
+    HOME="/root"
+
+# Pin these in lockstep with bin/setup, docker/pi-runtime/Dockerfile, and
+# lib/tasks/e2b.rake. PI_VERSION mirrors PiAgent::SUPPORTED_PI_VERSION.
+ARG PI_VERSION=0.77.0
+ARG PI_MCP_ADAPTER_VERSION=2.7.0
+
+# Base toolchain: gem build deps + libvips/libpq for the app, plus the
+# basics pi's bash tool and skills expect (git, ripgrep, curl). `gh` is
+# installed from GitHub's apt source so the agent can act on GitHub as the
+# operator via the per-turn GH_TOKEN (see app/services/agent/runtime/base.rb).
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y \
+      build-essential ca-certificates curl git gnupg \
+      libpq-dev libvips libyaml-dev pkg-config postgresql-client ripgrep && \
+    install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      | tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install --no-install-recommends -y gh nodejs && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives
+
+# pi itself, the MCP connector bridge, and the Google Workspace CLI. The
+# bridge installs under $HOME/.pi where pi (run as root in this container)
+# discovers it at turn time.
+RUN npm install --global "@earendil-works/pi-coding-agent@${PI_VERSION}" && \
+    npm install --global @googleworkspace/cli && \
+    pi install "npm:pi-mcp-adapter@${PI_MCP_ADAPTER_VERSION}"
+
+# foreman drives bin/dev; baked in so the entrypoint doesn't gem-install it.
+RUN gem install foreman
+
+# Install gems at build time. Gemfile changes need a rebuild
+# (docker compose build web).
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+
+EXPOSE 3000
+CMD ["bin/rails", "server", "-b", "0.0.0.0"]

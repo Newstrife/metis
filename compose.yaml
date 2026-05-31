@@ -1,0 +1,69 @@
+# Docker Compose development environment.
+#
+#   docker compose up --build      # first run / after a Gemfile change
+#   docker compose up              # subsequent runs
+#   open http://localhost:3000
+#
+# pi runs as a subprocess inside `web` (METIS_AGENT_RUNTIME=local) — agent
+# turns work fully in-container. Code is bind-mounted, so edits reload live;
+# gems are baked into the image (rebuild `web` after changing the Gemfile).
+#
+# Provider keys, connector secrets, etc. come from `.env` (see .env.example).
+
+name: metis
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: metis
+      POSTGRES_PASSWORD: metis
+      POSTGRES_DB: metis_development
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metis"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: bash -c "bin/rails db:prepare && bin/rails server -b 0.0.0.0"
+    env_file: .env
+    environment:
+      RAILS_ENV: development
+      PORT: 3000
+      METIS_AGENT_RUNTIME: local
+      DATABASE_URL: postgres://metis:metis@db:5432/metis_development
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/rails
+      # Container-local tmp: the host's tmp/ holds a darwin bootsnap cache
+      # and pidfiles that must not leak into the linux container.
+      - tmp:/rails/tmp
+    depends_on:
+      db:
+        condition: service_healthy
+
+  css:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # [always] keeps the watcher running without a TTY (it otherwise
+    # compiles once and exits in a container).
+    command: bin/rails tailwindcss:watch[always]
+    environment:
+      RAILS_ENV: development
+    volumes:
+      - .:/rails
+      - tmp:/rails/tmp
+
+volumes:
+  pgdata:
+  tmp:

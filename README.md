@@ -95,6 +95,19 @@ Set at least one provider key (e.g. `ANTHROPIC_API_KEY`) in `.env` —
 [`docs/configuration.md`](docs/configuration.md) for runtimes, providers,
 and every variable.
 
+### Docker
+
+No local Ruby/Node/pi needed — `compose.yaml` bakes pi, the MCP bridge,
+and the gws CLI into the dev image and runs the agent on the `local`
+runtime inside the container:
+
+```sh
+docker compose up --build   # first run (rebuild after a Gemfile change)
+docker compose up           # → http://localhost:3000
+```
+
+Code is bind-mounted for live reload; provider keys come from `.env`.
+
 > Metis encrypts `Message#content` and `Message#reasoning` with Active
 > Record Encryption; the keys must be present in Rails credentials for
 > every environment, tests included.
