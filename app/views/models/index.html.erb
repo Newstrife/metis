@@ -1,0 +1,40 @@
+<% content_for :title, "Models" %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title">Models</h1>
+    <div style="flex:1"></div>
+    <% if current_user.admin? %>
+      <%= button_to "Refresh", refresh_models_path, class: "btn btn-ghost" %>
+    <% end %>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <p class="muted" style="margin-bottom:1rem">
+        The providers and models this deployment offers in the new-chat composer.
+        <%= current_user.admin? ? "Refresh to pull the latest from pi, then enable what you want and set a default." : "Managed by an administrator." %>
+      </p>
+
+      <%# Enable/disable and set-default submit inside this frame, so Turbo
+          swaps just the list — derived provider state and the moved default
+          badge re-render without a full-page reload. %>
+      <%= turbo_frame_tag "models-catalog" do %>
+        <% if @providers.empty? %>
+          <div class="pane-empty">
+            <p>The catalog is empty.</p>
+            <% if current_user.admin? %>
+              <p>Click <strong>Refresh</strong> to populate it from pi.</p>
+            <% else %>
+              <p>An administrator hasn't populated it yet.</p>
+            <% end %>
+          </div>
+        <% else %>
+          <% @providers.each do |provider| %>
+            <%= render "provider", provider: provider, default_model: @default_model %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</main>

@@ -19,6 +19,7 @@ class User < ApplicationRecord
 
   validate :avatar_acceptable
 
+  before_create :grant_admin_to_first_user
   after_create :create_personal_team
 
   # Locales the UI is translated into. v1 ships English only; the
@@ -208,6 +209,13 @@ class User < ApplicationRecord
     return if Agent::Catalog.provider_for(preferred_model)
 
     errors.add(:preferred_model, "is not an available model")
+  end
+
+  # The first account on a fresh deployment is the operator — make it an
+  # admin so someone can curate the model catalog. Later users are not.
+  # Promote others with `rake admin:grant[email]`.
+  def grant_admin_to_first_user
+    self.admin = true if User.count.zero?
   end
 
   # Every user gets a personal team (a team of one) at signup.

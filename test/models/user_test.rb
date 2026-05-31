@@ -82,7 +82,7 @@ class UserTest < ActiveSupport::TestCase
     user.preferred_model = "no-such-model"
     refute user.valid?
 
-    user.preferred_model = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    user.preferred_model = seed_catalog_model
     assert user.valid?
   end
 

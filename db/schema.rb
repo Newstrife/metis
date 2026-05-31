@@ -10,9 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_28_200100) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_31_120002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "pg_trgm"
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
@@ -103,6 +104,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_28_200100) do
     t.index ["user_id"], name: "index_identities_on_user_id"
   end
 
+  create_table "llm_models", force: :cascade do |t|
+    t.integer "context_window"
+    t.jsonb "cost", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.boolean "enabled", default: true, null: false
+    t.jsonb "input_modalities", default: [], null: false
+    t.boolean "is_default", default: false, null: false
+    t.string "key", null: false
+    t.string "label", null: false
+    t.datetime "last_seen_at"
+    t.bigint "llm_provider_id", null: false
+    t.integer "max_tokens"
+    t.integer "position", default: 0, null: false
+    t.boolean "reasoning", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["is_default"], name: "index_llm_models_on_is_default", unique: true, where: "is_default"
+    t.index ["llm_provider_id", "key"], name: "index_llm_models_on_llm_provider_id_and_key", unique: true
+    t.index ["llm_provider_id"], name: "index_llm_models_on_llm_provider_id"
+  end
+
+  create_table "llm_providers", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", null: false
+    t.string "label", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_llm_providers_on_key", unique: true
+  end
+
   create_table "memberships", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "role", null: false
@@ -188,6 +218,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_28_200100) do
 
   create_table "users", force: :cascade do |t|
     t.text "about_you"
+    t.boolean "admin", default: false, null: false
     t.string "avatar_url"
     t.datetime "created_at", null: false
     t.text "custom_instructions"
@@ -215,6 +246,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_28_200100) do
   add_foreign_key "conversations", "teams"
   add_foreign_key "conversations", "users"
   add_foreign_key "identities", "users"
+  add_foreign_key "llm_models", "llm_providers"
   add_foreign_key "memberships", "teams"
   add_foreign_key "memberships", "users"
   add_foreign_key "messages", "conversations"

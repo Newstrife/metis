@@ -36,8 +36,9 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "stores the chosen provider and model on the conversation" do
+    seed_catalog_model(provider: "openai", key: "gpt-5.5")
     sign_in @user
-    post conversations_path, params: { content: "hi", provider: "openai", model: "gpt-5.5" }
+    post conversations_path, params: { content: "hi", model: "gpt-5.5" }
 
     settings = @user.conversations.last.settings
     assert_equal "openai", settings["provider"]

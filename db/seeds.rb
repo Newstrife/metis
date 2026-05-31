@@ -20,3 +20,9 @@ if Rails.env.local?
 else
   puts "Skipping development login seeds in #{Rails.env}."
 end
+
+# Populate the LLM catalog from pi. Idempotent and curation-preserving;
+# a no-op when pi is unreachable — an admin can Refresh from
+# /settings/models.
+result = Agent::ModelCatalogSync.call
+puts result[:ok] ? "Synced #{result[:models]} models from pi." : "pi unreachable — model catalog left as-is."

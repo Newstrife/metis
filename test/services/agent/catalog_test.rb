@@ -1,26 +1,53 @@
 require "test_helper"
 
 class Agent::CatalogTest < ActiveSupport::TestCase
+  def seed_catalog
+    anthropic = LlmProvider.create!(key: "anthropic", label: "Anthropic", position: 1)
+    anthropic.llm_models.create!(key: "claude-opus-4-8", label: "Claude Opus 4.8", position: 1)
+    codex = LlmProvider.create!(key: "openai-codex", label: "OpenAI Codex", position: 2)
+    codex.llm_models.create!(key: "gpt-5.5", label: "GPT-5.5", position: 1)
+    [ anthropic, codex ]
+  end
+
+  test "providers reflects enabled rows grouped by provider, in order" do
+    seed_catalog
+
+    assert_equal %w[Anthropic], Agent::Catalog.providers.map { |p| p[:label] }.first(1)
+    assert_equal [ "Anthropic", "OpenAI Codex" ], Agent::Catalog.providers.map { |p| p[:label] }
+  end
+
+  test "disabled providers and models are excluded" do
+    _anthropic, codex = seed_catalog
+    codex.set_enabled!(false)
+
+    assert_equal [ "Anthropic" ], Agent::Catalog.providers.map { |p| p[:label] }
+  end
+
+  test "is empty when the catalog has no rows" do
+    assert_empty Agent::Catalog.providers
+    assert_nil Agent::Catalog.provider_for("anything")
+  end
+
   test "grouped_model_options groups label/id model pairs under each provider" do
+    seed_catalog
     groups = Agent::Catalog.grouped_model_options
 
-    assert_includes groups.map(&:first), "Anthropic"
     anthropic = groups.find { |label, _| label == "Anthropic" }.last
     assert_includes anthropic, [ "Claude Opus 4.8", "claude-opus-4-8" ]
   end
 
   test "provider_for resolves the provider that offers a model" do
-    assert_equal "openai", Agent::Catalog.provider_for("gpt-5.5")
+    seed_catalog
+
+    assert_equal "openai-codex", Agent::Catalog.provider_for("gpt-5.5")
     assert_nil Agent::Catalog.provider_for("no-such-model")
   end
 
-  test "default_model is a model the catalog offers" do
-    models = Agent::Catalog::PROVIDERS.flat_map { |provider| provider[:models].pluck(:id) }
-    assert_includes models, Agent::Catalog.default_model
-  end
+  test "default_model and default_provider follow the deployment default" do
+    _anthropic, codex = seed_catalog
+    codex.llm_models.find_by(key: "gpt-5.5").make_default!
 
-  test "default_provider is one of the catalog providers" do
-    assert_includes Agent::Catalog::PROVIDERS.map { |provider| provider[:id] },
-                    Agent::Catalog.default_provider
+    assert_equal "gpt-5.5", Agent::Catalog.default_model
+    assert_equal "openai-codex", Agent::Catalog.default_provider
   end
 end
