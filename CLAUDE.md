@@ -63,6 +63,8 @@ keeps the raw payload for native view helpers.
 
 ### Request → response flow
 
+(For the full turn-flow diagram, see `docs/architecture.md`.)
+
 1. `MessagesController#create` creates a `user` message and a `pending`
    `assistant` message, then enqueues `ChatJob`.
 2. `ChatJob#perform` runs one turn: it gets the adapter, calls `#stream`, and
@@ -110,7 +112,7 @@ pi's own conventions (https://pi.dev/docs/latest/providers): `ANTHROPIC_API_KEY`
 `OPENAI_API_KEY`, `GEMINI_API_KEY` (note: not `GOOGLE_API_KEY` — pi's name),
 `DEEPSEEK_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, etc. Provider API keys are a
 shared, deployment-level resource — there are no per-user keys. All unset → pi
-uses its own config.
+uses its own config. Full env-var table in `docs/configuration.md`.
 
 ### Connectors (MCP)
 
@@ -134,6 +136,17 @@ pi ships no MCP support of its own; the bridge-via-extension choice (vs.
 pi's recommended skill+CLI path) is a load-bearing decision documented in
 `docs/connectors.md` and `VISION.md`. Don't replace it with CLI wrappers.
 
+### Skills
+
+Skills are pi's native unit of recallable know-how (a `SKILL.md` + files,
+auto-discovered from cwd). Metis layers two sources into
+`workspace/.pi/skills/` per turn — the repo's versioned `.pi/skills/`
+(`Agent::RepoSkills`) and the team's DB-authored `Skill` rows
+(`belongs_to :team`), the latter installable from GitHub via
+`Agent::SkillImporter` / `Agent::SkillMarketplace` and the
+`/settings/skills` UI. Like uploads and `.mcp.json`, this tree is a
+projected input — rewritten each turn, never durable. See `docs/skills.md`.
+
 ## Conventions
 
 - **Tenancy is `Team`-only.** Every ownable resource (`Conversation`,
@@ -143,8 +156,9 @@ pi's recommended skill+CLI path) is a load-bearing decision documented in
   no polymorphic `owner`. See `docs/tenancy.md`.
 - Models use integer enums: `Conversation#backend`, `Message#role`,
   `Message#streaming_status`.
-- Test parallelization is disabled below 500 tests on purpose — parallel
-  workers share the filesystem and race on per-conversation scratch paths.
+- Test parallelization is gated behind a high threshold (`threshold: 5000`
+  in `test/test_helper.rb`) on purpose — parallel workers share the
+  filesystem and race on per-conversation scratch paths.
 - Background jobs run on Solid Queue (in production); Solid Cache/Cable back
   Rails cache and Action Cable.
 
