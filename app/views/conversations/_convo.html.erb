@@ -2,7 +2,10 @@
     turbo-frame so picking a conversation swaps only the right pane —
     the sidebar (and its scroll/pagination state) stays put. Inline
     rename lives on the show page's h1, not here, so this row remains
-    a pure navigation link. %>
+    a pure navigation link.
+
+    The .convo-running dot is also appended / removed live via
+    ChatBroadcaster on the user's Turbo stream — see chat.html.erb. %>
 <%= link_to conversation,
       id: dom_id(conversation),
       class: "convo#{' on' if conversation == @conversation}",
@@ -11,4 +14,7 @@
               turbo_frame: "main",
               title: conversation.display_title } do %>
   <span class="tt" id="<%= dom_id(conversation, :sidebar_title) %>"><%= conversation.display_title %></span>
+  <% if conversation.turn_in_progress? %>
+    <span class="convo-running" id="<%= dom_id(conversation, :running) %>" aria-label="Running"></span>
+  <% end %>
 <% end %>
