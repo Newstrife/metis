@@ -1166,7 +1166,10 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   position:relative; display:inline-block; align-self:flex-start;
 }
 .avatar-editor-trigger {
-  display:block; cursor:pointer; border-radius:50%;
+  /* inline-block so the trigger hugs the round avatar; display:block would
+     stretch it to the container's width (which a long error message widens),
+     turning the 50% radius + hover outline into an ellipse. */
+  display:inline-block; cursor:pointer; border-radius:50%;
   outline:2px solid transparent;
   transition:outline-color .12s;
 }
