@@ -35,8 +35,13 @@ class ProfilesController < ApplicationController
     if remove
       @user.avatar.purge_later if @user.avatar.attached?
       @user.update_column(:avatar_url, nil) if @user.avatar_url.present?
-    elsif avatar.present?
-      @user.update(avatar: avatar)
+    elsif avatar.present? && !@user.update(avatar: avatar)
+      # A rejected upload (oversize / wrong type) leaves an unpersisted blob
+      # attached in memory — rendering it raises ("signed_id for a new
+      # record"). Reload to the saved state, but carry the error to the view.
+      messages = @user.errors[:avatar].dup
+      @user.reload
+      messages.each { |message| @user.errors.add(:avatar, message) }
     end
 
     respond_to do |format|
