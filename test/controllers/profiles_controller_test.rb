@@ -109,6 +109,18 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
     assert_nil @user.avatar_url
   end
 
+  test "update_avatar rejects an invalid file without raising, surfacing the error" do
+    patch update_avatar_profile_path, params: {
+      user: { avatar: Rack::Test::UploadedFile.new(
+        Rails.root.join("test/fixtures/files/sample.txt"), "text/plain"
+      ) }
+    }, as: :turbo_stream
+
+    assert_response :success
+    assert_match "JPEG, PNG, WebP, or GIF", response.body
+    refute @user.reload.avatar.attached?
+  end
+
   # IANA→Rails-friendly normalization: the browser sends "Europe/Berlin"
   # but the model validation and time_zone_select only know "Berlin".
   # Without normalization the selector silently shows blank after
