@@ -1180,6 +1180,12 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
 }
 .profile-form .form-flash,
 .profile-form .form-actions { grid-column: 1 / -1; }
+/* Footer bar: a full-width divider ties the Save button to the whole
+   form so it reads as the form's action, not stranded beside the
+   shorter Personalization column. */
+.profile-form .form-actions {
+  margin-top:10px; padding-top:20px; border-top:1px solid var(--line);
+}
 .profile-col { display:flex; flex-direction:column; gap:18px; min-width:0; }
 .profile-col-title {
   font-family:var(--fh); font-size:13px; font-weight:600;
