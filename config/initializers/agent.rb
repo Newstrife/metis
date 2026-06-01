@@ -37,6 +37,17 @@ Rails.application.config.x.agent.docker_image =
 Rails.application.config.x.agent.provider = ENV["METIS_AGENT_PROVIDER"].presence
 Rails.application.config.x.agent.model = ENV["METIS_AGENT_MODEL"].presence
 
+# How long an assistant turn may sit pending/streaming before
+# ReapStalledTurnsJob treats it as abandoned — its agent process died
+# mid-turn (a worker restart, an OOM, a dev code-reload on the in-process
+# :async adapter), so ChatJob's rescue/ensure never marked it errored and
+# the UI shows "Working…" forever. Generous on purpose: there is no
+# per-turn heartbeat, so the window must sit comfortably above the longest
+# real turn or a still-running turn would be reaped (and its freed
+# composer would admit a concurrent turn against the live process).
+Rails.application.config.x.agent.stalled_turn_window =
+  ENV.fetch("METIS_STALLED_TURN_MINUTES", "120").to_i.minutes
+
 # Canonical per-provider metadata — the one place each provider's display
 # label and API-key env var live, keyed by pi's provider id. Both fields
 # are optional and independent: `openai-codex` authenticates via the
