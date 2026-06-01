@@ -880,6 +880,9 @@ img.avatar { background:none; object-fit:cover; }
 .btn-primary:hover { opacity:.85; }
 .btn-ghost { background:var(--bg); color:var(--ink-2); }
 .btn-ghost:hover { color:var(--ink); }
+/* Turbo disables a submit button (and swaps in data-turbo-submits-with
+   text) while its form is in flight — show it as working, not clickable. */
+.btn:disabled { opacity:.6; cursor:progress; pointer-events:none; }
 
 /* Looks like the closed state of a native select — visual continuity
    for when the user clicks and the picker partial swaps a real <select>

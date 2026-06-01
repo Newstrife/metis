@@ -5,7 +5,11 @@
     <h1 class="pane-title">Models</h1>
     <div style="flex:1"></div>
     <% if current_user.admin? %>
-      <%= button_to "Refresh", refresh_models_path, class: "btn btn-ghost" %>
+      <%# Turbo swaps the label to "Refreshing…" and disables the button for
+          the whole request — the sync spawns pi (docker run / E2b microVM),
+          which can take a while. %>
+      <%= button_to "Refresh", refresh_models_path, class: "btn btn-ghost",
+            data: { turbo_submits_with: "Refreshing…" } %>
     <% end %>
   </header>
 

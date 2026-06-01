@@ -3,20 +3,14 @@
 # Local login accounts for development. Skipped in production so a
 # known-password account never lands on a live database.
 if Rails.env.local?
-  accounts = [
-    { email: "admin@metis.local", password: "password" }
-  ]
-
-  accounts.each do |attrs|
-    user = User.find_or_initialize_by(email: attrs[:email])
-    if user.new_record?
-      user.password = attrs[:password]
-      user.save!
-      puts "Created login: #{user.email} (password: #{attrs[:password]})"
-    else
-      puts "Login already exists: #{user.email}"
-    end
-  end
+  # A known admin login for development — the dev operator. Admin is granted
+  # explicitly here (and via `rake admin:grant` in production); there is no
+  # automatic "first user is admin" bootstrap.
+  user = User.find_or_initialize_by(email: "admin@metis.local")
+  user.password = "password" if user.new_record?
+  user.admin = true
+  user.save!
+  puts "Dev admin login: #{user.email} / password"
 else
   puts "Skipping development login seeds in #{Rails.env}."
 end
