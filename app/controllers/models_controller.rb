@@ -21,13 +21,13 @@ class ModelsController < ApplicationController
   end
 
   def update_provider
-    LlmProvider.find(params[:id]).set_enabled!(boolean_param(:enabled))
+    LlmProvider.find(params[:id]).set_enabled!(boolean_param(params[:enabled]))
     redirect_to models_path
   end
 
   def update_model
     model = LlmModel.find(params[:id])
-    model.update!(enabled: boolean_param(:enabled))
+    model.update!(enabled: boolean_param(params[:enabled]))
     redirect_to models_path
   end
 
@@ -45,9 +45,5 @@ class ModelsController < ApplicationController
     return if current_user.admin?
 
     redirect_to models_path, alert: "Only an administrator can change the model catalog."
-  end
-
-  def boolean_param(key)
-    ActiveModel::Type::Boolean.new.cast(params[key])
   end
 end

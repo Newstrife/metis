@@ -46,17 +46,24 @@ Rails.application.config.x.agent.model = ENV["METIS_AGENT_MODEL"].presence
 # (https://pi.dev/docs/latest/providers) so the same env that runs pi
 # locally works for Metis. Only entries with a non-blank value end up
 # in the map.
-Rails.application.config.x.agent.api_keys = {
-  "anthropic"   => ENV["ANTHROPIC_API_KEY"],
-  "openai"      => ENV["OPENAI_API_KEY"],
-  "google"      => ENV["GEMINI_API_KEY"],
-  "deepseek"    => ENV["DEEPSEEK_API_KEY"],
-  "mistral"     => ENV["MISTRAL_API_KEY"],
-  "groq"        => ENV["GROQ_API_KEY"],
-  "cerebras"    => ENV["CEREBRAS_API_KEY"],
-  "xai"         => ENV["XAI_API_KEY"],
-  "openrouter"  => ENV["OPENROUTER_API_KEY"],
-  "together"    => ENV["TOGETHER_API_KEY"],
-  "fireworks"   => ENV["FIREWORKS_API_KEY"],
-  "huggingface" => ENV["HF_TOKEN"]
-}.compact_blank
+# The provider -> env-var-name map is the single source of truth: the key
+# values below read from it, and Agent::ModelCatalogSync derives the
+# control-session env from it too (so a new provider is added in one place).
+Rails.application.config.x.agent.api_key_env_names = {
+  "anthropic"   => "ANTHROPIC_API_KEY",
+  "openai"      => "OPENAI_API_KEY",
+  "google"      => "GEMINI_API_KEY",
+  "deepseek"    => "DEEPSEEK_API_KEY",
+  "mistral"     => "MISTRAL_API_KEY",
+  "groq"        => "GROQ_API_KEY",
+  "cerebras"    => "CEREBRAS_API_KEY",
+  "xai"         => "XAI_API_KEY",
+  "openrouter"  => "OPENROUTER_API_KEY",
+  "together"    => "TOGETHER_API_KEY",
+  "fireworks"   => "FIREWORKS_API_KEY",
+  "huggingface" => "HF_TOKEN"
+}
+Rails.application.config.x.agent.api_keys =
+  Rails.application.config.x.agent.api_key_env_names
+       .transform_values { |env_name| ENV[env_name] }
+       .compact_blank

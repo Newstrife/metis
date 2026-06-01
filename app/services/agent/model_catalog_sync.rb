@@ -24,21 +24,6 @@ module Agent
       "deepseek"     => "DeepSeek"
     }.freeze
 
-    API_KEY_ENV = {
-      "anthropic"   => "ANTHROPIC_API_KEY",
-      "openai"      => "OPENAI_API_KEY",
-      "google"      => "GEMINI_API_KEY",
-      "deepseek"    => "DEEPSEEK_API_KEY",
-      "mistral"     => "MISTRAL_API_KEY",
-      "groq"        => "GROQ_API_KEY",
-      "cerebras"    => "CEREBRAS_API_KEY",
-      "xai"         => "XAI_API_KEY",
-      "openrouter"  => "OPENROUTER_API_KEY",
-      "together"    => "TOGETHER_API_KEY",
-      "fireworks"   => "FIREWORKS_API_KEY",
-      "huggingface" => "HF_TOKEN"
-    }.freeze
-
     module_function
 
     # Returns { providers:, models:, ok: } — ok false when pi was
@@ -70,8 +55,9 @@ module Agent
     end
 
     def api_key_env
+      names = Rails.application.config.x.agent.api_key_env_names
       Rails.application.config.x.agent.api_keys.to_h.filter_map do |provider, value|
-        name = API_KEY_ENV[provider]
+        name = names[provider]
         [ name, value ] if name && value.present?
       end.to_h
     end

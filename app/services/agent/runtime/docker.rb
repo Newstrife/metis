@@ -36,6 +36,16 @@ module Agent
       # The app's pi extensions, bind-mounted read-only — code, not
       # session state, so kept out of the archived scope.
       EXTENSIONS_DIR = "/metis-extensions".freeze
+      # Container hardening applied to every `docker run` we spawn (turn or
+      # control query) — one list so the two paths can't drift.
+      HARDENING_ARGS = %w[--cap-drop ALL --security-opt no-new-privileges].freeze
+
+      # Forward env values into the container by bare key (--env NAME), so
+      # docker reads them from the client process's own env rather than
+      # placing secrets in argv where `ps` could see them.
+      def self.env_forward(env)
+        env.keys.flat_map { |name| [ "--env", name ] }
+      end
 
       # Control-plane session (Agent::Runtime.control_session): the image's
       # pi answers, so no bind mount or workspace — a throwaway
@@ -46,9 +56,9 @@ module Agent
         args = [
           "run", "--rm", "-i", "--pull", "never",
           "--env", "HOME=/tmp",
-          *env.keys.flat_map { |name| [ "--env", name ] },
+          *env_forward(env),
           "--memory", "512m", "--cpus", "1", "--pids-limit", "256",
-          "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+          *HARDENING_ARGS,
           Rails.application.config.x.agent.docker_image,
           "pi", "--mode", "rpc"
         ]
@@ -133,17 +143,12 @@ module Agent
           *extension_mount,
           "--workdir", WORKSPACE_DIR,
           "--env", "HOME=/tmp",
-          *env_forward(env),
+          *self.class.env_forward(env),
           "--memory", "2g", "--cpus", "2", "--pids-limit", "512",
-          "--cap-drop", "ALL",
-          "--security-opt", "no-new-privileges",
+          *HARDENING_ARGS,
           image,
           "pi", *pi_args
         ]
-      end
-
-      def env_forward(env)
-        env.keys.flat_map { |name| [ "--env", name ] }
       end
 
       def extension_mount
