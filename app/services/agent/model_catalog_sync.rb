@@ -13,17 +13,6 @@ module Agent
   #
   # Deployment-level, like provider API keys (VISION rule 4).
   module ModelCatalogSync
-    # pi reports a provider id but no display name; seed a nice label for
-    # the casing-sensitive ones (titleize botches "deepseek"/"openai-codex").
-    # Seed-only — an admin's later label edits survive refreshes.
-    PROVIDER_LABELS = {
-      "anthropic"    => "Anthropic",
-      "openai"       => "OpenAI",
-      "openai-codex" => "OpenAI Codex",
-      "google"       => "Google",
-      "deepseek"     => "DeepSeek"
-    }.freeze
-
     module_function
 
     # Returns { providers:, models:, ok: } — ok false when pi was
@@ -55,17 +44,17 @@ module Agent
     end
 
     def api_key_env
-      names = Rails.application.config.x.agent.api_key_env_names
+      metadata = Rails.application.config.x.agent.provider_metadata
       Rails.application.config.x.agent.api_keys.to_h.filter_map do |provider, value|
-        name = names[provider]
-        [ name, value ] if name && value.present?
+        env_name = metadata.dig(provider, :env)
+        [ env_name, value ] if env_name && value.present?
       end.to_h
     end
 
     def upsert_provider(key)
       provider = LlmProvider.find_or_initialize_by(key: key)
       if provider.new_record?
-        provider.label = PROVIDER_LABELS[key] || key.to_s.titleize
+        provider.label = Rails.application.config.x.agent.provider_metadata.dig(key, :label) || key.to_s.titleize
         provider.position = LlmProvider.maximum(:position).to_i + 1
       end
       provider.save!

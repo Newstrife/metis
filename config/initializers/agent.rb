@@ -37,33 +37,37 @@ Rails.application.config.x.agent.docker_image =
 Rails.application.config.x.agent.provider = ENV["METIS_AGENT_PROVIDER"].presence
 Rails.application.config.x.agent.model = ENV["METIS_AGENT_MODEL"].presence
 
-# Per-provider API keys, read from the environment. A conversation's
-# provider id is matched against this map and the key is passed to pi
-# as --api-key. These are a shared, deployment-level resource — Metis
-# has no per-user keys.
-#
-# Provider ids and env var names mirror pi's own conventions
+# Canonical per-provider metadata — the one place each provider's display
+# label and API-key env var live, keyed by pi's provider id. Both fields
+# are optional and independent: `openai-codex` authenticates via the
+# ChatGPT backend (no key), and keyless providers fall back to a titleized
+# label. Ids and env var names mirror pi's own conventions
 # (https://pi.dev/docs/latest/providers) so the same env that runs pi
-# locally works for Metis. Only entries with a non-blank value end up
-# in the map.
-# The provider -> env-var-name map is the single source of truth: the key
-# values below read from it, and Agent::ModelCatalogSync derives the
-# control-session env from it too (so a new provider is added in one place).
-Rails.application.config.x.agent.api_key_env_names = {
-  "anthropic"   => "ANTHROPIC_API_KEY",
-  "openai"      => "OPENAI_API_KEY",
-  "google"      => "GEMINI_API_KEY",
-  "deepseek"    => "DEEPSEEK_API_KEY",
-  "mistral"     => "MISTRAL_API_KEY",
-  "groq"        => "GROQ_API_KEY",
-  "cerebras"    => "CEREBRAS_API_KEY",
-  "xai"         => "XAI_API_KEY",
-  "openrouter"  => "OPENROUTER_API_KEY",
-  "together"    => "TOGETHER_API_KEY",
-  "fireworks"   => "FIREWORKS_API_KEY",
-  "huggingface" => "HF_TOKEN"
-}
+# locally works for Metis.
+#
+#   :label -> Agent::ModelCatalogSync seeds LlmProvider#label on first sync
+#   :env   -> the env var the provider's API key is read from (below)
+Rails.application.config.x.agent.provider_metadata = {
+  "anthropic"    => { label: "Anthropic",   env: "ANTHROPIC_API_KEY" },
+  "openai"       => { label: "OpenAI",       env: "OPENAI_API_KEY" },
+  "openai-codex" => { label: "OpenAI Codex" },
+  "google"       => { label: "Google",       env: "GEMINI_API_KEY" },
+  "deepseek"     => { label: "DeepSeek",      env: "DEEPSEEK_API_KEY" },
+  "mistral"      => { env: "MISTRAL_API_KEY" },
+  "groq"         => { env: "GROQ_API_KEY" },
+  "cerebras"     => { env: "CEREBRAS_API_KEY" },
+  "xai"          => { env: "XAI_API_KEY" },
+  "openrouter"   => { env: "OPENROUTER_API_KEY" },
+  "together"     => { env: "TOGETHER_API_KEY" },
+  "fireworks"    => { env: "FIREWORKS_API_KEY" },
+  "huggingface"  => { env: "HF_TOKEN" }
+}.freeze
+
+# Per-provider API keys, read from the environment. A conversation's
+# provider id is matched against this map and the key is passed to pi as
+# --api-key. A shared, deployment-level resource — Metis has no per-user
+# keys. Only providers with a configured (non-blank) key end up here.
 Rails.application.config.x.agent.api_keys =
-  Rails.application.config.x.agent.api_key_env_names
-       .transform_values { |env_name| ENV[env_name] }
-       .compact_blank
+  Rails.application.config.x.agent.provider_metadata.filter_map do |provider, meta|
+    [ provider, ENV[meta[:env]] ] if meta[:env]
+  end.to_h.compact_blank
