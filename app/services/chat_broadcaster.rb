@@ -103,8 +103,13 @@ class ChatBroadcaster
   # Accumulate the streamed text and re-render the whole body as Markdown.
   # An innerHTML update (not append) keeps partial Markdown — open code
   # fences, half-built tables — rendering correctly as more text arrives.
+  #
+  # Skip only empty deltas, never `blank?` ones: some models stream block
+  # separators as standalone whitespace deltas ("\n\n", " "), and dropping
+  # those fuses Markdown blocks live (headings, tables) while the persisted
+  # content — which keeps every delta — renders fine on refresh.
   def append_text(delta)
-    return if delta.blank?
+    return if delta.to_s.empty?
 
     @text << delta
     Turbo::StreamsChannel.broadcast_update_to(
@@ -114,7 +119,7 @@ class ChatBroadcaster
   end
 
   def append_reasoning(delta)
-    return if delta.blank?
+    return if delta.to_s.empty?
 
     broadcast_append(target: "#{base_id}_reasoning", html: ERB::Util.html_escape(delta))
   end
