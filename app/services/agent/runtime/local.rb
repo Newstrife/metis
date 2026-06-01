@@ -9,6 +9,16 @@ module Agent
     # --continue carry continuity between turns. See
     # docs/session-persistence.md.
     class Local < Base
+      # Control-plane session (Agent::Runtime.control_session): pi as a
+      # local subprocess, no workspace. The host's pi answers; `env`
+      # carries the deployment's provider keys so pi advertises them.
+      def self.control_session(env: {})
+        session = PiAgent.session(args: %w[--mode rpc], env: env)
+        yield session
+      ensure
+        session&.close
+      end
+
       def session_dir
         workspace.session_dir
       end

@@ -17,17 +17,32 @@ module Agent
     # Resolve the runtime for a conversation — a per-deployment choice
     # (config.x.agent.runtime).
     def self.for(conversation)
-      build(conversation, Rails.application.config.x.agent.runtime)
+      runtime_class.new(conversation: conversation)
     end
 
     def self.build(conversation, name)
+      runtime_class(name).new(conversation: conversation)
+    end
+
+    # The configured runtime class (no conversation needed).
+    def self.runtime_class(name = Rails.application.config.x.agent.runtime)
       case name&.to_sym
-      when :local  then Local.new(conversation: conversation)
-      when :docker then Docker.new(conversation: conversation)
-      when :e2b    then E2b.new(conversation: conversation)
+      when :local  then Local
+      when :docker then Docker
+      when :e2b    then E2b
       else
         raise Agent::Error, "Unknown agent runtime #{name.inspect} — set config.x.agent.runtime"
       end
+    end
+
+    # Open a bare `pi --mode rpc` session in the configured runtime for a
+    # control-plane query (e.g. get_available_models), yield it, and tear
+    # it down. Unlike #run this carries no conversation and stages no
+    # workspace — it asks pi about itself, not about a turn. Each runtime
+    # owns *how* its pi is reached, so the catalog stays runtime-correct
+    # instead of assuming a local subprocess.
+    def self.control_session(env: {}, &block)
+      runtime_class.control_session(env: env, &block)
     end
 
     # The pi extensions shipped with the app, version-controlled under

@@ -28,5 +28,14 @@ module ActiveSupport
     ensure
       target.singleton_class.send(:define_method, method_name, original)
     end
+
+    # Idempotently create one enabled catalog model and return its key —
+    # for tests needing a valid preferred_model now that the catalog is
+    # DB-backed (Agent::Catalog has no hardcoded fallback).
+    def seed_catalog_model(provider: "anthropic", key: "claude-opus-4-8")
+      record = LlmProvider.find_or_create_by!(key: provider) { |p| p.label = provider.titleize }
+      record.llm_models.find_or_create_by!(key: key) { |m| m.label = key }
+      key
+    end
   end
 end

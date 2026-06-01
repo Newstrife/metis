@@ -81,9 +81,16 @@ a fast, open agent harness. The lessons come along; the lock-in does not.
 
 ## Quickstart
 
-First, set at least one provider key (e.g. `ANTHROPIC_API_KEY`) in `.env`
-so the agent can talk to a model — both setups below load it. Then pick
-**native** or **Docker**; either serves the app at http://localhost:3000.
+First, copy the env template and set at least one provider key (e.g.
+`ANTHROPIC_API_KEY`) so the agent can talk to a model — both setups below
+load `.env`:
+
+```sh
+cp .env.example .env   # then edit it: set ANTHROPIC_API_KEY (or another provider)
+```
+
+Then pick **native** or **Docker**; either serves the app at
+http://localhost:3000.
 
 ### Native
 

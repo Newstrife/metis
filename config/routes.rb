@@ -52,6 +52,11 @@ Rails.application.routes.draw do
         get :picker
       end
     end
+    get  "models", to: "models#index", as: :models
+    post "models/refresh", to: "models#refresh", as: :refresh_models
+    patch "models/providers/:id", to: "models#update_provider", as: :model_provider
+    patch "models/items/:id", to: "models#update_model", as: :model_item
+    post  "models/items/:id/default", to: "models#make_default", as: :model_item_default
     resources :skills, except: :show do
       collection do
         get  "import", action: :import_form, as: :import_form

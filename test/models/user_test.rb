@@ -82,8 +82,19 @@ class UserTest < ActiveSupport::TestCase
     user.preferred_model = "no-such-model"
     refute user.valid?
 
-    user.preferred_model = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    user.preferred_model = seed_catalog_model
     assert user.valid?
+  end
+
+  test "preferred_model accepts the configured fallback before the catalog is seeded" do
+    original = Rails.application.config.x.agent.model
+    Rails.application.config.x.agent.model = "gpt-5.5"
+    user = create_user
+    user.preferred_model = "gpt-5.5"
+
+    assert user.valid?
+  ensure
+    Rails.application.config.x.agent.model = original
   end
 
   test "placeholder_email? matches the metis synth suffix and GitHub's noreply, anchored" do

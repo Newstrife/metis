@@ -12,6 +12,11 @@ class ApplicationController < ActionController::Base
 
   private
 
+  # Cast a request param to a real boolean ("1"/"true"/"on" -> true, etc.).
+  def boolean_param(value)
+    ActiveModel::Type::Boolean.new.cast(value)
+  end
+
   def with_user_locale(&block)
     I18n.with_locale(current_user.language.presence || I18n.default_locale, &block)
   end

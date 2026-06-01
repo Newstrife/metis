@@ -30,7 +30,7 @@ class ProfilesController < ApplicationController
   def update_avatar
     @user = current_user
     avatar = params.dig(:user, :avatar)
-    remove = ActiveModel::Type::Boolean.new.cast(params.dig(:user, :remove_avatar))
+    remove = boolean_param(params.dig(:user, :remove_avatar))
 
     if remove
       @user.avatar.purge_later if @user.avatar.attached?

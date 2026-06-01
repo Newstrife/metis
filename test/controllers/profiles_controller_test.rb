@@ -15,7 +15,7 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "update saves valid preferences" do
-    model_id = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    model_id = seed_catalog_model
     # Submit a Rails-friendly zone name — the form's `time_zone_select`
     # only renders Rails-friendly names, so that's what the inclusion
     # validator accepts. (IANA names like "America/Los_Angeles" arrive
@@ -53,7 +53,7 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "update via turbo stream re-renders the form" do
-    model_id = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    model_id = seed_catalog_model
     patch profile_path,
       params: { user: { display_name: "Mike", preferred_model: model_id } },
       headers: { "Accept" => "text/vnd.turbo-stream.html" }
@@ -154,7 +154,7 @@ class ProfilesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "new conversation uses the user's preferred model when none picked" do
-    model_id = Agent::Catalog::PROVIDERS.first[:models].first[:id]
+    model_id = seed_catalog_model
     @user.update!(preferred_model: model_id)
 
     assert_difference("Conversation.count", 1) do

@@ -205,7 +205,7 @@ class User < ApplicationRecord
 
   def preferred_model_known
     return if preferred_model.blank?
-    return if Agent::Catalog.provider_for(preferred_model)
+    return if Agent::Catalog.known_model?(preferred_model)
 
     errors.add(:preferred_model, "is not an available model")
   end
