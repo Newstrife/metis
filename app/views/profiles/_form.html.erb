@@ -75,16 +75,16 @@
 
     <div class="form-row">
       <%= form.label :about_you, "About you" %>
-      <p class="form-hint">Rendered into every turn — keep it tight, not a memoir.</p>
       <%= form.text_area :about_you, rows: 6,
             placeholder: "Your role, what you work on, anything Metis should keep in mind." %>
+      <p class="form-hint">Rendered into every turn — keep it tight, not a memoir.</p>
     </div>
 
     <div class="form-row">
       <%= form.label :custom_instructions, "Custom instructions" %>
-      <p class="form-hint">How you want Metis to respond. Applied to every conversation.</p>
       <%= form.text_area :custom_instructions, rows: 10,
             placeholder: "e.g., Be terse. Don't apologize. Cite file:line when referencing code." %>
+      <p class="form-hint">How you want Metis to respond. Applied to every conversation.</p>
     </div>
   </div>
 

@@ -35,6 +35,23 @@ class ChatBroadcasterTest < ActiveSupport::TestCase
     assert_equal %i[tool_call_id name args output is_error skill_slug status].sort, locals.keys.sort
   end
 
+  test "a whitespace-only text delta is kept, not dropped as blank" do
+    @broadcaster.handle(event(:text_delta, delta: "## Heading"))
+    @broadcaster.handle(event(:text_delta, delta: "\n\n"))
+    @broadcaster.handle(event(:text_delta, delta: "Body text"))
+
+    # The live buffer must match what ChatJob persists (every delta), so the
+    # block separator survives and Heading/Body don't fuse live.
+    assert_equal "## Heading\n\nBody text", @broadcaster.instance_variable_get(:@text)
+  end
+
+  test "an empty text delta is skipped" do
+    @broadcaster.handle(event(:text_delta, delta: ""))
+    @broadcaster.handle(event(:text_delta, delta: nil))
+
+    assert_equal "", @broadcaster.instance_variable_get(:@text)
+  end
+
   test "record_tool carries skill_slug from started through later events" do
     @broadcaster.send(:record_tool,
       event(:tool_call_started, tool_call_id: "t1", name: "bash",
