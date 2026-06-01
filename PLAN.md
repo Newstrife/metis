@@ -43,22 +43,52 @@ build live in [`VISION.md`](VISION.md); architecture in
 - **Profile** — avatars (OAuth or upload), personalization fields,
   user-menu popup with live theme switch.
 
+## The loop we're building
+
+The roadmap below is ordered by where value compounds, not by
+engineering dependency. Skills, connectors, projects, and teams aren't
+parallel tracks — they're one flywheel:
+
+> A person builds a skill → it works → they pull in a teammate → the
+> team's skills accumulate → switching cost rises → the *org* depends
+> on the platform.
+
+Two ends of that flywheel, kept distinct on purpose:
+
+- **Impact** lives with [Themis](https://pipihosting.github.io/themis/) —
+  the internal, daily-used, Claude-locked sibling where proven workflow
+  value (and revenue) already sit.
+- **Influence** lives with Metis — open, self-hostable,
+  provider-agnostic. Its currency is adoption and attention, not ARR.
+
+This is why we don't monetize lock-in here. Hosting tiers and
+fine-tuning stickiness are a Themis / hosted-offering play; on open
+Metis the only VISION-legal moat is a team's own accumulated tools —
+lock-in to *your* skills, never to a vendor. See [`VISION.md`](VISION.md)
+rules 4 and 8.
+
 ## Roadmap
 
-Themes, roughly in dependency order:
+Themes, in impact order:
 
 | Theme | Goal |
 |---|---|
-| **More connectors** | Slack, Notion, Metabase next — each configuration on top of `pi-mcp-adapter`. GitHub and Linear shipped; Google via `gws` fallback. |
+| **Expansion trigger** | The flywheel's ignition: a power user finishes a skill mid-conversation, then invites a teammate into a team built around it — in one click. This is the growth lever; it ranks above the next three connectors. Builds on the team-of-one → real-teams path (invitations, memberships UI, shared connectors and conversations). |
+| **Moat depth** | Make accumulated skills sticky and self-improving: skill versioning, team libraries, usage analytics, and a reject/edit learning signal captured at ingestion (Metis owns ingestion, so this stays "Rails governs, pi executes"). Beyond GitHub import — export, registry, or git-backed publishing. |
+| **Neutrality, loud** | Turn our #1 differentiator from a buried implementation detail into positioning: a visible provider switch, and a day-zero ritual when a notable model drops ("Metis runs it now"). Influence is recurring attention. |
+| **Connectors as fuel** | Slack, Notion, Metabase next — each ranked by what shareable skills it unlocks across a team's stack, not by checklist order. Configuration on top of `pi-mcp-adapter`. GitHub and Linear shipped; Google via `gws` fallback. |
+| **Projects as container** | Build on the v1 scaffold: a Project becomes the unit a team's skills/connectors attach to (the moat's storage shape) — richer external-ref types, project-scoped skills/connectors, project-level conversation defaults. |
 | **Dual GitHub persona** | **Shipped**: two GitHub MCP servers staged at once — `github` (`ghu_`, acts as the operator) and `github_bot` (`ghs_`, acts as `<slug>[bot]`). `GithubApp::InstallationToken` mints the bot bearer with the install id auto-resolved from the App's sole install; `McpConfig` stages `github_bot` automatically when `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` are set. The reviewing-code skill posts PR reviews via `github_bot` (GitHub forbids approving your own PR), everything else via `github`. No team/shared-credential concept. See [`docs/connectors.md`](docs/connectors.md). |
-| **Projects v2** | Build on the v1 scaffold: richer external-ref types, project-scoped skills/connectors, project-level conversation defaults. |
-| **Real teams** | Beyond team-of-one: invitations, memberships UI, shared connectors and conversations. |
-| **Skill sharing** | Beyond GitHub import — export, registry, or git-backed publishing. Same question open #2 raises for connectors and extensions. |
 | **Web UI** | A design system in the Hotwire stack — consistent component set + design tokens. |
 
 ## Next
 
-- [ ] **Slack or Notion connector.** Continue proving "configuration,
-  not code" beyond GitHub + Linear.
-- [ ] **Projects in daily use.** Drive a real workflow through a
-  bound repo + Linear project; let the friction shape v2.
+- [ ] **Invite-around-a-skill, end to end.** Finish a skill
+  mid-conversation → one click to invite a teammate into a team built
+  around it. Worth more than the next three connectors.
+- [ ] **Skill usage analytics + reject/edit capture.** Even a crude
+  "used N / edited M" surfaces load-bearing skills and seeds the
+  learning loop. Cheapest moat-deepener we have.
+- [ ] **A day-zero model ritual.** When a notable model drops, a
+  same-day "Metis runs it now" note — architecture as recurring
+  attention.

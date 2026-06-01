@@ -16,3 +16,6 @@ production:
   evict_paused_e2b_sandboxes:
     class: EvictPausedSandboxesJob
     schedule: every hour at minute 7
+  reap_stalled_turns:
+    class: ReapStalledTurnsJob
+    schedule: every 5 minutes
