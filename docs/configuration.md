@@ -1,7 +1,12 @@
 # Configuration
 
 pi's runtime and credentials are configured through the environment
-(`.env` in development; `bin/dev` loads it via foreman).
+(`.env` in development; both `bin/dev` via foreman and Docker Compose load
+it). Copy the template to start, then fill in what you need:
+
+```sh
+cp .env.example .env
+```
 
 ## Environment variables
 
@@ -64,6 +69,7 @@ keyed for.
 | `HF_TOKEN` | Hugging Face |
 
 Variable names mirror pi's own conventions so the same env that runs pi
-locally works here. The new-chat composer's curated dropdown lives in
-`app/services/agent/catalog.rb` — add provider/model entries there to
-surface them in the UI.
+locally works here. The new-chat composer's model list is the deployment
+LLM catalog — synced from pi and curated by an admin at **Settings →
+Models**. After setting a provider's key, click **Refresh** there to pull
+that provider's models into the catalog, then enable the ones to offer.
