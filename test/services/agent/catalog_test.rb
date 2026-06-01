@@ -28,6 +28,16 @@ class Agent::CatalogTest < ActiveSupport::TestCase
     assert_nil Agent::Catalog.provider_for("anything")
   end
 
+  test "known_model allows the configured fallback before the catalog is seeded" do
+    original = Rails.application.config.x.agent.model
+    Rails.application.config.x.agent.model = "gpt-5.5"
+
+    assert Agent::Catalog.known_model?("gpt-5.5")
+    assert_not Agent::Catalog.known_model?("no-such-model")
+  ensure
+    Rails.application.config.x.agent.model = original
+  end
+
   test "grouped_model_options groups label/id model pairs under each provider" do
     seed_catalog
     groups = Agent::Catalog.grouped_model_options

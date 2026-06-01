@@ -27,13 +27,16 @@ class ModelsController < ApplicationController
 
   def update_model
     model = LlmModel.find(params[:id])
-    model.update(enabled: boolean_param(:enabled))
+    model.update!(enabled: boolean_param(:enabled))
     redirect_to models_path
   end
 
   def make_default
     LlmModel.find(params[:id]).make_default!
     redirect_to models_path
+  rescue ActiveRecord::RecordNotUnique
+    redirect_to models_path,
+                alert: "Another administrator changed the default model. Please try again."
   end
 
   private

@@ -25,6 +25,7 @@ class ModelsControllerTest < ActionDispatch::IntegrationTest
     patch model_item_path(@model), params: { enabled: false }
 
     assert_redirected_to models_path
+    assert_equal "Only an administrator can change the model catalog.", flash[:alert]
     assert @model.reload.enabled?
   end
 
@@ -56,6 +57,19 @@ class ModelsControllerTest < ActionDispatch::IntegrationTest
     post model_item_default_path(@model)
 
     assert @model.reload.is_default?
+  end
+
+  test "default race redirects with an alert" do
+    sign_in @admin
+    model = @model
+    with_stub(LlmModel, :find, ->(_id) { model }) do
+      with_stub(model, :make_default!, -> { raise ActiveRecord::RecordNotUnique }) do
+        post model_item_default_path(model)
+      end
+    end
+
+    assert_redirected_to models_path
+    assert_equal "Another administrator changed the default model. Please try again.", flash[:alert]
   end
 
   test "refresh surfaces an unreachable pi" do

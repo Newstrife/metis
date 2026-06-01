@@ -11,6 +11,14 @@ class Agent::ModelCatalogSyncTest < ActiveSupport::TestCase
     with_stub(PiAgent, :session, ->(*, **) { fake }) { yield }
   end
 
+  def with_runtime_config(runtime)
+    original = Rails.application.config.x.agent.runtime
+    Rails.application.config.x.agent.runtime = runtime
+    yield
+  ensure
+    Rails.application.config.x.agent.runtime = original
+  end
+
   PAYLOAD = [
     { "id" => "gpt-5.5", "name" => "GPT-5.5", "provider" => "openai-codex",
       "contextWindow" => 272_000, "maxTokens" => 128_000, "reasoning" => true,
@@ -57,5 +65,24 @@ class Agent::ModelCatalogSyncTest < ActiveSupport::TestCase
 
     assert_not result[:ok]
     assert_equal 0, LlmProvider.count
+  end
+
+  test "docker runtime fetches models through the configured image" do
+    fake = FakeSession.new(PAYLOAD)
+    called = nil
+    original_keys = Rails.application.config.x.agent.api_keys
+    Rails.application.config.x.agent.api_keys = { "openai" => "sk-test" }
+
+    with_runtime_config(:docker) do
+      with_stub(PiAgent, :session, ->(**kwargs) { called = kwargs; fake }) do
+        Agent::ModelCatalogSync.call
+      end
+    end
+
+    assert_equal "docker", called[:bin]
+    assert_includes called[:args], Rails.application.config.x.agent.docker_image
+    assert_equal({ "OPENAI_API_KEY" => "sk-test" }, called[:env])
+  ensure
+    Rails.application.config.x.agent.api_keys = original_keys
   end
 end
