@@ -28,6 +28,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # importmap audit boots the app, which loads ruby-vips (it dlopens
+      # libvips on require), so the lib must be present even here.
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libvips
+
       - name: Checkout code
         uses: actions/checkout@v6
 
