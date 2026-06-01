@@ -203,4 +203,27 @@ class Agent::Runtime::LocalTest < ActiveSupport::TestCase
       end
     end
   end
+
+  test "control_session opens an rpc session, yields it, and closes it" do
+    session = fake_session
+    def session.available_models = [ { "id" => "m", "provider" => "p" } ]
+
+    result = with_pi_session(session) do
+      Agent::Runtime::Local.control_session { |s| s.available_models }
+    end
+
+    assert_equal [ { "id" => "m", "provider" => "p" } ], result
+    assert session.closed?
+  end
+
+  test "Agent::Runtime.control_session dispatches to the configured runtime" do
+    session = fake_session
+    def session.available_models = [ "ok" ]
+
+    result = with_pi_session(session) do
+      Agent::Runtime.control_session { |s| s.available_models }
+    end
+
+    assert_equal [ "ok" ], result
+  end
 end

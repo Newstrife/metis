@@ -58,6 +58,31 @@ module Agent
         Pathname.new(SESSION_DIR)
       end
 
+      # Control-plane session (Agent::Runtime.control_session): the
+      # template's pi answers. There is no persistent sandbox for a control
+      # query, so spin an ephemeral microVM, ask, and kill it — heavier
+      # than Local/Docker (the catalog is baked into the template, so
+      # capturing it at e2b:template build time is the optimization if this
+      # refresh cost ever matters). `env` carries the deployment's provider
+      # keys so pi advertises them.
+      def self.control_session(env: {})
+        sandbox = E2B::Sandbox.create(
+          template: Rails.application.config.x.agent.e2b_template, timeout: SANDBOX_TIMEOUT
+        )
+        command = Shellwords.join(%w[pi --mode rpc])
+        factory = lambda do |on_message:, on_stderr:|
+          E2bTransport.new(
+            sandbox: sandbox, command: command, envs: env,
+            on_message: on_message, on_stderr: on_stderr
+          )
+        end
+        session = PiAgent.session(transport_factory: factory)
+        yield session
+      ensure
+        session&.close
+        sandbox&.kill
+      end
+
       # The app's pi extensions at their planned in-sandbox paths. These
       # are deterministic so pi_args can be built before the sandbox
       # exists; #stage_extensions uploads the files to them.

@@ -58,64 +58,15 @@ module Agent
       { providers: LlmProvider.count, models: seen, ok: true }
     end
 
+    # Ask the configured runtime's pi what models it offers. The runtime
+    # owns *how* pi is reached (local subprocess, docker run, E2b microVM);
+    # the catalog is a property of that runtime's pi build. The provider
+    # keys go along so pi advertises the providers this deployment can use.
     def fetch_models
-      case Rails.application.config.x.agent.runtime&.to_sym
-      when :docker then fetch_models_from_docker
-      when :e2b    then fetch_models_from_e2b
-      else fetch_models_from_local
-      end
+      Agent::Runtime.control_session(env: api_key_env) { |session| session.available_models }
     rescue StandardError => e
       Rails.logger.warn("Agent::ModelCatalogSync fetch failed: #{e.message}")
       nil
-    end
-
-    def fetch_models_from_local
-      session = PiAgent.session(args: %w[--mode rpc], env: api_key_env)
-      session.available_models
-    ensure
-      session&.close
-    end
-
-    def fetch_models_from_docker
-      session = PiAgent.session(
-        bin: "docker", args: docker_args, env: api_key_env
-      )
-      session.available_models
-    ensure
-      session&.close
-    end
-
-    def fetch_models_from_e2b
-      sandbox = E2B::Sandbox.create(
-        template: Rails.application.config.x.agent.e2b_template,
-        timeout: Agent::Runtime::E2b::SANDBOX_TIMEOUT
-      )
-      command = Shellwords.join(%w[pi --mode rpc])
-      transport = lambda do |on_message:, on_stderr:|
-        Agent::Runtime::E2bTransport.new(
-          sandbox: sandbox, command: command, envs: api_key_env,
-          on_message: on_message, on_stderr: on_stderr
-        )
-      end
-      session = PiAgent.session(transport_factory: transport)
-      session.available_models
-    ensure
-      session&.close
-      sandbox&.kill
-    end
-
-    def docker_args
-      [
-        "run", "--rm", "-i",
-        "--pull", "never",
-        "--env", "HOME=/tmp",
-        *api_key_env.keys.flat_map { |name| [ "--env", name ] },
-        "--memory", "2g", "--cpus", "2", "--pids-limit", "512",
-        "--cap-drop", "ALL",
-        "--security-opt", "no-new-privileges",
-        Rails.application.config.x.agent.docker_image,
-        "pi", "--mode", "rpc"
-      ]
     end
 
     def api_key_env

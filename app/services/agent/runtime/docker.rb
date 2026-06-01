@@ -37,6 +37,27 @@ module Agent
       # session state, so kept out of the archived scope.
       EXTENSIONS_DIR = "/metis-extensions".freeze
 
+      # Control-plane session (Agent::Runtime.control_session): the image's
+      # pi answers, so no bind mount or workspace — a throwaway
+      # `docker run --rm <image> pi --mode rpc`. Provider keys in `env` are
+      # forwarded by bare-key `--env NAME` (read from the docker client's
+      # own env) so they stay out of argv.
+      def self.control_session(env: {})
+        args = [
+          "run", "--rm", "-i", "--pull", "never",
+          "--env", "HOME=/tmp",
+          *env.keys.flat_map { |name| [ "--env", name ] },
+          "--memory", "512m", "--cpus", "1", "--pids-limit", "256",
+          "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+          Rails.application.config.x.agent.docker_image,
+          "pi", "--mode", "rpc"
+        ]
+        session = PiAgent.session(bin: "docker", args: args, env: env)
+        yield session
+      ensure
+        session&.close
+      end
+
       def session_dir
         Pathname.new(SESSION_DIR)
       end
