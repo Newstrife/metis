@@ -61,7 +61,7 @@ class ProjectsController < ApplicationController
   private
 
   def team
-    current_user.personal_team
+    current_team
   end
 
   def set_project

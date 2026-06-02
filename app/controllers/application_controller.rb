@@ -8,9 +8,25 @@ class ApplicationController < ActionController::Base
   around_action :with_user_locale, if: :user_signed_in?
   around_action :with_user_timezone, if: :user_signed_in?
 
+  helper_method :current_team, :current_membership
+
   SIDEBAR_PAGE_SIZE = 30
 
   private
+
+  # The team this request acts in. Session-backed and always validated
+  # against membership, so a stale or forged id can never reach a team
+  # the user isn't in (docs/tenancy.md). Falls back to the personal
+  # team-of-one when nothing is selected.
+  def current_team
+    @current_team ||=
+      current_user.teams.find_by(id: session[:current_team_id]) ||
+      current_user.personal_team
+  end
+
+  def current_membership
+    @current_membership ||= current_user.memberships.find_by(team: current_team)
+  end
 
   # Cast a request param to a real boolean ("1"/"true"/"on" -> true, etc.).
   def boolean_param(value)
@@ -35,7 +51,7 @@ class ApplicationController < ActionController::Base
   def set_sidebar
     @sidebar_pagy, @conversations = pagy(
       :countless,
-      current_user.conversations.active.recent,
+      current_user.conversations.for_team(current_team).active.recent,
       limit: SIDEBAR_PAGE_SIZE
     )
   end

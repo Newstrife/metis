@@ -282,6 +282,9 @@ img.avatar { background:none; object-fit:cover; }
 .user-menu-signout { color:var(--ink-3); }
 .user-menu-signout:hover { color:var(--danger); }
 .user-menu-signout:hover svg { color:var(--danger); }
+.user-menu-team.is-active { color:var(--ink); }
+.user-menu-team-check { margin-left:auto; color:var(--accent); }
+.user-menu-team.is-active svg.user-menu-team-check { color:var(--accent); }
 /* button_to wraps in a <form>; strip its margin so the button sits flush. */
 .user-menu-panel form { margin:0; }
 

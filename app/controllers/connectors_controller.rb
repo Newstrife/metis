@@ -56,7 +56,7 @@ class ConnectorsController < ApplicationController
   private
 
   def team
-    current_user.personal_team
+    current_team
   end
 
   def set_connector

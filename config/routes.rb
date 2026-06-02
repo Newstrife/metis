@@ -24,6 +24,10 @@ Rails.application.routes.draw do
     resources :messages, only: :create
   end
 
+  resources :teams, only: %i[] do
+    member { post :switch }
+  end
+
   get "/share/:token", to: "shared_conversations#show", as: :shared_conversation
 
   get "/artifacts/:signed_id/preview",

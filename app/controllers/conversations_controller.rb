@@ -25,7 +25,7 @@ class ConversationsController < ApplicationController
       return render_composer_error(nil, error)
     end
 
-    conversation = current_user.conversations.create!(settings: chat_settings)
+    conversation = current_user.conversations.create!(team: current_team, settings: chat_settings)
     start_turn(conversation, content, uploads)
     redirect_to conversation
   end
@@ -51,7 +51,7 @@ class ConversationsController < ApplicationController
   end
 
   def archived
-    @archived_conversations = current_user.conversations.archived.recent
+    @archived_conversations = current_user.conversations.for_team(current_team).archived.recent
   end
 
   def archive

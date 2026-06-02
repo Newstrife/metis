@@ -56,6 +56,30 @@
 
     <div class="user-menu-sep"></div>
 
+    <% if current_user.teams.many? %>
+      <div class="user-menu-teams" role="group" aria-label="Switch team">
+        <% current_user.teams.order(personal: :desc, name: :asc).each do |team| %>
+          <% active = team.id == current_team.id %>
+          <%= button_to switch_team_path(team), class: "user-menu-item user-menu-team#{' is-active' if active}",
+                role: "menuitemradio", "aria-checked": active, form: { data: { turbo_frame: "_top" } } do %>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5.5 6.5a2 2 0 104 0 2 2 0 00-4 0zM2 13c.4-2 1.9-3 3.5-3M14 13c-.4-2-1.9-3-3.5-3"/>
+            </svg>
+            <span><%= team.personal? ? "Personal" : team.name %></span>
+            <% if active %>
+              <svg class="user-menu-team-check" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3.5 8.5l3 3 6-7"/>
+              </svg>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
+
+      <div class="user-menu-sep"></div>
+    <% end %>
+
     <%= link_to profile_path, class: "user-menu-item", role: "menuitem",
           data: { turbo_frame: "_top" } do %>
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
