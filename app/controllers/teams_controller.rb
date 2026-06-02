@@ -26,7 +26,7 @@ class TeamsController < ApplicationController
   def switch
     team = current_user.teams.find(params[:id])
     session[:current_team_id] = team.id
-    redirect_back fallback_location: root_path
+    redirect_to root_path
   end
 
   private

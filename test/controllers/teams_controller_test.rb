@@ -10,8 +10,10 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
     sign_in @user
   end
 
-  test "switching sets the active team and redirects back" do
-    post switch_team_path(@other), headers: { "HTTP_REFERER" => root_path }
+  test "switching sets the active team and lands on home" do
+    # Always home, so the previous team's open conversation/section never
+    # stays on screen against the new scope.
+    post switch_team_path(@other), headers: { "HTTP_REFERER" => conversation_path(1) }
     assert_redirected_to root_path
 
     # The active team now scopes resources: a conversation in @other shows
