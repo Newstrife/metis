@@ -94,9 +94,7 @@ module Agent
       # talk to a desktop keyring in the headless sandbox.
       def sandbox_env
         env = {}
-        github = OauthBroker.bearer_for(
-          user: conversation.user, provider: "github", required_scopes: %w[repo]
-        )
+        github = bearer_or_nil(provider: "github", required_scopes: %w[repo])
         if github
           env["GH_TOKEN"] = github
           author = git_identity_for(conversation.user)
@@ -106,7 +104,7 @@ module Agent
           env["GIT_COMMITTER_EMAIL"] = author[:email]
         end
 
-        google = OauthBroker.bearer_for(user: conversation.user, provider: "google")
+        google = bearer_or_nil(provider: "google")
         if google
           env["GOOGLE_WORKSPACE_CLI_TOKEN"] = google
           env["GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND"] = "file"
@@ -116,6 +114,21 @@ module Agent
       end
 
       protected
+
+      # A stale/revoked grant for one provider must not crash the turn —
+      # drop that credential and proceed, same as Agent::McpConfig does
+      # when a connector's refresh fails.
+      def bearer_or_nil(provider:, required_scopes: [])
+        OauthBroker.bearer_for(
+          user: conversation.user, provider: provider, required_scopes: required_scopes
+        )
+      rescue OauthBroker::Error => error
+        Rails.logger.error(
+          "sandbox_env: OAuth refresh failed for user=#{conversation.user_id} " \
+          "provider=#{provider}: #{error.message} — omitting credential"
+        )
+        nil
+      end
 
       # mtime-windowed so cleanup of artifacts/ stays the runtime's
       # job — old turns' files fall outside the window.

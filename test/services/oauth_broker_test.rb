@@ -43,6 +43,24 @@ class OauthBrokerTest < ActiveSupport::TestCase
     assert_equal "rt-google", g.reload.refresh_token
   end
 
+  test "a permanently dead refresh token (invalid_grant) clears the grant and raises" do
+    g = grant(provider: "google", access_token: "old", refresh_token: "rt-dead", expires_at: 10.seconds.ago)
+
+    failing = ->(_rt) { raise OauthBroker::InvalidGrantError, "google invalid_grant: token revoked or expired" }
+    assert_raises(OauthBroker::InvalidGrantError) do
+      with_stub(OauthBroker::Clients::Google, :refresh, failing) { OauthBroker.access_token_for(g) }
+    end
+
+    assert_not OauthGrant.exists?(g.id), "dead grant should be cleared so the next Connect re-consents"
+  end
+
+  test "the Google client raises InvalidGrantError on an invalid_grant body" do
+    response = Struct.new(:code, :body).new("400", %({"error":"invalid_grant","error_description":"Token has been expired or revoked."}))
+
+    error = assert_raises(OauthBroker::InvalidGrantError) { OauthBroker::Clients::Google.parse(response) }
+    assert_match(/expired or revoked/, error.message)
+  end
+
   test "raises on an unknown provider" do
     g = grant(expires_at: 10.seconds.ago)
     g.update_column(:provider, "bogus") # bypass validation just to exercise the broker

@@ -103,6 +103,21 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
     assert_equal "file", env["GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND"]
   end
 
+  test "sandbox_env omits a credential when its refresh fails instead of crashing the turn" do
+    @user.oauth_grants.create!(
+      provider: "google", access_token: "expired", refresh_token: "rt",
+      expires_at: 10.seconds.ago,
+      scopes: "https://www.googleapis.com/auth/gmail.readonly"
+    )
+
+    with_stub(OauthBroker::Clients::Google, :refresh, ->(_) { raise OauthBroker::Error, "google oauth status 400" }) do
+      env = @runtime.sandbox_env
+
+      assert_nil env["GOOGLE_WORKSPACE_CLI_TOKEN"]
+      assert_nil env["GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND"]
+    end
+  end
+
   test "sandbox_env does not set GOOGLE_WORKSPACE_CLI_TOKEN without a Google grant" do
     @user.oauth_grants.create!(
       provider: "github", access_token: "ghu_live", refresh_token: "rt",

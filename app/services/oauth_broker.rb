@@ -10,6 +10,13 @@
 module OauthBroker
   class Error < StandardError; end
 
+  # The provider rejected the refresh token as permanently dead —
+  # revoked by the user, expired (e.g. a Testing-status app's 7-day
+  # refresh-token life), or superseded. No retry can recover it; only
+  # re-consent. Distinct from Error so refresh! can clear the grant
+  # instead of leaving it to fail on every turn.
+  class InvalidGrantError < Error; end
+
   CLIENTS = {
     "github" => Clients::Github,
     "google" => Clients::Google,
@@ -108,6 +115,14 @@ module OauthBroker
       grant.access_token
     rescue KeyError => error
       raise Error, "refresh response missing #{error.key}"
+    rescue InvalidGrantError
+      # The refresh token is dead on the provider's side — drop the grant
+      # so the next Connect re-consents and we stop refreshing it every turn.
+      Rails.logger.warn(
+        "OauthBroker: dropping dead grant user=#{grant.user_id} provider=#{grant.provider} (invalid_grant)"
+      )
+      grant.destroy
+      raise
     end
 
     def client_for(provider)
