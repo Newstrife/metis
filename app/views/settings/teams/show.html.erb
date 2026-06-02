@@ -68,7 +68,7 @@
           <div class="settings-danger">
             <% if owner %>
               <%= button_to "Delete team", team_path, method: :delete, class: "btn btn-danger",
-                    form: { data: { turbo_confirm: "Delete #{@team.name}? This removes the team for everyone." } } %>
+                    form: { data: { turbo_confirm: "Delete #{@team.name}? This permanently deletes the team and all its conversations for everyone." } } %>
             <% else %>
               <%= button_to "Leave team", leave_team_memberships_path, method: :delete, class: "btn btn-danger",
                     form: { data: { turbo_confirm: "Leave #{@team.name}? You'll lose access to its shared resources." } } %>

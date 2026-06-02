@@ -31,6 +31,18 @@ class InvitationsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".sidebar .convo .tt", text: "In Acme"
   end
 
+  test "re-accepting after joining is idempotent, not a 404" do
+    sign_in @invitee
+    post accept_invitation_path(@invitation.token)
+
+    assert_no_difference -> { @team.memberships.count } do
+      post accept_invitation_path(@invitation.token)
+      get invitation_path(@invitation.token)
+    end
+    assert_redirected_to root_path
+    assert_equal "You're already in #{@team.name}.", flash[:notice]
+  end
+
   test "cannot accept an invitation sent to a different address" do
     other = User.create!(email: "someone@else.com", password: "password123")
     sign_in other

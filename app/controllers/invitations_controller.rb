@@ -5,11 +5,13 @@ class InvitationsController < ApplicationController
   layout "settings"
 
   def show
-    @invitation = Invitation.pending.find_by!(token: params[:token])
+    @invitation = Invitation.find_by!(token: params[:token])
+    redirect_if_settled(@invitation)
   end
 
   def accept
-    invitation = Invitation.pending.find_by!(token: params[:token])
+    invitation = Invitation.find_by!(token: params[:token])
+    return if redirect_if_settled(invitation)
 
     return redirect_to(root_path, alert: "That invitation has expired.") if invitation.expired?
     unless invitation.for?(current_user)
@@ -20,5 +22,21 @@ class InvitationsController < ApplicationController
     invitation.accept!(current_user)
     session[:current_team_id] = invitation.team_id
     redirect_to root_path, notice: "You've joined #{invitation.team.name}."
+  end
+
+  private
+
+  # An already-accepted invite shouldn't 404 on a double-submit or back —
+  # send the user home, into the team if they're a member of it.
+  def redirect_if_settled(invitation)
+    return false unless invitation.accepted?
+
+    if invitation.team.members.include?(current_user)
+      session[:current_team_id] = invitation.team_id
+      redirect_to root_path, notice: "You're already in #{invitation.team.name}."
+    else
+      redirect_to root_path, alert: "That invitation has already been used."
+    end
+    true
   end
 end

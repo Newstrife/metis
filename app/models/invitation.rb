@@ -26,6 +26,10 @@ class Invitation < ApplicationRecord
     expires_at.past?
   end
 
+  def accepted?
+    accepted_at.present?
+  end
+
   # Whether this invite was sent to `user`'s address (email is stored
   # already-normalized, so just downcase the comparison side).
   def for?(user)
