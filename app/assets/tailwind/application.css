@@ -311,8 +311,9 @@ img.avatar { background:none; object-fit:cover; }
 }
 .team-switcher.open .team-switcher-panel { display:block; }
 .team-switcher-label {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
   font-family:var(--fm); font-size:10px; font-weight:500; letter-spacing:.1em;
-  color:var(--faint); text-transform:uppercase; padding:6px 8px 4px;
+  color:var(--faint); text-transform:uppercase; padding:5px 6px 4px 8px;
 }
 .team-switcher-item {
   display:flex; align-items:center; gap:8px; width:100%;
@@ -324,9 +325,15 @@ img.avatar { background:none; object-fit:cover; }
 .team-switcher-item-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .team-switcher-item svg { width:14px; height:14px; flex:none; }
 .team-switcher-item-check { color:var(--accent); }
-.team-switcher-create { color:var(--ink-3); }
 .team-switcher-sep { height:1px; background:var(--line); margin:5px 4px; }
 .team-switcher-panel form { margin:0; }
+.team-switcher-gear {
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+  width:22px; height:22px; border-radius:6px; color:var(--ink-3); text-decoration:none;
+  transition:background-color .15s,color .15s;
+}
+.team-switcher-gear:hover { background:var(--bg); color:var(--ink); }
+.team-switcher-gear svg { width:14px; height:14px; }
 
 /* Team settings (.team-input is its own class, not .field input, because
    .field input also styles submit buttons — which stretched them). */

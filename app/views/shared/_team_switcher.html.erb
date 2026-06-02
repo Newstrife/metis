@@ -1,7 +1,8 @@
 <%# First-level tenancy scope (docs/tenancy.md): the active team that
     scopes conversations, connectors, skills, and projects beneath it.
-    Switching reloads so every section re-scopes. Rendered at the top of
-    both the chat and settings sidebars. %>
+    Switching reloads so every section re-scopes. The gear beside it opens
+    the current team's settings (rename, members, invites, new team).
+    Rendered at the top of both the chat and settings sidebars. %>
 <div class="team-switcher" data-controller="dropdown">
   <button type="button" class="team-switcher-trigger" data-action="click->dropdown#toggle"
           aria-haspopup="true" aria-label="Switch team">
@@ -13,7 +14,18 @@
   </button>
 
   <div class="team-switcher-panel" role="menu">
-    <div class="team-switcher-label">Teams</div>
+    <div class="team-switcher-label">
+      <span>Teams</span>
+      <%= link_to team_path, class: "team-switcher-gear", title: "Team settings",
+            role: "menuitem", data: { turbo_frame: "_top" } do %>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+             stroke-linecap="round" aria-hidden="true">
+          <path d="M2.5 5h11M2.5 11h11"/>
+          <circle cx="10" cy="5" r="1.7" fill="var(--card)"/>
+          <circle cx="6" cy="11" r="1.7" fill="var(--card)"/>
+        </svg>
+      <% end %>
+    </div>
     <% current_user.teams.order(personal: :desc, name: :asc).each do |team| %>
       <% active = team.id == current_team.id %>
       <%= button_to switch_team_path(team),
@@ -28,14 +40,6 @@
           </svg>
         <% end %>
       <% end %>
-    <% end %>
-
-    <div class="team-switcher-sep"></div>
-    <%= link_to new_team_path, class: "team-switcher-item team-switcher-create",
-          role: "menuitem", data: { turbo_frame: "_top" } do %>
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
-           stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
-      <span>Create team</span>
     <% end %>
   </div>
 </div>
