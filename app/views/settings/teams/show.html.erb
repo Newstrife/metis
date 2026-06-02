@@ -23,12 +23,10 @@
 
         <% if current_membership&.manages_team? %>
           <%= form_with model: @team, url: team_path, method: :patch, class: "team-rename" do |form| %>
-            <div class="field">
-              <%= form.label :name, "Team name" %>
-              <div class="team-rename-row">
-                <%= form.text_field :name %>
-                <%= form.submit "Save", class: "btn btn-ghost" %>
-              </div>
+            <%= form.label :name, "Team name", class: "team-form-label" %>
+            <div class="team-rename-row">
+              <%= form.text_field :name, class: "team-input" %>
+              <%= form.submit "Save", class: "btn btn-ghost" %>
             </div>
           <% end %>
         <% end %>
@@ -68,8 +66,8 @@
           <div class="cat-label">Invite a teammate</div>
           <%= form_with model: @invitation, url: team_invitations_path, class: "invite-form" do |form| %>
             <div class="invite-row">
-              <%= form.email_field :email, placeholder: "teammate@example.com", "aria-label": "Email" %>
-              <%= form.select :role, Invitation::INVITABLE_ROLES.map { |r| [ r.titleize, r ] } %>
+              <%= form.email_field :email, placeholder: "teammate@example.com", "aria-label": "Email", class: "team-input" %>
+              <%= form.select :role, Invitation::INVITABLE_ROLES.map { |r| [ r.titleize, r ] }, {}, class: "team-input" %>
               <%= form.submit "Send invite", class: "btn btn-primary" %>
             </div>
           <% end %>
@@ -83,7 +81,7 @@
                     <div class="member-email">Pending · <%= invitation.role.titleize %></div>
                   </div>
                   <%= button_to "Revoke", team_invitation_path(invitation),
-                        method: :delete, class: "btn btn-ghost" %>
+                        method: :delete, class: "btn btn-ghost btn-sm" %>
                 </li>
               <% end %>
             </ul>
