@@ -47,6 +47,32 @@
           <% end %>
         </ul>
 
+        <% if current_membership&.manages_team? %>
+          <div class="cat-label">Invite a teammate</div>
+          <%= form_with model: @invitation, url: team_invitations_path, class: "invite-form" do |form| %>
+            <div class="invite-row">
+              <%= form.email_field :email, placeholder: "teammate@example.com", "aria-label": "Email" %>
+              <%= form.select :role, Invitation::INVITABLE_ROLES.map { |r| [ r.titleize, r ] } %>
+              <%= form.submit "Send invite", class: "btn btn-primary" %>
+            </div>
+          <% end %>
+
+          <% if @pending_invitations.any? %>
+            <ul class="member-list">
+              <% @pending_invitations.each do |invitation| %>
+                <li class="member-row">
+                  <div class="member-id">
+                    <div class="member-name"><%= invitation.email %></div>
+                    <div class="member-email">Pending · <%= invitation.role.titleize %></div>
+                  </div>
+                  <%= button_to "Revoke", team_invitation_path(invitation),
+                        method: :delete, class: "btn btn-ghost" %>
+                </li>
+              <% end %>
+            </ul>
+          <% end %>
+        <% end %>
+
         <% if current_membership&.owner? %>
           <div class="cat-label">Danger zone</div>
           <%= button_to "Delete team", team_path, method: :delete, class: "btn btn-danger",

@@ -28,6 +28,10 @@ Rails.application.routes.draw do
     member { post :switch }
   end
 
+  resources :invitations, only: %i[show], param: :token do
+    member { post :accept }
+  end
+
   get "/share/:token", to: "shared_conversations#show", as: :shared_conversation
 
   get "/artifacts/:signed_id/preview",
@@ -41,7 +45,9 @@ Rails.application.routes.draw do
   scope "/settings", as: nil do
     # The active team (current_team), not addressed by id — a singular
     # resource managing whichever team the session is scoped to.
-    resource :team, only: %i[show update destroy], controller: "settings/teams"
+    resource :team, only: %i[show update destroy], controller: "settings/teams" do
+      resources :invitations, only: %i[create destroy], controller: "settings/invitations"
+    end
     resource :profile, only: %i[show update]
     post "profile/detect_timezone", to: "profiles#detect_timezone",
                                     as: :detect_timezone_profile

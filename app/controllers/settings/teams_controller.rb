@@ -10,6 +10,8 @@ class Settings::TeamsController < ApplicationController
   def show
     @team = current_team
     @memberships = @team.memberships.includes(:user)
+    @invitation = Invitation.new
+    @pending_invitations = @team.invitations.pending.order(:created_at)
   end
 
   def update

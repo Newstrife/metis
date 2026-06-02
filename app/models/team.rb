@@ -8,6 +8,7 @@ class Team < ApplicationRecord
   has_many :connectors, dependent: :destroy
   has_many :skills, dependent: :destroy
   has_many :projects, dependent: :destroy
+  has_many :invitations, dependent: :destroy
 
   validates :name, presence: true
 end

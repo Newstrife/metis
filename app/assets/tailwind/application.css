@@ -303,6 +303,9 @@ img.avatar { background:none; object-fit:cover; }
   font-size:11.5px; font-weight:600; color:var(--ink-2);
   padding:2px 8px; border:1px solid var(--line-2); border-radius:999px;
 }
+.invite-form { margin:8px 0 4px; max-width:520px; }
+.invite-row { display:flex; gap:8px; align-items:center; }
+.invite-row input { flex:1; }
 /* button_to wraps in a <form>; strip its margin so the button sits flush. */
 .user-menu-panel form { margin:0; }
 
