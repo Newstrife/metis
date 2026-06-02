@@ -42,6 +42,30 @@ cost is small and honest: a `Team` row per signup and a `team_id` on
 resources that feel personal; a `personal:` flag lets the UI hide the team
 framing for solo users.
 
+## A second axis: the deployment superuser
+
+Team membership answers "may this user touch this *team's* resource?" It
+does **not** answer "may this user curate the *deployment*?" Some state is
+deployment-level, not team-owned — the LLM catalog (`LlmProvider` /
+`LlmModel`), the same bend as provider API keys, which are paid for by the
+deployment, not the team (VISION rule 4). Team-scoping the catalog would
+reintroduce per-team — and from there per-user — provider curation, which
+VISION rules out.
+
+So there is one flag orthogonal to the whole team model: `User#superuser?`.
+It gates catalog curation (`require_superuser!`) and nothing team-scoped.
+Two deliberately separate axes, named so they never collide:
+
+| Axis | Granted by | Predicate | Gates |
+|------|------------|-----------|-------|
+| Team management | `Membership#role` (`member`/`admin`/`owner`) | `manages_team?` → `require_team_admin!` | one team's members, settings, invitations |
+| Deployment | `User#superuser` boolean | `superuser?` → `require_superuser!` | the shared LLM catalog |
+
+A team `admin` is **not** a `superuser` and vice versa. Superuser is
+granted out-of-band (`rake superuser:grant`, or seeds in dev) — there is no
+"first user is superuser" bootstrap and no in-app promotion path, because
+it is an operator concern, not a product role.
+
 ## Resources are composed into a conversation
 
 Ownership is half the model. The other half: a conversation is a

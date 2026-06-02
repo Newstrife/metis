@@ -1,10 +1,10 @@
 # The deployment's LLM catalog under /settings — list providers/models,
 # refresh from pi, toggle availability, and set the default. The page is
-# readable by any member; mutations are admin-only (see #require_admin).
+# readable by any member; mutations are superuser-only.
 class ModelsController < ApplicationController
   layout "settings"
 
-  before_action :require_admin, except: :index
+  before_action :require_superuser!, except: :index
 
   def index
     @providers = LlmProvider.ordered.includes(:llm_models)
@@ -36,14 +36,6 @@ class ModelsController < ApplicationController
     redirect_to models_path
   rescue ActiveRecord::RecordNotUnique
     redirect_to models_path,
-                alert: "Another administrator changed the default model. Please try again."
-  end
-
-  private
-
-  def require_admin
-    return if current_user.admin?
-
-    redirect_to models_path, alert: "Only an administrator can change the model catalog."
+                alert: "Another superuser changed the default model. Please try again."
   end
 end

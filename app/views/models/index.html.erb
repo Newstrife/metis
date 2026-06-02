@@ -4,7 +4,7 @@
   <header class="pane-head">
     <h1 class="pane-title">Models</h1>
     <div style="flex:1"></div>
-    <% if current_user.admin? %>
+    <% if current_user.superuser? %>
       <%# Turbo swaps the label to "Refreshing…" and disables the button for
           the whole request — the sync spawns pi (docker run / E2b microVM),
           which can take a while. %>
@@ -17,7 +17,7 @@
     <div class="pane-inner">
       <p class="muted" style="margin-bottom:1rem">
         The providers and models this deployment offers in the new-chat composer.
-        <%= current_user.admin? ? "Refresh to pull the latest from pi, then enable what you want and set a default." : "Managed by an administrator." %>
+        <%= current_user.superuser? ? "Refresh to pull the latest from pi, then enable what you want and set a default." : "Managed by an administrator." %>
       </p>
 
       <%# Enable/disable and set-default submit inside this frame, so Turbo
@@ -27,7 +27,7 @@
         <% if @providers.empty? %>
           <div class="pane-empty">
             <p>The catalog is empty.</p>
-            <% if current_user.admin? %>
+            <% if current_user.superuser? %>
               <p>Click <strong>Refresh</strong> to populate it from pi.</p>
             <% else %>
               <p>An administrator hasn't populated it yet.</p>

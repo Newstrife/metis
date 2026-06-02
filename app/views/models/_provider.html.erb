@@ -7,7 +7,7 @@
       <span class="badge badge-warn" title="No API key is configured for this provider; its models won't run.">no API key</span>
     <% end %>
     <div style="flex:1"></div>
-    <% if current_user.admin? %>
+    <% if current_user.superuser? %>
       <%= button_to provider.enabled? ? "Enabled" : "Disabled",
             model_provider_path(provider), method: :patch,
             params: { enabled: !provider.enabled? }, form_class: "inline-form",
@@ -37,7 +37,7 @@
 
         <div style="flex:1"></div>
 
-        <% if current_user.admin? %>
+        <% if current_user.superuser? %>
           <div class="model-actions">
             <% if model.enabled? && model != default_model %>
               <%= button_to "Set default", model_item_default_path(model), method: :post,

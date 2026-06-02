@@ -40,6 +40,15 @@ class ApplicationController < ActionController::Base
     redirect_to team_path, alert: "Only the team owner can do that."
   end
 
+  # Deployment-level authority, orthogonal to team membership: the
+  # superuser curates the shared LLM catalog. Granted out-of-band
+  # (`rake superuser:grant`), never through a team role (docs/tenancy.md).
+  def require_superuser!
+    return if current_user.superuser?
+
+    redirect_to models_path, alert: "Only a superuser can change the model catalog."
+  end
+
   # Roster operations (rename, delete, invite, leave) only make sense on
   # a shared team — a personal workspace is a team-of-one.
   def reject_personal_team!

@@ -2,7 +2,7 @@ module Agent
   # Provider/model options offered in the new-chat composer.
   #
   # Sourced from the deployment's LLM catalog — LlmProvider / LlmModel rows
-  # that an admin curates and Agent::ModelCatalogSync refreshes from pi.
+  # that a superuser curates and Agent::ModelCatalogSync refreshes from pi.
   # Empty before the first sync: the composer renders no options and a turn
   # falls back to the deployment default (config.x.agent / Conversation).
   # The chosen values land in Conversation#settings and are passed through
@@ -44,7 +44,7 @@ module Agent
         model_id == Rails.application.config.x.agent.model.presence
     end
 
-    # Model pre-selected in the composer: the admin-set deployment default,
+    # Model pre-selected in the composer: the superuser-set deployment default,
     # else the configured env default when it's in the catalog, else the
     # default provider's first model.
     def self.default_model(provider_options = providers)

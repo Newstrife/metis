@@ -70,6 +70,6 @@ keyed for.
 
 Variable names mirror pi's own conventions so the same env that runs pi
 locally works here. The new-chat composer's model list is the deployment
-LLM catalog — synced from pi and curated by an admin at **Settings →
+LLM catalog — synced from pi and curated by a superuser at **Settings →
 Models**. After setting a provider's key, click **Refresh** there to pull
 that provider's models into the catalog, then enable the ones to offer.
