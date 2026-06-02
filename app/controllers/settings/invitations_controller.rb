@@ -9,6 +9,7 @@ class Settings::InvitationsController < ApplicationController
 
     invitation = current_team.invitations.new(invitation_params)
     invitation.invited_by = current_user
+    invitation.role = invited_role
     if invitation.save
       TeamMailer.invitation(invitation).deliver_later
       redirect_to team_path, notice: "Invitation sent to #{invitation.email}."
@@ -25,6 +26,14 @@ class Settings::InvitationsController < ApplicationController
   private
 
   def invitation_params
-    params.require(:invitation).permit(:email, :role)
+    params.require(:invitation).permit(:email)
+  end
+
+  # role grants privilege, so it's resolved against an allowlist rather
+  # than mass-assigned — anything off-list (incl. tampered "owner")
+  # falls back to the least-privileged member.
+  def invited_role
+    role = params.dig(:invitation, :role)
+    Invitation::INVITABLE_ROLES.include?(role) ? role : "member"
   end
 end

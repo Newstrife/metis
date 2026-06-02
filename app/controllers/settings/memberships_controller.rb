@@ -10,7 +10,9 @@ class Settings::MembershipsController < ApplicationController
     membership = current_team.memberships.find(params[:id])
     return reject("You can't change the owner's role.") if membership.owner?
 
-    role = membership_params[:role]
+    # role is read straight off params (not strong-params) and checked
+    # against an allowlist — never mass-assigned, since it grants privilege.
+    role = params.dig(:membership, :role)
     return reject("That role can't be assigned.") unless Membership::ASSIGNABLE_ROLES.include?(role)
 
     membership.update!(role: role)
@@ -52,10 +54,6 @@ class Settings::MembershipsController < ApplicationController
   end
 
   private
-
-  def membership_params
-    params.require(:membership).permit(:role)
-  end
 
   def reject(message)
     redirect_to team_path, alert: message
