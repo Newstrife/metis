@@ -42,7 +42,24 @@
                 <div class="member-name"><%= membership.user.display_label %></div>
                 <div class="member-email"><%= membership.user.email %></div>
               </div>
-              <span class="member-role"><%= membership.role.titleize %></span>
+              <% if current_membership&.manages_team? && !membership.owner? && membership.user_id != current_user.id %>
+                <div class="member-actions">
+                  <% next_role = membership.member? ? "admin" : "member" %>
+                  <%= button_to membership.role.titleize, team_membership_path(membership), method: :patch,
+                        params: { membership: { role: next_role } }, form_class: "inline-form",
+                        class: "btn btn-ghost btn-sm", title: "Make #{next_role}" %>
+                  <% if current_membership.owner? %>
+                    <%= button_to "Make owner", transfer_team_membership_path(membership), method: :post,
+                          form: { class: "inline-form", data: { turbo_confirm: "Make #{membership.user.display_label} the owner? You'll step down to admin." } },
+                          class: "btn btn-ghost btn-sm" %>
+                  <% end %>
+                  <%= button_to "Remove", team_membership_path(membership), method: :delete,
+                        form: { class: "inline-form", data: { turbo_confirm: "Remove #{membership.user.display_label} from #{@team.name}?" } },
+                        class: "btn btn-ghost btn-sm" %>
+                </div>
+              <% else %>
+                <span class="member-role"><%= membership.role.titleize %></span>
+              <% end %>
             </li>
           <% end %>
         </ul>
@@ -73,10 +90,13 @@
           <% end %>
         <% end %>
 
+        <div class="cat-label">Danger zone</div>
         <% if current_membership&.owner? %>
-          <div class="cat-label">Danger zone</div>
           <%= button_to "Delete team", team_path, method: :delete, class: "btn btn-danger",
                 form: { data: { turbo_confirm: "Delete #{@team.name}? This removes the team for everyone." } } %>
+        <% else %>
+          <%= button_to "Leave team", leave_team_memberships_path, method: :delete, class: "btn btn-danger",
+                form: { data: { turbo_confirm: "Leave #{@team.name}? You'll lose access to its shared resources." } } %>
         <% end %>
       <% end %>
     </div>

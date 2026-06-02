@@ -2,6 +2,10 @@
 # (docs/tenancy.md). A user may touch a resource when
 # `resource.team.members.include?(user)`.
 class Membership < ApplicationRecord
+  # Roles assignable through member management. Owner is excluded — it
+  # moves only via ownership transfer, keeping exactly one owner.
+  ASSIGNABLE_ROLES = %w[member admin].freeze
+
   belongs_to :user
   belongs_to :team
 

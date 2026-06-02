@@ -306,6 +306,7 @@ img.avatar { background:none; object-fit:cover; }
 .invite-form { margin:8px 0 4px; max-width:520px; }
 .invite-row { display:flex; gap:8px; align-items:center; }
 .invite-row input { flex:1; }
+.member-actions { display:flex; gap:6px; align-items:center; }
 /* button_to wraps in a <form>; strip its margin so the button sits flush. */
 .user-menu-panel form { margin:0; }
 
