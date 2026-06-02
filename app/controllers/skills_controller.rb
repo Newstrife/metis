@@ -4,6 +4,8 @@ class SkillsController < ApplicationController
   TABS = %w[team builtin marketplace].freeze
 
   before_action :set_skill, only: %i[edit update destroy add_file destroy_file download_file]
+  # Members use the team's skills (view, download); only admins curate them.
+  before_action :require_team_admin!, except: %i[index download_file]
 
   def index
     @tab = TABS.include?(params[:tab]) ? params[:tab] : "team"

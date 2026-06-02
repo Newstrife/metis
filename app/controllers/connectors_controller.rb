@@ -2,6 +2,10 @@ class ConnectorsController < ApplicationController
   layout "settings"
 
   before_action :set_connector, only: %i[edit update destroy]
+  # Members connect their own account to a team connector (OAuth, handled
+  # outside this controller); only admins add, configure, or remove the
+  # team's connectors.
+  before_action :require_team_admin!, only: %i[new create edit update destroy]
 
   def index
     @apps = ConnectorCatalog.all

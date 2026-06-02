@@ -1,4 +1,6 @@
-<%= link_to edit_project_path(project), class: "conn-row" do %>
+<%# Managers edit a project; members see it read-only. %>
+<%= content_tag(team_manager? ? :a : :div, class: "conn-row",
+      href: (team_manager? ? edit_project_path(project) : nil)) do %>
   <div class="conn-main">
     <div class="conn-name"><%= project.name %></div>
     <% if project.about.present? %>

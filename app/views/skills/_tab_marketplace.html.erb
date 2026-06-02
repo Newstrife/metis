@@ -9,7 +9,7 @@
       </div>
       <% if installed %>
         <span class="badge">Installed</span>
-      <% else %>
+      <% elsif team_manager? %>
         <%= button_to "Install", import_skills_path,
               params: { url: entry.source },
               method: :post,

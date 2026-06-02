@@ -8,7 +8,7 @@ class ApplicationController < ActionController::Base
   around_action :with_user_locale, if: :user_signed_in?
   around_action :with_user_timezone, if: :user_signed_in?
 
-  helper_method :current_team, :current_membership
+  helper_method :current_team, :current_membership, :team_manager?
 
   SIDEBAR_PAGE_SIZE = 30
 
@@ -26,6 +26,13 @@ class ApplicationController < ActionController::Base
 
   def current_membership
     @current_membership ||= current_user.memberships.find_by(team: current_team)
+  end
+
+  # Admins and owners curate the team's shared tools (skills, connectors,
+  # projects); plain members use them. The view counterpart of
+  # require_team_admin! — used to hide write controls.
+  def team_manager?
+    current_membership&.manages_team? || false
   end
 
   def require_team_admin!

@@ -4,7 +4,9 @@
   <header class="pane-head">
     <h1 class="pane-title">Projects</h1>
     <div style="flex:1"></div>
-    <%= link_to "New", new_project_path, class: "btn btn-ghost" %>
+    <% if team_manager? %>
+      <%= link_to "New", new_project_path, class: "btn btn-ghost" %>
+    <% end %>
   </header>
 
   <div class="pane-body">
@@ -16,7 +18,9 @@
       <% else %>
         <div class="pane-empty">
           <p>No projects yet. A project tells the agent which GitHub repo and Linear project you're working on — once. Every conversation attached to it inherits the mapping.</p>
-          <%= link_to "Create your first project", new_project_path, class: "btn btn-primary" %>
+          <% if team_manager? %>
+            <%= link_to "Create your first project", new_project_path, class: "btn btn-primary" %>
+          <% end %>
         </div>
       <% end %>
     </div>
