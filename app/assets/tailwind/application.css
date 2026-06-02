@@ -365,6 +365,47 @@ img.avatar { background:none; object-fit:cover; }
 /* button_to wraps in a <form>; strip its margin so the button sits flush. */
 .user-menu-panel form { margin:0; }
 
+/* Settings cards — separate "manage the team" from "invitations" so the
+   two jobs read as distinct groups instead of one flat stack. */
+.settings-card {
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:16px 18px; margin-bottom:14px;
+}
+.settings-card-head { display:flex; align-items:baseline; gap:9px; margin-bottom:6px; }
+.settings-card-title { font-size:14px; font-weight:600; color:var(--ink); }
+.settings-card-count {
+  font-size:11px; font-weight:600; color:var(--ink-3);
+  background:var(--accent-soft); border-radius:999px; padding:2px 9px;
+}
+.settings-card-sub {
+  font-family:var(--fm); font-size:10px; font-weight:500; letter-spacing:.1em;
+  color:var(--faint); text-transform:uppercase; margin:16px 0 4px;
+}
+.settings-card .team-rename,
+.settings-card .member-list,
+.settings-card .invite-form,
+.settings-card .invite-list { max-width:none; }
+.card-divider { border:none; border-top:1px solid var(--line); margin:13px 0 4px; }
+
+/* Pending invitations — deliberately unlike a member row (muted, dashed
+   "Pending" pill) so an invite is never mistaken for someone who joined. */
+.invite-list { list-style:none; margin:4px 0 0; padding:0; }
+.invite-pending {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 2px; border-bottom:1px solid var(--line);
+}
+.invite-pending:last-child { border-bottom:none; }
+.invite-pending-id { min-width:0; flex:1; }
+.invite-pending-email { font-size:13px; font-weight:500; color:var(--ink-2); }
+.invite-pending-meta { font-size:12px; color:var(--ink-3); margin-top:1px; }
+.badge-pending {
+  flex:none; font-size:10.5px; font-weight:600; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--ink-3); background:var(--accent-soft);
+  border:1px dashed var(--line-2); border-radius:999px; padding:2px 9px;
+}
+.invite-empty { font-size:13px; color:var(--ink-3); margin:12px 0 2px; }
+.settings-danger { margin-top:18px; }
+
 .theme-toggle {
   border:none; background:none; cursor:pointer; flex:none;
   padding:6px; border-radius:8px; color:var(--ink-3);
