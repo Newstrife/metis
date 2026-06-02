@@ -6,7 +6,11 @@
     into view. %>
 <aside id="sidebar" class="sidebar" data-controller="conversation-filter">
   <div class="ws">
-    <div class="ws-name">Metis</div>
+    <div class="ws-crumb">
+      <span class="ws-name">Metis</span>
+      <span class="ws-sep" aria-hidden="true">›</span>
+      <%= render "shared/team_switcher" %>
+    </div>
     <div style="flex:1"></div>
     <%= link_to conversations_path, class: "ico-btn", title: "New chat",
           data: { turbo_frame: "main" } do %>

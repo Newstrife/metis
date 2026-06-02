@@ -1,0 +1,9 @@
+Hi,
+
+<%= @inviter.display_label %> invited you to join <%= @team.name %> on Metis as a <%= @invitation.role %>.
+
+Accept the invitation:
+<%= @accept_url %>
+
+This invitation expires on <%= @invitation.expires_at.to_date.to_fs(:long) %>.
+If you weren't expecting it, you can ignore this email.

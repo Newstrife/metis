@@ -44,9 +44,18 @@ module OauthBroker
       end
 
       def parse(response)
-        raise OauthBroker::Error, "google oauth status #{response.code}" unless response.code == "200"
+        parsed = JSON.parse(response.body) rescue {}
 
-        parsed = JSON.parse(response.body)
+        if parsed["error"] == "invalid_grant"
+          raise OauthBroker::InvalidGrantError,
+                "google invalid_grant: #{parsed["error_description"] || "token revoked or expired"}"
+        end
+
+        unless response.code == "200"
+          detail = parsed["error_description"] || parsed["error"] || response.body.to_s.truncate(200)
+          raise OauthBroker::Error, "google oauth status #{response.code}: #{detail}"
+        end
+
         raise OauthBroker::Error, parsed["error_description"] || parsed["error"] if parsed["error"]
 
         parsed

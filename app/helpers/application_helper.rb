@@ -4,7 +4,7 @@ module ApplicationHelper
   # composer as a JSON data attribute and filtered client-side by
   # SkillPaletteController.
   def chat_skill_palette
-    team = current_user&.personal_team
+    team = current_team if user_signed_in?
     team_entries = team ? team.skills.enabled.order(:slug).pluck(:slug, :description) : []
     team_entries = team_entries.map { |slug, desc| { slug: slug, description: desc, source: "team" } }
 

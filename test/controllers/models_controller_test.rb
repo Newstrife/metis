@@ -6,13 +6,13 @@ class ModelsControllerTest < ActionDispatch::IntegrationTest
   setup do
     @provider = LlmProvider.create!(key: "openai-codex", label: "OpenAI Codex")
     @model = @provider.llm_models.create!(key: "gpt-5.5", label: "GPT-5.5")
-    @admin = User.create!(email: "admin-#{SecureRandom.hex(4)}@example.com",
-                          password: "password123", admin: true)
+    @superuser = User.create!(email: "super-#{SecureRandom.hex(4)}@example.com",
+                              password: "password123", superuser: true)
     @member = User.create!(email: "member-#{SecureRandom.hex(4)}@example.com",
-                           password: "password123", admin: false)
+                           password: "password123", superuser: false)
   end
 
-  test "index renders for a non-admin member" do
+  test "index renders for a non-superuser member" do
     sign_in @member
     get models_path
 
@@ -25,7 +25,7 @@ class ModelsControllerTest < ActionDispatch::IntegrationTest
     patch model_item_path(@model), params: { enabled: false }
 
     assert_redirected_to models_path
-    assert_equal "Only an administrator can change the model catalog.", flash[:alert]
+    assert_equal "Only a superuser can change the model catalog.", flash[:alert]
     assert @model.reload.enabled?
   end
 
@@ -34,33 +34,33 @@ class ModelsControllerTest < ActionDispatch::IntegrationTest
     post refresh_models_path
 
     assert_redirected_to models_path
-    assert_equal "Only an administrator can change the model catalog.", flash[:alert]
+    assert_equal "Only a superuser can change the model catalog.", flash[:alert]
   end
 
-  test "an admin toggles a model" do
-    sign_in @admin
+  test "a superuser toggles a model" do
+    sign_in @superuser
     patch model_item_path(@model), params: { enabled: false }
 
     assert_not @model.reload.enabled?
   end
 
-  test "an admin toggles a provider, cascading to its models" do
-    sign_in @admin
+  test "a superuser toggles a provider, cascading to its models" do
+    sign_in @superuser
     patch model_provider_path(@provider), params: { enabled: false }
 
     assert_not @provider.reload.enabled?
     assert_not @model.reload.enabled?
   end
 
-  test "an admin sets the default model" do
-    sign_in @admin
+  test "a superuser sets the default model" do
+    sign_in @superuser
     post model_item_default_path(@model)
 
     assert @model.reload.is_default?
   end
 
   test "default race redirects with an alert" do
-    sign_in @admin
+    sign_in @superuser
     model = @model
     with_stub(LlmModel, :find, ->(_id) { model }) do
       with_stub(model, :make_default!, -> { raise ActiveRecord::RecordNotUnique }) do
@@ -69,11 +69,11 @@ class ModelsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_redirected_to models_path
-    assert_equal "Another administrator changed the default model. Please try again.", flash[:alert]
+    assert_equal "Another superuser changed the default model. Please try again.", flash[:alert]
   end
 
   test "refresh surfaces an unreachable pi" do
-    sign_in @admin
+    sign_in @superuser
     with_stub(PiAgent, :session, ->(*, **) { raise "no pi" }) do
       post refresh_models_path
     end

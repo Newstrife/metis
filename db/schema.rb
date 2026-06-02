@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_31_120002) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_02_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -102,6 +102,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_120002) do
     t.bigint "user_id", null: false
     t.index ["provider", "uid"], name: "index_identities_on_provider_and_uid", unique: true
     t.index ["user_id"], name: "index_identities_on_user_id"
+  end
+
+  create_table "invitations", force: :cascade do |t|
+    t.datetime "accepted_at"
+    t.datetime "created_at", null: false
+    t.string "email", null: false
+    t.datetime "expires_at", null: false
+    t.bigint "invited_by_id", null: false
+    t.integer "role", default: 0, null: false
+    t.bigint "team_id", null: false
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.index ["invited_by_id"], name: "index_invitations_on_invited_by_id"
+    t.index ["team_id", "email"], name: "index_invitations_on_team_id_and_email", unique: true, where: "(accepted_at IS NULL)"
+    t.index ["team_id"], name: "index_invitations_on_team_id"
+    t.index ["token"], name: "index_invitations_on_token", unique: true
   end
 
   create_table "llm_models", force: :cascade do |t|
@@ -218,7 +234,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_120002) do
 
   create_table "users", force: :cascade do |t|
     t.text "about_you"
-    t.boolean "admin", default: false, null: false
     t.string "avatar_url"
     t.datetime "created_at", null: false
     t.text "custom_instructions"
@@ -230,6 +245,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_120002) do
     t.datetime "remember_created_at"
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
+    t.boolean "superuser", default: false, null: false
     t.string "theme"
     t.string "timezone"
     t.datetime "updated_at", null: false
@@ -246,6 +262,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_120002) do
   add_foreign_key "conversations", "teams"
   add_foreign_key "conversations", "users"
   add_foreign_key "identities", "users"
+  add_foreign_key "invitations", "teams"
+  add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "llm_models", "llm_providers"
   add_foreign_key "memberships", "teams"
   add_foreign_key "memberships", "users"

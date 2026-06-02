@@ -8,9 +8,61 @@ class ApplicationController < ActionController::Base
   around_action :with_user_locale, if: :user_signed_in?
   around_action :with_user_timezone, if: :user_signed_in?
 
+  helper_method :current_team, :current_membership, :team_manager?
+
   SIDEBAR_PAGE_SIZE = 30
 
   private
+
+  # The team this request acts in. Session-backed and always validated
+  # against membership, so a stale or forged id can never reach a team
+  # the user isn't in (docs/tenancy.md). Falls back to the personal
+  # team-of-one when nothing is selected.
+  def current_team
+    @current_team ||=
+      (session[:current_team_id] && current_user.teams.find_by(id: session[:current_team_id])) ||
+      current_user.personal_team
+  end
+
+  def current_membership
+    @current_membership ||= current_user.memberships.find_by(team: current_team)
+  end
+
+  # Admins and owners curate the team's shared tools (skills, connectors,
+  # projects); plain members use them. The view counterpart of
+  # require_team_admin! — used to hide write controls.
+  def team_manager?
+    current_membership&.manages_team? || false
+  end
+
+  def require_team_admin!
+    return if current_membership&.manages_team?
+
+    redirect_to team_path, alert: "You don't have permission to manage this team."
+  end
+
+  def require_team_owner!
+    return if current_membership&.owner?
+
+    redirect_to team_path, alert: "Only the team owner can do that."
+  end
+
+  # Deployment-level authority, orthogonal to team membership: the
+  # superuser curates the shared LLM catalog. Granted out-of-band
+  # (`rake superuser:grant`), never through a team role (docs/tenancy.md).
+  def require_superuser!
+    return if current_user.superuser?
+
+    redirect_to models_path, alert: "Only a superuser can change the model catalog."
+  end
+
+  # Roster operations (rename, delete, invite, leave) only make sense on
+  # a shared team — a personal workspace is a team-of-one.
+  def reject_personal_team!
+    return unless current_team.personal?
+
+    redirect_to team_path, alert: "That isn't available for your personal workspace."
+  end
 
   # Cast a request param to a real boolean ("1"/"true"/"on" -> true, etc.).
   def boolean_param(value)
@@ -35,7 +87,7 @@ class ApplicationController < ActionController::Base
   def set_sidebar
     @sidebar_pagy, @conversations = pagy(
       :countless,
-      current_user.conversations.active.recent,
+      current_user.conversations.for_team(current_team).active.recent,
       limit: SIDEBAR_PAGE_SIZE
     )
   end

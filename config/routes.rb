@@ -24,6 +24,14 @@ Rails.application.routes.draw do
     resources :messages, only: :create
   end
 
+  resources :teams, only: %i[new create] do
+    member { post :switch }
+  end
+
+  resources :invitations, only: %i[show], param: :token do
+    member { post :accept }
+  end
+
   get "/share/:token", to: "shared_conversations#show", as: :shared_conversation
 
   get "/artifacts/:signed_id/preview",
@@ -35,6 +43,15 @@ Rails.application.routes.draw do
   # `connectors_path`, …) keep their names; only URLs move under
   # /settings.
   scope "/settings", as: nil do
+    # The active team (current_team), not addressed by id — a singular
+    # resource managing whichever team the session is scoped to.
+    resource :team, only: %i[show update destroy], controller: "settings/teams" do
+      resources :invitations, only: %i[create destroy], controller: "settings/invitations"
+      resources :memberships, only: %i[update destroy], controller: "settings/memberships" do
+        member { post :transfer }
+        collection { delete :leave }
+      end
+    end
     resource :profile, only: %i[show update]
     post "profile/detect_timezone", to: "profiles#detect_timezone",
                                     as: :detect_timezone_profile

@@ -1,0 +1,120 @@
+<% content_for :title, "Team" %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title"><%= @team.personal? ? "Personal workspace" : @team.name %></h1>
+    <div style="flex:1"></div>
+    <%= link_to "New team", new_team_path, class: "btn btn-ghost" %>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <% if @team.personal? %>
+        <p class="pane-lead">
+          You're in your personal workspace — a team of one. Create a team
+          to share connectors, skills, and projects with others.
+        </p>
+        <%= link_to "Create a team", new_team_path, class: "btn btn-primary" %>
+      <% else %>
+        <% manager = team_manager? %>
+        <% owner = current_membership&.owner? %>
+        <p class="pane-lead">
+          Members share this team's connectors, skills, and projects.
+          Conversations stay private to whoever started them.
+        </p>
+
+        <%# Group one: the team as it stands — its name and who's in it. %>
+        <section class="settings-card">
+          <% if manager %>
+            <%= form_with model: @team, url: team_path, method: :patch, class: "team-rename" do |form| %>
+              <%= form.label :name, "Team name", class: "team-form-label" %>
+              <div class="team-rename-row">
+                <%= form.text_field :name, class: "team-input" %>
+                <%= form.submit "Save", class: "btn btn-ghost" %>
+              </div>
+            <% end %>
+          <% end %>
+
+          <div class="settings-card-sub">Members · <%= @memberships.size %></div>
+          <ul class="member-list">
+            <% @memberships.each do |membership| %>
+              <li class="member-row">
+                <%= avatar_for membership.user, size: 32 %>
+                <div class="member-id">
+                  <div class="member-name"><%= membership.user.display_label %></div>
+                  <div class="member-email"><%= membership.user.email %></div>
+                </div>
+                <span class="member-role"><%= membership.role.titleize %></span>
+                <% if manager && !membership.owner? && membership.user_id != current_user.id %>
+                  <div class="member-actions">
+                    <% next_role = membership.member? ? "admin" : "member" %>
+                    <%= button_to "Make #{next_role}", team_membership_path(membership), method: :patch,
+                          params: { membership: { role: next_role } }, form_class: "inline-form",
+                          class: "btn btn-ghost btn-sm" %>
+                    <% if owner %>
+                      <%= button_to "Make owner", transfer_team_membership_path(membership), method: :post,
+                            form: { class: "inline-form", data: { turbo_confirm: "Make #{membership.user.display_label} the owner? You'll step down to admin." } },
+                            class: "btn btn-ghost btn-sm" %>
+                    <% end %>
+                    <%= button_to "Remove", team_membership_path(membership), method: :delete,
+                          form: { class: "inline-form", data: { turbo_confirm: "Remove #{membership.user.display_label} from #{@team.name}?" } },
+                          class: "btn btn-ghost btn-sm" %>
+                  </div>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+
+          <div class="settings-danger">
+            <% if owner %>
+              <%= button_to "Delete team", team_path, method: :delete, class: "btn btn-danger",
+                    form: { data: { turbo_confirm: "Delete #{@team.name}? This permanently deletes the team and all its conversations for everyone." } } %>
+            <% else %>
+              <%= button_to "Leave team", leave_team_memberships_path, method: :delete, class: "btn btn-danger",
+                    form: { data: { turbo_confirm: "Leave #{@team.name}? You'll lose access to its shared resources." } } %>
+            <% end %>
+          </div>
+        </section>
+
+        <%# Group two: people in flight — the invite form and who's pending. %>
+        <% if manager %>
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <span class="settings-card-title">Invitations</span>
+              <% if @pending_invitations.any? %>
+                <span class="settings-card-count"><%= @pending_invitations.size %> pending</span>
+              <% end %>
+            </div>
+
+            <%= form_with model: @invitation, url: team_invitations_path, class: "invite-form" do |form| %>
+              <div class="invite-row">
+                <%= form.email_field :email, placeholder: "teammate@example.com", "aria-label": "Email", class: "team-input" %>
+                <%= form.select :role, Invitation::INVITABLE_ROLES.map { |r| [ r.titleize, r ] }, {}, class: "team-input" %>
+                <%= form.submit "Send invite", class: "btn btn-primary" %>
+              </div>
+            <% end %>
+
+            <% if @pending_invitations.any? %>
+              <hr class="card-divider">
+              <ul class="invite-list">
+                <% @pending_invitations.each do |invitation| %>
+                  <li class="invite-pending">
+                    <div class="invite-pending-id">
+                      <div class="invite-pending-email"><%= invitation.email %></div>
+                      <div class="invite-pending-meta">Invited as <%= invitation.role.titleize %></div>
+                    </div>
+                    <span class="badge-pending">Pending</span>
+                    <%= button_to "Revoke", team_invitation_path(invitation), method: :delete,
+                          form_class: "inline-form", class: "btn btn-ghost btn-sm" %>
+                  </li>
+                <% end %>
+              </ul>
+            <% else %>
+              <p class="invite-empty">No pending invitations.</p>
+            <% end %>
+          </section>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</main>

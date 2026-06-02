@@ -4,8 +4,10 @@
   <header class="pane-head">
     <h1 class="pane-title">Skills</h1>
     <div style="flex:1"></div>
-    <%= link_to "Import", import_form_skills_path, class: "btn btn-ghost" %>
-    <%= link_to "New", new_skill_path, class: "btn btn-ghost" %>
+    <% if team_manager? %>
+      <%= link_to "Import", import_form_skills_path, class: "btn btn-ghost" %>
+      <%= link_to "New", new_skill_path, class: "btn btn-ghost" %>
+    <% end %>
   </header>
 
   <div class="pane-body">

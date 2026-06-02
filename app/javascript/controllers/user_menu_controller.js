@@ -1,49 +1,16 @@
-import { Controller } from "@hotwired/stimulus"
+import DropdownController from "controllers/dropdown_controller"
 
-// Bottom-of-sidebar user popup: opens the panel, cycles the theme
-// (system → light → dark → system), and persists each change via
-// PATCH /profile/theme so it follows the user across devices. The
-// no-flash head script reads the same localStorage + server value
-// on next load.
-export default class extends Controller {
+// Bottom-of-sidebar user popup. Inherits open/close/click-away/Escape
+// from `dropdown`; adds the theme cycle (system → light → dark → system)
+// persisted via PATCH /profile/theme so it follows the user across
+// devices. The no-flash head script reads the same localStorage +
+// server value on next load.
+export default class extends DropdownController {
   static targets = ["panel"]
   static values  = { themeUrl: String, themePref: String }
 
   // Cycle order matches the icon order in the partial: monitor → sun → moon.
   CYCLE = ["system", "light", "dark"]
-
-  connect() {
-    this.onDocClick = (event) => {
-      if (!this.element.contains(event.target)) this.close()
-    }
-    this.onKey = (event) => { if (event.key === "Escape") this.close() }
-  }
-
-  disconnect() {
-    document.removeEventListener("click", this.onDocClick)
-    document.removeEventListener("keydown", this.onKey)
-  }
-
-  toggle(event) {
-    event.preventDefault()
-    event.stopPropagation()
-    this.element.classList.contains("open") ? this.close() : this.open()
-  }
-
-  open() {
-    this.element.classList.add("open")
-    // Defer so the click that opened it doesn't immediately close it.
-    setTimeout(() => {
-      document.addEventListener("click", this.onDocClick)
-      document.addEventListener("keydown", this.onKey)
-    }, 0)
-  }
-
-  close() {
-    this.element.classList.remove("open")
-    document.removeEventListener("click", this.onDocClick)
-    document.removeEventListener("keydown", this.onKey)
-  }
 
   cycleTheme(event) {
     event.preventDefault()

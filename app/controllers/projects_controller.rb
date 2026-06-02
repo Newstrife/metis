@@ -2,6 +2,8 @@ class ProjectsController < ApplicationController
   layout "settings"
 
   before_action :set_project, only: %i[edit update destroy]
+  # Members use the team's projects (view); only admins curate them.
+  before_action :require_team_admin!, except: :index
   before_action :load_available_providers, only: %i[new create edit update]
 
   def index
@@ -61,7 +63,7 @@ class ProjectsController < ApplicationController
   private
 
   def team
-    current_user.personal_team
+    current_team
   end
 
   def set_project
