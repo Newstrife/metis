@@ -46,7 +46,7 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
     assert @user.memberships.find_by(team: team).owner?
     assert_redirected_to team_path
     follow_redirect!
-    assert_select ".pane-title", text: "Team"
+    assert_select ".pane-title", text: "Beta Squad"
   end
 
   test "creating a team with a blank name re-renders the form" do

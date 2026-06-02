@@ -2,7 +2,7 @@
 
 <main class="pane">
   <header class="pane-head">
-    <h1 class="pane-title">Team</h1>
+    <h1 class="pane-title"><%= @team.personal? ? "Personal workspace" : @team.name %></h1>
     <div style="flex:1"></div>
     <%= link_to "New team", new_team_path, class: "btn btn-ghost" %>
   </header>

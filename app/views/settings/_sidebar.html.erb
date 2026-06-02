@@ -4,13 +4,17 @@
     ProfilesController, etc.). %>
 <aside id="sidebar" class="sidebar settings-sidebar">
   <div class="ws">
-    <%= link_to root_path, class: "settings-back", title: "Back to Metis" do %>
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M10 3L5 8l5 5"/>
-      </svg>
-      <span>Back</span>
-    <% end %>
+    <div class="ws-crumb">
+      <%= link_to root_path, class: "ws-home", title: "Back to Metis" do %>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 3L5 8l5 5"/>
+        </svg>
+        <span class="ws-name">Metis</span>
+      <% end %>
+      <span class="ws-sep" aria-hidden="true">›</span>
+      <%= render "shared/team_switcher" %>
+    </div>
   </div>
 
   <nav class="settings-nav" aria-label="Settings sections">

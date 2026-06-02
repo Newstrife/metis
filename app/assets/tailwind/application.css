@@ -79,7 +79,7 @@ turbo-frame#main { display:contents; }
 
 /* ───────────── sidebar ───────────── */
 .sidebar { background:var(--side); display:flex; flex-direction:column; min-height:0; }
-.ws { display:flex; align-items:center; gap:9px; padding:8px 8px 14px; }
+.ws { display:flex; align-items:center; gap:9px; padding:14px 8px 18px; }
 .ws-name { font-family:var(--fd); font-weight:600; font-size:16px; letter-spacing:-.01em; }
 .ico-btn {
   width:30px; height:30px; border-radius:9px; border:1px solid transparent;
@@ -94,7 +94,7 @@ turbo-frame#main { display:contents; }
 :root[data-theme="dark"] .theme-toggle .sun { display:block; }
 
 .search {
-  display:flex; align-items:center; gap:9px; margin:0 8px 8px;
+  display:flex; align-items:center; gap:9px; margin:0 8px 10px;
   background:var(--card); border-radius:11px; padding:9px 12px;
   color:var(--ink-3); box-shadow:var(--sh-sm);
   border:1px solid transparent; transition:border-color .15s,box-shadow .15s;
@@ -282,9 +282,51 @@ img.avatar { background:none; object-fit:cover; }
 .user-menu-signout { color:var(--ink-3); }
 .user-menu-signout:hover { color:var(--danger); }
 .user-menu-signout:hover svg { color:var(--danger); }
-.user-menu-team.is-active { color:var(--ink); }
-.user-menu-team-check { margin-left:auto; color:var(--accent); }
-.user-menu-team.is-active svg.user-menu-team-check { color:var(--accent); }
+/* Sidebar breadcrumb: Metis › <team switcher>. The team is the
+   first-level tenancy scope (docs/tenancy.md); switching it re-scopes
+   everything beneath. */
+.ws-crumb { display:flex; align-items:center; gap:5px; min-width:0; }
+.ws-sep { color:var(--faint); font-size:15px; line-height:1; user-select:none; }
+.ws-home { display:inline-flex; align-items:center; gap:5px; color:var(--ink); text-decoration:none; }
+.ws-home svg { width:15px; height:15px; color:var(--ink-3); }
+.ws-home:hover svg { color:var(--ink); }
+
+.team-switcher { position:relative; display:inline-flex; }
+.team-switcher-trigger {
+  display:inline-flex; align-items:center; gap:5px;
+  margin-left:-2px; padding:4px 7px; border-radius:7px;
+  border:none; background:none; cursor:pointer;
+  font-family:var(--fb); font-size:14px; font-weight:600; color:var(--ink-2);
+  transition:background-color .12s,color .12s;
+}
+.team-switcher-trigger:hover { background:var(--bg); color:var(--ink); }
+.team-switcher-name { max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.team-switcher-chev { width:12px; height:12px; flex:none; color:var(--ink-3); transition:transform .15s; }
+.team-switcher.open .team-switcher-chev { transform:rotate(180deg); }
+
+.team-switcher-panel {
+  display:none; position:absolute; left:0; top:calc(100% + 4px); z-index:40;
+  min-width:210px; background:var(--card); border:1px solid var(--line-2); border-radius:10px;
+  box-shadow:0 12px 30px rgba(0,0,0,.14); padding:5px;
+}
+.team-switcher.open .team-switcher-panel { display:block; }
+.team-switcher-label {
+  font-family:var(--fm); font-size:10px; font-weight:500; letter-spacing:.1em;
+  color:var(--faint); text-transform:uppercase; padding:6px 8px 4px;
+}
+.team-switcher-item {
+  display:flex; align-items:center; gap:8px; width:100%;
+  padding:7px 8px; border-radius:7px; border:none; background:none; cursor:pointer;
+  font-family:var(--fb); font-size:13px; color:var(--ink-2); text-align:left; text-decoration:none;
+}
+.team-switcher-item:hover { background:var(--bg); color:var(--ink); }
+.team-switcher-item.is-active { color:var(--ink); }
+.team-switcher-item-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.team-switcher-item svg { width:14px; height:14px; flex:none; }
+.team-switcher-item-check { color:var(--accent); }
+.team-switcher-create { color:var(--ink-3); }
+.team-switcher-sep { height:1px; background:var(--line); margin:5px 4px; }
+.team-switcher-panel form { margin:0; }
 
 /* Team settings */
 .team-input {
@@ -874,17 +916,8 @@ img.avatar { background:none; object-fit:cover; }
 .nav-item svg { width:16px; height:16px; flex:none; color:var(--ink-3); }
 .nav-item:hover svg,.nav-item.on svg { color:var(--ink); }
 
-/* settings shell — same .app grid + .sidebar styles, plus back link
-   and the section nav that fills the slot the conversations list
-   occupies in the chat shell. */
-.settings-back {
-  display:inline-flex; align-items:center; gap:6px;
-  font-family:var(--fd); font-weight:600; font-size:14px;
-  color:var(--ink-2); text-decoration:none; padding:6px 8px;
-  border-radius:9px; transition:background-color .13s,color .13s;
-}
-.settings-back:hover { background:var(--card); color:var(--ink); }
-.settings-back svg { width:15px; height:15px; }
+/* settings shell — same .app grid + .sidebar styles, plus the section
+   nav that fills the slot the conversations list occupies in chat. */
 .settings-nav { flex:1; padding:14px 8px 4px; display:flex; flex-direction:column; gap:2px; }
 
 /* ───────────── pane — settings-style pages ───────────── */

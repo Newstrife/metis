@@ -1,0 +1,41 @@
+<%# First-level tenancy scope (docs/tenancy.md): the active team that
+    scopes conversations, connectors, skills, and projects beneath it.
+    Switching reloads so every section re-scopes. Rendered at the top of
+    both the chat and settings sidebars. %>
+<div class="team-switcher" data-controller="dropdown">
+  <button type="button" class="team-switcher-trigger" data-action="click->dropdown#toggle"
+          aria-haspopup="true" aria-label="Switch team">
+    <span class="team-switcher-name"><%= current_team.personal? ? "Personal" : current_team.name %></span>
+    <svg class="team-switcher-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+         stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 6l4 4 4-4"/>
+    </svg>
+  </button>
+
+  <div class="team-switcher-panel" role="menu">
+    <div class="team-switcher-label">Teams</div>
+    <% current_user.teams.order(personal: :desc, name: :asc).each do |team| %>
+      <% active = team.id == current_team.id %>
+      <%= button_to switch_team_path(team),
+            class: "team-switcher-item#{' is-active' if active}",
+            role: "menuitemradio", "aria-checked": active,
+            form: { data: { turbo_frame: "_top" } } do %>
+        <span class="team-switcher-item-name"><%= team.personal? ? "Personal" : team.name %></span>
+        <% if active %>
+          <svg class="team-switcher-item-check" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3.5 8.5l3 3 6-7"/>
+          </svg>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <div class="team-switcher-sep"></div>
+    <%= link_to new_team_path, class: "team-switcher-item team-switcher-create",
+          role: "menuitem", data: { turbo_frame: "_top" } do %>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+      <span>Create team</span>
+    <% end %>
+  </div>
+</div>
