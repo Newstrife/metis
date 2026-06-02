@@ -5,7 +5,7 @@
 <div class="team-switcher" data-controller="dropdown">
   <button type="button" class="team-switcher-trigger" data-action="click->dropdown#toggle"
           aria-haspopup="true" aria-label="Switch team">
-    <span class="team-switcher-name"><%= current_team.personal? ? "Personal" : current_team.name %></span>
+    <span class="team-switcher-name"><%= current_team.display_name %></span>
     <svg class="team-switcher-chev" viewBox="0 0 16 16" fill="none" stroke="currentColor"
          stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M4 6l4 4 4-4"/>
@@ -20,7 +20,7 @@
             class: "team-switcher-item#{' is-active' if active}",
             role: "menuitemradio", "aria-checked": active,
             form: { data: { turbo_frame: "_top" } } do %>
-        <span class="team-switcher-item-name"><%= team.personal? ? "Personal" : team.name %></span>
+        <span class="team-switcher-item-name"><%= team.display_name %></span>
         <% if active %>
           <svg class="team-switcher-item-check" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

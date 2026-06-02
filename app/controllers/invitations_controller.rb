@@ -12,7 +12,7 @@ class InvitationsController < ApplicationController
     invitation = Invitation.pending.find_by!(token: params[:token])
 
     return redirect_to(root_path, alert: "That invitation has expired.") if invitation.expired?
-    unless invitation.email == current_user.email.to_s.downcase
+    unless invitation.for?(current_user)
       return redirect_to invitation_path(invitation.token),
                          alert: "This invitation was sent to #{invitation.email}."
     end

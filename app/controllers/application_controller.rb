@@ -20,7 +20,7 @@ class ApplicationController < ActionController::Base
   # team-of-one when nothing is selected.
   def current_team
     @current_team ||=
-      current_user.teams.find_by(id: session[:current_team_id]) ||
+      (session[:current_team_id] && current_user.teams.find_by(id: session[:current_team_id])) ||
       current_user.personal_team
   end
 
@@ -38,6 +38,14 @@ class ApplicationController < ActionController::Base
     return if current_membership&.owner?
 
     redirect_to team_path, alert: "Only the team owner can do that."
+  end
+
+  # Roster operations (rename, delete, invite, leave) only make sense on
+  # a shared team — a personal workspace is a team-of-one.
+  def reject_personal_team!
+    return unless current_team.personal?
+
+    redirect_to team_path, alert: "That isn't available for your personal workspace."
   end
 
   # Cast a request param to a real boolean ("1"/"true"/"on" -> true, etc.).

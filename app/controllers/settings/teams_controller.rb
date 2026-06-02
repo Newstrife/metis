@@ -6,24 +6,21 @@ class Settings::TeamsController < ApplicationController
 
   before_action :require_team_admin!, only: :update
   before_action :require_team_owner!, only: :destroy
+  before_action :reject_personal_team!, only: %i[update destroy]
 
   def show
     @team = current_team
-    @memberships = @team.memberships.includes(:user)
+    @memberships = @team.memberships.includes(user: { avatar_attachment: :blob })
     @invitation = Invitation.new
     @pending_invitations = @team.invitations.pending.order(:created_at)
   end
 
   def update
-    return redirect_to team_path, alert: "Your personal workspace can't be renamed." if current_team.personal?
-
     current_team.update!(team_params)
     redirect_to team_path, notice: "Team renamed."
   end
 
   def destroy
-    return redirect_to team_path, alert: "Your personal workspace can't be deleted." if current_team.personal?
-
     name = current_team.name
     current_team.destroy
     session.delete(:current_team_id) # falls back to the personal team

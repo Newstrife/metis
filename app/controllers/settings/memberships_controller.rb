@@ -5,6 +5,7 @@
 class Settings::MembershipsController < ApplicationController
   before_action :require_team_admin!, only: %i[update destroy]
   before_action :require_team_owner!, only: :transfer
+  before_action :reject_personal_team!, only: :leave
 
   def update
     membership = current_team.memberships.find(params[:id])
@@ -28,22 +29,15 @@ class Settings::MembershipsController < ApplicationController
     redirect_to team_path, notice: "#{membership.user.display_label} removed."
   end
 
-  # Promote a member to owner and step the current owner down to admin —
-  # an atomic swap that preserves the single-owner invariant.
   def transfer
     target = current_team.memberships.find(params[:id])
     return reject("They're already the owner.") if target.owner?
 
-    ActiveRecord::Base.transaction do
-      current_membership.update!(role: :admin)
-      target.update!(role: :owner)
-    end
+    current_team.transfer_ownership!(from: current_membership, to: target)
     redirect_to team_path, notice: "#{target.user.display_label} is now the owner."
   end
 
   def leave
-    return reject("You can't leave your personal workspace.") if current_team.personal?
-
     membership = current_team.memberships.find_by!(user: current_user)
     return reject("Transfer ownership or delete the team before leaving.") if membership.owner?
 

@@ -11,4 +11,19 @@ class Team < ApplicationRecord
   has_many :invitations, dependent: :destroy
 
   validates :name, presence: true
+
+  # A personal team-of-one shows as "Personal" rather than its raw name
+  # (which is the owner's email).
+  def display_name
+    personal? ? "Personal" : name
+  end
+
+  # Hand ownership to another member and step the current owner down to
+  # admin, atomically — preserving the single-owner invariant.
+  def transfer_ownership!(from:, to:)
+    transaction do
+      from.update!(role: :admin)
+      to.update!(role: :owner)
+    end
+  end
 end

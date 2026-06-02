@@ -328,7 +328,8 @@ img.avatar { background:none; object-fit:cover; }
 .team-switcher-sep { height:1px; background:var(--line); margin:5px 4px; }
 .team-switcher-panel form { margin:0; }
 
-/* Team settings */
+/* Team settings (.team-input is its own class, not .field input, because
+   .field input also styles submit buttons — which stretched them). */
 .team-input {
   font-family:var(--fb); font-size:13.5px; color:var(--ink);
   background:var(--card); border:1px solid var(--line-2); border-radius:10px;

@@ -3,10 +3,9 @@
 # of this team yet).
 class Settings::InvitationsController < ApplicationController
   before_action :require_team_admin!
+  before_action :reject_personal_team!, only: :create
 
   def create
-    return redirect_to team_path, alert: "Create a team before inviting people." if current_team.personal?
-
     invitation = current_team.invitations.new(invitation_params)
     invitation.invited_by = current_user
     invitation.role = invited_role

@@ -9,7 +9,7 @@
     <div class="pane-inner">
       <% if @invitation.expired? %>
         <p class="pane-lead">This invitation has expired. Ask for a new one.</p>
-      <% elsif @invitation.email == current_user.email.to_s.downcase %>
+      <% elsif @invitation.for?(current_user) %>
         <p class="pane-lead">
           <%= @invitation.invited_by.display_label %> invited you to join
           <strong><%= @invitation.team.name %></strong> as a <%= @invitation.role %>.

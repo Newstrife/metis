@@ -26,6 +26,12 @@ class Invitation < ApplicationRecord
     expires_at.past?
   end
 
+  # Whether this invite was sent to `user`'s address (email is stored
+  # already-normalized, so just downcase the comparison side).
+  def for?(user)
+    email == user.email.to_s.downcase
+  end
+
   # Idempotent: re-accepting (or accepting when already a member) just
   # stamps accepted_at; an existing membership keeps its role.
   def accept!(user)

@@ -16,12 +16,14 @@
         </p>
         <%= link_to "Create a team", new_team_path, class: "btn btn-primary" %>
       <% else %>
+        <% manager = current_membership&.manages_team? %>
+        <% owner = current_membership&.owner? %>
         <p class="pane-lead">
           Members share this team's connectors, skills, and projects.
           Conversations stay private to whoever started them.
         </p>
 
-        <% if current_membership&.manages_team? %>
+        <% if manager %>
           <%= form_with model: @team, url: team_path, method: :patch, class: "team-rename" do |form| %>
             <%= form.label :name, "Team name", class: "team-form-label" %>
             <div class="team-rename-row">
@@ -40,13 +42,13 @@
                 <div class="member-name"><%= membership.user.display_label %></div>
                 <div class="member-email"><%= membership.user.email %></div>
               </div>
-              <% if current_membership&.manages_team? && !membership.owner? && membership.user_id != current_user.id %>
+              <% if manager && !membership.owner? && membership.user_id != current_user.id %>
                 <div class="member-actions">
                   <% next_role = membership.member? ? "admin" : "member" %>
                   <%= button_to membership.role.titleize, team_membership_path(membership), method: :patch,
                         params: { membership: { role: next_role } }, form_class: "inline-form",
                         class: "btn btn-ghost btn-sm", title: "Make #{next_role}" %>
-                  <% if current_membership.owner? %>
+                  <% if owner %>
                     <%= button_to "Make owner", transfer_team_membership_path(membership), method: :post,
                           form: { class: "inline-form", data: { turbo_confirm: "Make #{membership.user.display_label} the owner? You'll step down to admin." } },
                           class: "btn btn-ghost btn-sm" %>
@@ -62,7 +64,7 @@
           <% end %>
         </ul>
 
-        <% if current_membership&.manages_team? %>
+        <% if manager %>
           <div class="cat-label">Invite a teammate</div>
           <%= form_with model: @invitation, url: team_invitations_path, class: "invite-form" do |form| %>
             <div class="invite-row">
@@ -89,7 +91,7 @@
         <% end %>
 
         <div class="cat-label">Danger zone</div>
-        <% if current_membership&.owner? %>
+        <% if owner %>
           <%= button_to "Delete team", team_path, method: :delete, class: "btn btn-danger",
                 form: { data: { turbo_confirm: "Delete #{@team.name}? This removes the team for everyone." } } %>
         <% else %>
