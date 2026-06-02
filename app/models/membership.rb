@@ -9,4 +9,10 @@ class Membership < ApplicationRecord
 
   validates :role, presence: true
   validates :user_id, uniqueness: { scope: :team_id }
+
+  # Owners and admins manage the team (members, settings); plain
+  # members only use its shared resources.
+  def manages_team?
+    admin? || owner?
+  end
 end

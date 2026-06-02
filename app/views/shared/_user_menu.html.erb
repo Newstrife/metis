@@ -75,6 +75,14 @@
             <% end %>
           <% end %>
         <% end %>
+        <%= link_to new_team_path, class: "user-menu-item user-menu-team", role: "menuitem",
+              data: { turbo_frame: "_top" } do %>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"
+               stroke-linecap="round" aria-hidden="true">
+            <path d="M8 3v10M3 8h10"/>
+          </svg>
+          <span>Create team</span>
+        <% end %>
       </div>
 
       <div class="user-menu-sep"></div>

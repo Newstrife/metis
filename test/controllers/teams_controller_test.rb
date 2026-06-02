@@ -35,4 +35,24 @@ class TeamsControllerTest < ActionDispatch::IntegrationTest
     get conversations_path
     assert_select ".sidebar .convo .tt", text: "Solo chat"
   end
+
+  test "creating a team makes the user its owner and switches into it" do
+    assert_difference -> { Team.count } => 1, -> { @user.memberships.count } => 1 do
+      post teams_path, params: { team: { name: "Beta Squad" } }
+    end
+
+    team = Team.find_by!(name: "Beta Squad")
+    assert_not team.personal?
+    assert @user.memberships.find_by(team: team).owner?
+    assert_redirected_to team_path
+    follow_redirect!
+    assert_select ".pane-title", text: "Team"
+  end
+
+  test "creating a team with a blank name re-renders the form" do
+    assert_no_difference -> { Team.count } do
+      post teams_path, params: { team: { name: "" } }
+    end
+    assert_response :unprocessable_entity
+  end
 end

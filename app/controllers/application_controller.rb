@@ -28,6 +28,18 @@ class ApplicationController < ActionController::Base
     @current_membership ||= current_user.memberships.find_by(team: current_team)
   end
 
+  def require_team_admin!
+    return if current_membership&.manages_team?
+
+    redirect_to team_path, alert: "You don't have permission to manage this team."
+  end
+
+  def require_team_owner!
+    return if current_membership&.owner?
+
+    redirect_to team_path, alert: "Only the team owner can do that."
+  end
+
   # Cast a request param to a real boolean ("1"/"true"/"on" -> true, etc.).
   def boolean_param(value)
     ActiveModel::Type::Boolean.new.cast(value)
