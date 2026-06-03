@@ -106,6 +106,31 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
     assert_nil connector.credential_for(@user)
   end
 
+  test "an admin can enable and disable the github bot on the connector" do
+    connector = github_connector
+
+    patch connector_path(connector), params: { connector: { bot_enabled: "1" } }
+    assert connector.reload.bot_enabled?
+
+    patch connector_path(connector), params: { connector: { bot_enabled: "0" } }
+    assert_not connector.reload.bot_enabled?
+  end
+
+  test "the manage form's hidden companion disables the bot when the box is unchecked" do
+    connector = github_connector
+    connector.update!(bot_enabled: true)
+
+    # An unchecked check_box_tag sends no "1"; the hidden field supplies "0".
+    patch connector_path(connector), params: { connector: { bot_enabled: "0" } }
+    assert_not connector.reload.bot_enabled?
+
+    # Form rendering: the hidden companion is present so the param is never absent.
+    with_stub(GithubApp::Config, :app_auth_configured?, -> { true }) do
+      get edit_connector_path(connector)
+      assert_select %(input[type=hidden][name="connector[bot_enabled]"][value="0"])
+    end
+  end
+
   test "disconnect removes the connector" do
     connector = github_connector
     assert_difference("Connector.count", -1) { delete connector_path(connector) }
@@ -117,5 +142,23 @@ class ConnectorsControllerTest < ActionDispatch::IntegrationTest
 
     get edit_connector_path(connector)
     assert_response :not_found
+  end
+
+  test "the github tile reads Connect when I have no credential, even if a teammate wired it" do
+    github_connector # team Connector row exists; current user has no credential on it
+
+    with_stub(GithubApp::Config, :configured?, -> { true }) do
+      get connectors_path
+      assert_select %(form[action^="#{user_github_omniauth_authorize_path}"] button), text: "Connect"
+    end
+  end
+
+  test "the github tile reads Reconnect when I connected before but the grant lapsed" do
+    github_connector.connector_credentials.create!(user: @user) # my credential exists, no usable grant
+
+    with_stub(GithubApp::Config, :configured?, -> { true }) do
+      get connectors_path
+      assert_select %(form[action^="#{user_github_omniauth_authorize_path}"] button), text: "Reconnect"
+    end
   end
 end
