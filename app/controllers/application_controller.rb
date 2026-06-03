@@ -8,7 +8,7 @@ class ApplicationController < ActionController::Base
   around_action :with_user_locale, if: :user_signed_in?
   around_action :with_user_timezone, if: :user_signed_in?
 
-  helper_method :current_team, :current_membership, :team_manager?
+  helper_method :current_team, :current_membership, :team_manager?, :pending_invitation
 
   SIDEBAR_PAGE_SIZE = 30
 
@@ -67,6 +67,27 @@ class ApplicationController < ActionController::Base
   # Cast a request param to a real boolean ("1"/"true"/"on" -> true, etc.).
   def boolean_param(value)
     ActiveModel::Type::Boolean.new.cast(value)
+  end
+
+  # After signing in or up, return to a pending invitation when one is
+  # stashed (InvitationsController#show) — the 99% case is a brand-new
+  # invitee who just created an account. Inherited by Devise's session /
+  # registration / omniauth controllers, so it covers password and OAuth.
+  def after_sign_in_path_for(resource)
+    token = session.delete(:pending_invitation_token)
+    return invitation_path(token) if token.present? && Invitation.exists?(token: token)
+
+    super
+  end
+
+  # The still-pending invitation a signed-out visitor is mid-acceptance
+  # of (stashed by InvitationsController#show) — lets the auth pages tell
+  # them which email to register/sign in with so it matches the invite.
+  def pending_invitation
+    return @pending_invitation if defined?(@pending_invitation)
+
+    token = session[:pending_invitation_token]
+    @pending_invitation = token.present? ? Invitation.pending.find_by(token: token) : nil
   end
 
   def with_user_locale(&block)
