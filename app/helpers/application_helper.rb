@@ -143,15 +143,6 @@ module ApplicationHelper
     LANGUAGE_LABELS[code.to_s] || code.to_s.upcase
   end
 
-  # Turbo-frame DOM id for a project's picker for a connector. Both
-  # the placeholder in the form and the loaded picker partial use this
-  # so Turbo can swap content in place. `dom_id` returns "new_project"
-  # for unpersisted records and "project_<id>" otherwise — same shape
-  # either way.
-  def project_picker_frame_id(project, provider)
-    "#{dom_id(project)}_picker_#{provider}"
-  end
-
   # Display label for a recency bucket. Views can't reach the constant
   # by bare name (lexical scope, not the include chain), so they go
   # through this helper.
@@ -209,14 +200,21 @@ module ApplicationHelper
          include_granted_scopes: true)
   end
 
+  # True when a connector still needs a one-time admin OAuth-app setup —
+  # a brokered provider (GitHub/Google) whose deployment credentials aren't
+  # configured yet. The marketplace flags only these (with a dot) so an
+  # installation owner sees what's left to wire up; mcp_oauth (DCR) and
+  # token connectors need no setup and carry no marker.
+  def connector_needs_setup?(app)
+    app.oauth? && !oauth_provider_configured?(app.oauth_provider)
+  end
+
   def oauth_provider_configured?(provider)
     case OauthBroker.normalize_provider(provider) || provider.to_s
     when "github"
       GithubApp::Config.configured?
     when "google"
       GoogleApp::Config.configured?
-    when "linear"
-      LinearApp::Config.configured?
     else
       false
     end

@@ -65,15 +65,12 @@ Rails.application.routes.draw do
     patch "profile/avatar", to: "profiles#update_avatar",
                             as: :update_avatar_profile
     resources :connectors, except: :show
-    resources :projects, except: :show do
-      collection do
-        # Stateless picker — project_id is an optional query param
-        # ("what's already selected") rather than a path segment, so
-        # one route serves both the edit form (with a project) and
-        # the new form (without one).
-        get :picker
-      end
-    end
+    # MCP-OAuth (Dynamic Client Registration) connect flow — distinct from
+    # the omniauth providers; these servers self-register. The callback URL
+    # is stable (it's registered with each server at DCR time).
+    get  "connectors/oauth/callback",     to: "connectors/oauth#callback", as: :connector_oauth_callback
+    post "connectors/oauth/:catalog_key", to: "connectors/oauth#start",    as: :connector_oauth_start
+    resources :projects, except: :show
     get  "models", to: "models#index", as: :models
     post "models/refresh", to: "models#refresh", as: :refresh_models
     patch "models/providers/:id", to: "models#update_provider", as: :model_provider
