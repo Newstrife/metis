@@ -69,6 +69,8 @@ gem "image_processing", "~> 2.0"
 # libvips driver for image_processing — image_processing lists it only as an
 # optional dep, so the variant processor (Rails 8 default :vips) needs it here.
 gem "ruby-vips", "~> 2.0"
+# S3 (and S3-compatible: R2, MinIO) backend for Active Storage in production.
+gem "aws-sdk-s3", require: false
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem

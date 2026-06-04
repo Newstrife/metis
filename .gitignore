@@ -7,9 +7,10 @@
 # Ignore bundler config.
 /.bundle
 
-# Ignore all environment files, but keep the committed reference template.
+# Ignore all environment files, but keep the committed reference templates.
 /.env*
 !/.env.example
+!/.env.deploy.example
 
 # Ignore all logfiles and tempfiles.
 /log/*
@@ -33,6 +34,8 @@
 
 # Ignore key files for decrypting credentials and more.
 /config/*.key
+# Per-environment credential keys (e.g. credentials:edit -e production).
+/config/credentials/*.key
 
 
 /app/assets/builds/*
@@ -44,3 +47,7 @@
 # Skills are sourced per-checkout (vendored / team-managed via DB), not vendored in-repo for now.
 /.pi/skills/
 /.claude/skills/
+
+# Ignore key files for decrypting credentials and more.
+/config/credentials/*.key
+
