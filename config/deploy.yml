@@ -153,6 +153,13 @@ asset_path: /rails/public/assets
 builder:
   arch: arm64
 
+  # Build from the working tree, not a git clone. Kamal clones the repo by
+  # default (git_clone? is true only while context is nil), which drops
+  # git-ignored-but-present paths — notably .pi/skills/ — from the image.
+  # Setting context builds from the checkout instead; .dockerignore still
+  # filters secrets, logs, tmp, and local cruft.
+  context: .
+
   # # Build image via remote server (useful for faster amd64 builds on arm64 computers)
   # remote: ssh://docker@docker-builder-server
   #

@@ -49,3 +49,10 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Local agent/session cruft. With builder context "." the build copies the
+# working tree, so keep these out — only .pi/skills/ should ride along.
+/.claude
+/.remember
+/.ruby-lsp
+.DS_Store
