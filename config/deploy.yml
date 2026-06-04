@@ -114,8 +114,8 @@ env:
     # Setting AWS_BUCKET switches uploads from the (ephemeral) container disk
     # to S3. For Cloudflare R2 / MinIO, set AWS_REGION: auto and AWS_ENDPOINT
     # to the account endpoint. Keys live in env.secret above.
-    AWS_BUCKET: metis-uploads
-    AWS_REGION: us-west-1
+    AWS_BUCKET: <%= ENV.fetch("AWS_BUCKET") %>
+    AWS_REGION: <%= ENV.fetch("AWS_REGION") %>
     # AWS_ENDPOINT: https://<account>.r2.cloudflarestorage.com
 
     # Set number of processes dedicated to Solid Queue (default: 1)
