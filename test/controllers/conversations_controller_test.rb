@@ -1,7 +1,9 @@
 require "test_helper"
+require "turbo/broadcastable/test_helper"
 
 class ConversationsControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
+  include Turbo::Broadcastable::TestHelper
 
   setup do
     @user = User.create!(email: "test@example.com", password: "password123")
@@ -296,5 +298,239 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     post cancel_conversation_path(conversation)
 
     assert_response :not_found
+  end
+
+  test "a personal workspace shows Mine and Starred tabs but not Shared or Archived" do
+    sign_in @user
+    get conversations_path
+
+    assert_response :success
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "active"), text: "Mine"
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "starred"), text: "Starred"
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "shared"), count: 0
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "archived"), count: 0
+    assert_select ".convo-tab.on", text: "Mine"
+  end
+
+  test "a shared team shows the Shared tab" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    sign_in @user
+    post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
+
+    get conversations_path
+    assert_response :success
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "shared")
+    assert_select ".convo-tabs a.convo-tab #shared-tab-dot[hidden]"
+  end
+
+  test "sharing in a team broadcasts the shared-tab dot to the team" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    conversation = @user.conversations.create!(team: team, title: "Shareable")
+    sign_in @user
+
+    assert_turbo_stream_broadcasts(team, count: 1) do
+      post share_conversation_path(conversation), as: :turbo_stream
+    end
+    assert conversation.reload.shared?
+  end
+
+  test "the shared filter lists every member's shared conversations in the team" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    teammate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    team.memberships.create!(user: teammate, role: :member)
+
+    teammate_shared = teammate.conversations.create!(team: team, title: "Teammate shared")
+    teammate_shared.generate_share_token!
+    teammate.conversations.create!(team: team, title: "Teammate private")
+
+    mine = @user.conversations.create!(team: team, title: "My shared")
+    mine.generate_share_token!
+
+    sign_in @user
+    post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
+    get conversations_path(filter: "shared")
+
+    assert_response :success
+    assert_select "#convos-list .convo .tt", text: "Teammate shared"
+    assert_select "#convos-list .convo .tt", text: "My shared"
+    assert_select "#convos-list .convo .tt", text: "Teammate private", count: 0
+    assert_select "#convos-list .convo .convo-avatar"
+    assert_select ".convo-tab.on", text: "Shared"
+  end
+
+  test "the shared filter routes every row to the in-app chat view" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    teammate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    team.memberships.create!(user: teammate, role: :member)
+    shared = teammate.conversations.create!(team: team, title: "Theirs")
+    shared.generate_share_token!
+
+    sign_in @user
+    post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
+    get conversations_path(filter: "shared")
+
+    assert_response :success
+    assert_select "#convos-list .convo[href=?][data-turbo-frame=main]", conversation_path(shared)
+  end
+
+  test "a team member opens a teammate's shared conversation read-only" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    teammate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    team.memberships.create!(user: teammate, role: :member)
+    shared = teammate.conversations.create!(team: team, title: "Theirs")
+    shared.generate_share_token!
+    shared.messages.create!(role: :user, content: "hi")
+    shared.messages.create!(
+      role: :assistant, content: "the answer", reasoning: "secret thinking",
+      streaming_status: :done,
+      tool_calls: [ { "name" => "bash", "args" => {}, "output" => "ok", "status" => "done" } ]
+    )
+
+    sign_in @user
+    post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
+    get conversation_path(shared)
+
+    assert_response :success
+    assert_select "h1 span", text: "Theirs"
+    assert_select ".readonly-note"
+    assert_select "#composer", count: 0
+    # The public share link stays available (read-only), but not owner controls.
+    assert_select ".chat-actions .share .share-panel-url[value=?]",
+                  shared_conversation_url(token: shared.share_token)
+    assert_select ".chat-actions .share-panel-revoke", count: 0
+    assert_select ".chat-actions form[action=?]", archive_conversation_path(shared), count: 0
+    # A shared view hides the whole activity block (reasoning + tool calls),
+    # like the public share template; the answer text remains.
+    assert_select ".activity", count: 0
+    assert_select ".reasoning", count: 0
+    assert_no_match(/secret thinking/, @response.body)
+    assert_select ".chat-content", text: /the answer/
+  end
+
+  test "an owner sees reasoning and tool calls in their own conversation" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Mine")
+    conversation.messages.create!(
+      role: :assistant, content: "answer", reasoning: "my private thinking",
+      streaming_status: :done,
+      tool_calls: [ { "name" => "bash", "args" => {}, "output" => "ok", "status" => "done" } ]
+    )
+
+    get conversation_path(conversation)
+
+    assert_response :success
+    assert_select ".activity"
+    assert_select ".reasoning", text: "my private thinking"
+  end
+
+  test "a team member cannot open a teammate's conversation that is not shared" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    teammate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    team.memberships.create!(user: teammate, role: :member)
+    private_convo = teammate.conversations.create!(team: team, title: "Private")
+
+    sign_in @user
+    post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
+    get conversation_path(private_convo)
+
+    assert_response :not_found
+  end
+
+  test "the shared filter excludes conversations shared in another team" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    other_team = Team.create!(name: "Other")
+    stranger = User.create!(email: "str-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    other_team.memberships.create!(user: stranger, role: :owner)
+    elsewhere = stranger.conversations.create!(team: other_team, title: "Elsewhere")
+    elsewhere.generate_share_token!
+
+    sign_in @user
+    post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
+    get conversations_path(filter: "shared")
+
+    assert_response :success
+    assert_select "#convos-list .convo", count: 0
+  end
+
+  test "an unknown filter (e.g. archived) falls back to the active scope" do
+    sign_in @user
+    @user.conversations.create!(title: "Live")
+    archived = @user.conversations.create!(title: "Done")
+    archived.archive!
+
+    get conversations_path(filter: "archived")
+
+    assert_response :success
+    assert_select "#convos-list .convo .tt", text: "Live"
+    assert_select "#convos-list .convo .tt", text: "Done", count: 0
+    assert_select ".convo-tab.on", text: "Mine"
+  end
+
+  test "star marks a conversation as starred via turbo stream" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Pin me")
+
+    post star_conversation_path(conversation), as: :turbo_stream
+
+    assert_response :success
+    assert conversation.reload.starred?
+    assert_select "turbo-stream[action=replace][target=?]", dom_id(conversation, :star)
+  end
+
+  test "star is reversible via unstar" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Unpin me")
+    conversation.star!
+
+    delete star_conversation_path(conversation), as: :turbo_stream
+
+    assert_response :success
+    refute conversation.reload.starred?
+  end
+
+  test "cannot star another user's conversation" do
+    other = User.create!(email: "star-other@example.com", password: "password123")
+    conversation = other.conversations.create!(title: "Theirs")
+    sign_in @user
+
+    post star_conversation_path(conversation)
+
+    assert_response :not_found
+    refute conversation.reload.starred?
+  end
+
+  test "the starred filter lists only the user's active starred conversations" do
+    sign_in @user
+    @user.conversations.create!(title: "Plain")
+    starred = @user.conversations.create!(title: "Important")
+    starred.star!
+    archived_starred = @user.conversations.create!(title: "Old favourite")
+    archived_starred.star!
+    archived_starred.archive!
+
+    get conversations_path(filter: "starred")
+
+    assert_response :success
+    assert_select "#convos-list .convo .tt", text: "Important"
+    assert_select "#convos-list .convo .tt", text: "Plain", count: 0
+    assert_select "#convos-list .convo .tt", text: "Old favourite", count: 0
+    assert_select ".convo-tab.on", text: "Starred"
+  end
+
+  test "the owner sees a star toggle on their own conversation" do
+    sign_in @user
+    conversation = @user.conversations.create!(title: "Mine")
+
+    get conversation_path(conversation)
+
+    assert_response :success
+    assert_select ".chat-actions form[action=?]", star_conversation_path(conversation)
   end
 end

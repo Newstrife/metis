@@ -126,13 +126,30 @@ class ApplicationController < ActionController::Base
     Time.use_zone(zone, &block)
   end
 
+  # Archived lives on its own page (conversations#archived), not as a sidebar
+  # scope — it's deliberately kept out of the high-level list.
+  SIDEBAR_FILTERS = %w[active shared starred].freeze
+
   # :countless (LIMIT+1 probe, no COUNT). Don't switch to headless: true —
   # that drops the probe and `@sidebar_pagy.next` goes nil.
   def set_sidebar
+    @sidebar_filter = SIDEBAR_FILTERS.include?(params[:filter]) ? params[:filter] : "active"
+    # No "shared" scope in a team of one — there's nobody to share with.
+    @sidebar_filter = "active" if @sidebar_filter == "shared" && current_team.personal?
     @sidebar_pagy, @conversations = pagy(
-      :countless,
-      current_user.conversations.for_team(current_team).active.recent,
-      limit: SIDEBAR_PAGE_SIZE
+      :countless, sidebar_scope(@sidebar_filter), limit: SIDEBAR_PAGE_SIZE
     )
+  end
+
+  # "shared" spans the whole team (every member's shared conversations);
+  # "active" and "starred" are the signed-in user's own, archived excluded.
+  # All ordered by recency for the same bucketed sidebar list.
+  def sidebar_scope(filter)
+    mine = current_user.conversations.for_team(current_team)
+    case filter
+    when "shared"  then current_team.conversations.shared.active.recent
+    when "starred" then mine.starred.active.recent
+    else                mine.active.recent
+    end
   end
 end

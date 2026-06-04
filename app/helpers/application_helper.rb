@@ -166,6 +166,21 @@ module ApplicationHelper
     end
   end
 
+  SIDEBAR_EMPTY_MESSAGES = {
+    "shared" => "No conversations shared with your team yet.",
+    "starred" => "No starred conversations yet — star one to keep it handy.",
+    "active" => "No conversations yet — start one on the right."
+  }.freeze
+
+  def sidebar_empty_message(filter)
+    SIDEBAR_EMPTY_MESSAGES.fetch(filter, SIDEBAR_EMPTY_MESSAGES["active"])
+  end
+
+  # Sidebar scope-tab class, marking the current filter active.
+  def sidebar_tab_class(filter)
+    class_names("convo-tab", "on" => @sidebar_filter == filter)
+  end
+
   # Human label for an identity provider key — `google_oauth2` reads as
   # "Google", `github` as "GitHub". Falls back to a titleized key.
   IDENTITY_PROVIDER_LABELS = {

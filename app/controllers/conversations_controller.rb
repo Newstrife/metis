@@ -3,7 +3,7 @@ class ConversationsController < ApplicationController
 
   layout "chat"
 
-  before_action :set_conversation, only: %i[show cancel archive unarchive update share unshare]
+  before_action :set_conversation, only: %i[cancel archive unarchive star unstar update share unshare]
   before_action :set_sidebar, only: %i[index show archived]
 
   def index
@@ -30,7 +30,14 @@ class ConversationsController < ApplicationController
     redirect_to conversation
   end
 
+  # Own conversations open normally; a teammate's conversation that was
+  # shared with the team opens read-only (same chat view, no composer).
+  # Mutating actions still go through the owner-scoped set_conversation,
+  # so read-only here can't be escalated.
   def show
+    @conversation = current_user.conversations.find_by(id: params[:id]) ||
+                    current_team.conversations.shared.find(params[:id])
+    @read_only = @conversation.user_id != current_user.id
     @messages = @conversation.messages.chronological
   end
 
@@ -67,26 +74,41 @@ class ConversationsController < ApplicationController
     redirect_to @conversation
   end
 
+  def star
+    @conversation.star!
+    respond_with_panel "conversations/star"
+  end
+
+  def unstar
+    @conversation.unstar!
+    respond_with_panel "conversations/star"
+  end
+
   def share
+    newly_shared = !@conversation.shared?
     @conversation.generate_share_token!
-    respond_to do |format|
-      format.turbo_stream { render "conversations/share" }
-      format.html { redirect_to @conversation }
-    end
+    @conversation.broadcast_shared_to_team! if newly_shared && !@conversation.team.personal?
+    respond_with_panel "conversations/share"
   end
 
   def unshare
     @conversation.revoke_share!
-    respond_to do |format|
-      format.turbo_stream { render "conversations/share" }
-      format.html { redirect_to @conversation }
-    end
+    respond_with_panel "conversations/share"
   end
 
   private
 
   def set_conversation
     @conversation = current_user.conversations.find(params[:id])
+  end
+
+  # The star/share toggles re-render their inline header panel over Turbo,
+  # or fall back to a full-page redirect.
+  def respond_with_panel(partial)
+    respond_to do |format|
+      format.turbo_stream { render partial }
+      format.html { redirect_to @conversation }
+    end
   end
 
   # Composer wins; profile default backs up a scrubbed pick; both blank →
