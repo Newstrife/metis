@@ -10,6 +10,8 @@ module Agent
     # E2B delivers stdout as arbitrary byte chunks, not lines, so chunks are
     # reframed through PiAgent::Framer (strict-LF JSONL) before parsing.
     class E2bTransport
+      include TransportTiming
+
       CLOSE_TIMEOUT = 5
       # Lifetime cap for the pi process. The e2b SDK derives the stdout
       # stream's HTTP timeout from this, so it must comfortably exceed the
@@ -32,6 +34,7 @@ module Agent
       end
 
       def start
+        @started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
         # stdin: true is mandatory — without it E2B never opens the pipe
         # and send_stdin is a silent no-op.
         @handle = @sandbox.commands.run(
@@ -84,6 +87,7 @@ module Agent
       end
 
       def dispatch_message(line)
+        log_first_message
         @on_message&.call(JSON.parse(line))
       rescue JSON::ParserError => e
         Rails.logger.warn("[e2b] non-JSON line from pi: #{e.message}: #{line.inspect}")

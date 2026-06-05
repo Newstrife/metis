@@ -12,6 +12,8 @@ class ChatBroadcaster
 
   def handle(event)
     case event.type
+    when :runtime_status    then update_runtime_status(event)
+    when :message_started   then clear_runtime_phase
     when :text_delta        then append_text(event[:delta])
     when :reasoning_delta   then append_reasoning(event[:delta])
     when :tool_call_started then start_tool(event)
@@ -156,6 +158,28 @@ class ChatBroadcaster
 
   def finish
     Turbo::StreamsChannel.broadcast_remove_to(@conversation, target: "#{base_id}_indicator")
+  end
+
+  # Show the runtime's provisioning phase ("Creating sandbox", …) in the same
+  # indicator the elapsed timer lives in — these arrive before pi's first event.
+  def update_runtime_status(event)
+    @phase_shown = true
+    broadcast_indicator(phase: event[:message])
+  end
+
+  # pi has started producing output, so provisioning is done — drop the phase
+  # label back to the plain elapsed timer. No-op unless a phase was shown.
+  def clear_runtime_phase
+    return unless @phase_shown
+
+    @phase_shown = false
+    broadcast_indicator(phase: nil)
+  end
+
+  def broadcast_indicator(phase:)
+    broadcast(:replace, target: "#{base_id}_indicator",
+                        partial: "messages/streaming_indicator",
+                        locals: { message: @message, phase: phase })
   end
 
   # Append into the message card, not the body — the body's innerHTML is

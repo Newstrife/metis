@@ -72,6 +72,11 @@ module Agent
         Pathname.new(SESSION_DIR)
       end
 
+      # Every turn runs a fresh container.
+      def initial_status
+        "Starting container"
+      end
+
       # The app's pi extensions at their in-container paths, under the
       # read-only extensions mount (#docker_args bind-mounts the dir).
       def extension_paths
@@ -88,6 +93,7 @@ module Agent
         workspace.stage_skills
         turn_started_at = Time.current.floor  # see Local#run
         env = sandbox_env
+        emit_status(:starting, "Starting container")
         session = PiAgent.session(bin: "docker", args: docker_args(pi_args, env: env), env: env)
         begin
           yield session
