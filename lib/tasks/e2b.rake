@@ -23,8 +23,11 @@ namespace :e2b do
       rm -rf /var/lib/apt/lists/*
     SH
 
+    # Debian trixie (glibc 2.41), not the default node:lts (bookworm, glibc
+    # 2.36). The @googleworkspace/cli prebuilt glibc binary requires GLIBC
+    # 2.39 — on bookworm every `gws` call hard-crashes with a version error.
     template = E2B::Template.new(file_context_path: Rails.root.to_s)
-                            .from_node_image
+                            .from_node_image("lts-trixie")
                             .apt_install([ "curl", "gnupg" ])
                             .run_cmd(install_gh, user: "root")
                             .npm_install(pi_package, g: true)
