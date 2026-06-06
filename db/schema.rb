@@ -176,9 +176,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_06_002119) do
     t.integer "cache_read_tokens"
     t.text "content"
     t.bigint "conversation_id", null: false
+    t.decimal "cost", precision: 12, scale: 6
     t.datetime "created_at", null: false
     t.datetime "finished_at"
     t.integer "input_tokens"
+    t.string "model_key"
     t.jsonb "native_ref"
     t.integer "output_tokens"
     t.text "reasoning"
