@@ -10,6 +10,9 @@ class ChatJob < ApplicationJob
     conversation = Conversation.find(conversation_id)
     user_message = Message.find(user_message_id)
     assistant_message = Message.find(assistant_message_id)
+    # Copy the source's pi session in before the adapter reads
+    # backend_session_id for --continue.
+    Agent::ForkPreparer.prepare(conversation) if conversation.fork_pending?
     broadcaster = ChatBroadcaster.new(conversation, assistant_message)
     adapter = Agent::Adapters.for(conversation)
 
@@ -72,6 +75,7 @@ class ChatJob < ApplicationJob
     )
     broadcaster.refresh_usage
     broadcaster.collapse_activity
+    broadcaster.reveal_actions
     broadcaster.stop_sidebar_indicator
     broadcaster.refresh_composer
   end

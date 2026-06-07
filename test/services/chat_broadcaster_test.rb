@@ -1,11 +1,14 @@
 require "test_helper"
+require "turbo/broadcastable/test_helper"
 
 class ChatBroadcasterTest < ActiveSupport::TestCase
+  include Turbo::Broadcastable::TestHelper
+
   setup do
-    user = User.create!(email: "bc@example.com", password: "password123")
-    conversation = user.conversations.create!
-    message = conversation.messages.create!(role: :assistant, content: "", streaming_status: :streaming)
-    @broadcaster = ChatBroadcaster.new(conversation, message)
+    @owner = User.create!(email: "bc@example.com", password: "password123")
+    @conversation = @owner.conversations.create!
+    @message = @conversation.messages.create!(role: :assistant, content: "", streaming_status: :streaming)
+    @broadcaster = ChatBroadcaster.new(@conversation, @message)
   end
 
   def event(type, **data)
@@ -94,5 +97,20 @@ class ChatBroadcasterTest < ActiveSupport::TestCase
       status: :done)
 
     assert_equal "eli5", locals[:skill_slug]
+  end
+
+  test "reveal_actions broadcasts the copy and fork actions to the owner once done" do
+    @message.update!(streaming_status: :done)
+
+    streams = capture_turbo_stream_broadcasts(@owner) { @broadcaster.reveal_actions }
+
+    assert_equal 1, streams.size
+    assert_includes streams.first.to_s, "msg-fork"
+    assert_includes streams.first.to_s, "msg-copy"
+  end
+
+  test "reveal_actions stays silent while the message is unfinished" do
+    streams = capture_turbo_stream_broadcasts(@owner) { @broadcaster.reveal_actions }
+    assert_empty streams
   end
 end

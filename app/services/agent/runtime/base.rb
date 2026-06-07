@@ -72,12 +72,12 @@ module Agent
         Agent::McpConfig.new(conversation).content
       end
 
-      # The rendered AGENTS.md (Agent::Identity) — the agent boot file
-      # pi auto-loads from its working directory each turn. Per-turn
-      # projected input, like mcp_config. On a reaped sandbox
-      # (#context_lost?) it also replays the conversation from the DB.
+      # The rendered AGENTS.md (Agent::Identity) — pi's per-turn boot file.
+      # With no live transcript — a reaped sandbox or a cloud-source fork — it
+      # also replays the conversation from the DB.
       def identity_content
-        Agent::Identity.new(conversation, kind, restore_history: context_lost?).content
+        restore = context_lost? || conversation.needs_history_replay?
+        Agent::Identity.new(conversation, kind, restore_history: restore).content
       end
 
       # The runtime's short name (`local`, `docker`, `e2b`) — used in

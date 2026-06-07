@@ -2,6 +2,7 @@ class Conversation < ApplicationRecord
   belongs_to :user
   belongs_to :team
   belongs_to :project, optional: true
+  belongs_to :forked_from_message, class_name: "Message", optional: true
   has_many :messages, dependent: :destroy
 
   # A conversation is owned by a team; default it to the creator's
@@ -175,6 +176,20 @@ class Conversation < ApplicationRecord
     scope = messages.conversational
     scope = scope.where("messages.id < ?", current_user_id) if current_user_id
     scope.chronological
+  end
+
+  def forked?
+    forked_from_message_id.present?
+  end
+
+  def forked_from_conversation
+    forked_from_message&.conversation
+  end
+
+  # A cloud-source fork replays its copied history into AGENTS.md; a host-backed
+  # one (fork_pending) copies the real session instead, so it must not replay.
+  def needs_history_replay?
+    forked? && backend_session_id.blank? && !fork_pending?
   end
 
   private
