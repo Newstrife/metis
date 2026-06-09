@@ -11,22 +11,22 @@ module Composing
     Array(params[:attachments]).reject(&:blank?)
   end
 
+  # The conversation's provider/model from the composer's model picker.
+  # Composer wins; profile default backs up a scrubbed pick; both blank →
+  # the adapter falls back to deployment defaults.
+  def chat_settings
+    model = params[:model].presence || current_user.preferred_model.presence
+    { "provider" => model && Agent::Catalog.provider_for(model), "model" => model }.compact
+  end
+
   # One transaction so a turn-guard collision on the assistant row rolls
-  # the user message back too — no orphan.
+  # the user message back too — no orphan. The turn-start core lives in
+  # ConversationTurn (shared with the workflow engine); here we only add
+  # the composer's upload handling.
   def start_turn(conversation, content, uploads)
-    user_message = assistant_message = nil
-    conversation.transaction do
-      user_message = conversation.messages.create!(
-        role: :user, content: content, streaming_status: :done
-      )
+    ConversationTurn.start(conversation, content: content) do |user_message|
       attach_uploads(user_message, uploads)
-      # Stamped at send time so duration spans the queue wait too.
-      assistant_message = conversation.messages.create!(
-        role: :assistant, content: "", streaming_status: :pending, started_at: Time.current
-      )
     end
-    ChatJob.perform_later(conversation.id, user_message.id, assistant_message.id)
-    [ user_message, assistant_message ]
   end
 
   def attach_uploads(message, uploads)

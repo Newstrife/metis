@@ -24,6 +24,14 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :workflow_runs, only: %i[create] do
+    member do
+      post :approve
+      post :reject
+      post :request_changes
+    end
+  end
+
   resources :teams, only: %i[new create] do
     member { post :switch }
   end
@@ -60,6 +68,7 @@ Rails.application.routes.draw do
     post "connectors/oauth/:catalog_key", to: "connectors/oauth#start",    as: :connector_oauth_start
 
     resources :projects, except: :show
+    resources :workflows, except: :show
 
     get   "models",                   to: "models#index",           as: :models
     post  "models/refresh",           to: "models#refresh",         as: :refresh_models

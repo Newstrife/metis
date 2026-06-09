@@ -149,6 +149,9 @@ turbo-frame#convos { display:contents; }
 
 .convos { flex:1; overflow-y:auto; padding:6px 8px 4px; min-height:0; scrollbar-width:none; }
 .convos::-webkit-scrollbar { display:none; }
+/* Gates awaiting the operator, pinned above the recency list. */
+.convos-pinned { padding-bottom:6px; margin-bottom:2px; border-bottom:1px solid var(--line); }
+.convos-pinned .grp-label:first-child { padding-top:6px; }
 .grp-label {
   font-family:var(--fm); font-size:10px; font-weight:500; letter-spacing:.1em;
   color:var(--faint); text-transform:uppercase; padding:14px 8px 6px;
@@ -1926,3 +1929,260 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
 
 /* Drawer scroll lock — toggled by the sidebar controller on body. */
 body.drawer-open { overflow:hidden; }
+
+/* ═══════════════════════════════════════════════════════════
+   Workflows — progress rail, gate card, run note, sidebar pill.
+   See docs/workflows.md and docs/mockups/workflows.html.
+   ═══════════════════════════════════════════════════════════ */
+:root {
+  --gold-soft:color-mix(in srgb, var(--gold) 16%, var(--card));
+  --gold-line:color-mix(in srgb, var(--gold) 42%, var(--card));
+}
+:root[data-theme="dark"] {
+  --gold-soft:color-mix(in srgb, var(--gold) 20%, var(--card));
+  --gold-line:color-mix(in srgb, var(--gold) 46%, var(--card));
+}
+
+/* progress rail */
+.wf-rail-wrap { border-bottom:1px solid var(--line); background:var(--canvas); }
+
+/* workflow identity in the chat-header meta row */
+.wf-meta { display:inline-flex; align-items:center; gap:9px; }
+.wf-meta-name { display:inline-flex; align-items:center; gap:5px; text-decoration:none; color:var(--ink-2); }
+.wf-meta-name svg { width:11px; height:11px; color:var(--ink-3); }
+.wf-meta-name:hover { color:var(--ink); }
+.wf-meta-state {
+  display:inline-flex; align-items:center; gap:5px; font-weight:600;
+  background:var(--bg); color:var(--ink-3);
+}
+.wf-meta-state::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.wf-meta-state--running::before, .wf-meta-state--pending::before { animation:convo-pulse 1.6s ease-in-out infinite; }
+.wf-meta-state--running, .wf-meta-state--pending { color:var(--accent-fg); background:var(--accent-soft); }
+.wf-meta-state--awaiting_approval { color:var(--gold); background:var(--gold-soft); }
+.wf-meta-state--completed { color:var(--ok); background:var(--ok-soft); }
+.wf-meta-state--failed { color:var(--danger); background:var(--danger-soft); }
+.wf-meta-state--cancelled { color:var(--ink-3); }
+.wf-rail {
+  display:flex; align-items:flex-start; gap:0;
+  max-width:760px; margin:0 auto; padding:11px 28px 7px; overflow-x:auto;
+}
+.wf-step { display:flex; flex-direction:column; align-items:center; flex:1; min-width:90px; position:relative; }
+.wf-step:not(:first-child)::before {
+  content:""; position:absolute; top:11px; left:calc(-50% + 11px);
+  width:calc(100% - 22px); height:2px; background:var(--line-2);
+}
+.wf-step.done::before, .wf-step.current::before, .wf-step.running::before { background:var(--accent); }
+.wf-node {
+  width:24px; height:24px; border-radius:50%; flex:none; z-index:1;
+  display:grid; place-items:center; font-family:var(--fm); font-size:11px;
+  background:var(--card); border:2px solid var(--line-2); color:var(--faint);
+}
+.wf-node svg { width:13px; height:13px; }
+.wf-step.done .wf-node { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.wf-step.running .wf-node { border-color:var(--accent); color:var(--accent-fg); }
+.wf-step.current .wf-node { border-color:var(--gold); background:var(--gold-soft); color:var(--gold); box-shadow:0 0 0 4px var(--gold-soft); }
+.wf-step.failed .wf-node { border-color:var(--danger-line); background:var(--danger-soft); color:var(--danger); }
+.wf-pulse { width:8px; height:8px; border-radius:50%; background:currentColor; animation:convo-pulse 1.6s ease-in-out infinite; }
+.wf-step.running .wf-pulse { background:var(--accent-fg); }
+.wf-step.current .wf-pulse { background:var(--gold); }
+.wf-label {
+  font-family:var(--fm); font-size:10.5px; font-weight:500; margin-top:8px;
+  text-align:center; color:var(--faint); line-height:1.3; max-width:108px;
+}
+.wf-step.done .wf-label, .wf-step.running .wf-label { color:var(--ink-2); }
+.wf-step.current .wf-label { color:var(--ink); font-weight:600; }
+.wf-gate-tag {
+  display:block; margin-top:2px; font-family:var(--fm); font-size:8.5px;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--gold);
+}
+
+/* gate card (in the message thread) */
+.wf-gate-region:empty { display:none; }
+/* Match the thread's inter-message gap — the gate lives in a sibling
+   .thread, so it doesn't inherit that spacing. */
+.wf-gate { display:flex; gap:13px; margin-top:20px; }
+.wf-gate-mark {
+  width:32px; height:32px; border-radius:10px; flex:none; margin-top:1px;
+  display:grid; place-items:center;
+  background:var(--gold-soft); color:var(--gold); border:1px solid var(--gold-line);
+}
+.wf-gate-mark svg { width:16px; height:16px; }
+.wf-gate-card {
+  flex:1; min-width:0; background:var(--card); border:1px solid var(--gold-line);
+  border-radius:6px 16px 16px 16px; box-shadow:var(--sh-md); overflow:hidden;
+}
+.wf-gate-top { padding:14px 18px 4px; }
+.wf-gate-eyebrow {
+  display:inline-flex; align-items:center; gap:6px; font-family:var(--fm);
+  font-size:10px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:var(--gold);
+}
+.wf-gate-eyebrow svg { width:12px; height:12px; }
+.wf-gate-title { font-family:var(--fd); font-weight:600; font-size:15.5px; letter-spacing:-.01em; margin:7px 0 2px; }
+.wf-gate-desc { font-size:13.5px; color:var(--ink-2); line-height:1.5; margin:0; }
+.wf-gate-review { margin:12px 18px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
+.wf-gate-review summary {
+  list-style:none; cursor:pointer; display:flex; align-items:center; gap:7px;
+  padding:9px 12px; font-family:var(--fm); font-size:11px; color:var(--ink-2);
+}
+.wf-gate-review summary::-webkit-details-marker { display:none; }
+.wf-gate-review summary::before {
+  content:""; width:0; height:0; border:4px solid transparent;
+  border-left-color:var(--ink-3); transition:transform .15s;
+}
+.wf-gate-review[open] summary::before { transform:rotate(90deg); }
+.wf-gate-review .body { padding:0 14px 12px; }
+.wf-gate-bar {
+  display:flex; align-items:center; gap:9px; padding:12px 18px;
+  border-top:1px solid var(--line); background:var(--canvas);
+}
+.wf-gate-bar form { margin:0; }
+.wf-gate-meta { flex:1; min-width:0; font-family:var(--fm); font-size:10.5px; color:var(--ink-3); }
+.btn {
+  font:inherit; font-family:var(--fb); font-size:13px; font-weight:600; cursor:pointer;
+  border-radius:10px; padding:8px 15px; border:1px solid transparent;
+  transition:opacity .14s, background .14s, border-color .14s, box-shadow .14s, transform .08s;
+}
+.btn:active { transform:scale(.97); }
+.btn-primary { background:var(--accent); color:var(--on-accent); }
+.btn-primary:hover { opacity:.85; }
+.btn-ghost { background:transparent; color:var(--ink-2); border-color:var(--line-2); }
+.btn-ghost:hover { color:var(--ink); border-color:var(--ink-3); box-shadow:var(--sh-sm); }
+.btn-sm { padding:6px 12px; font-size:12px; border-radius:8px; }
+
+/* composer-slot run note */
+.wf-run-note {
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  max-width:760px; margin:0 auto; padding:14px 16px;
+  font-family:var(--fm); font-size:12px; color:var(--ink-3);
+  background:var(--bg); border:1px dashed var(--line-2); border-radius:14px;
+}
+.wf-run-note svg { width:14px; height:14px; flex:none; }
+.wf-run-dot { width:7px; height:7px; border-radius:50%; background:var(--accent-fg); animation:convo-pulse 1.4s ease-in-out infinite; }
+.wf-run-link { color:var(--accent-fg); text-decoration:underline; text-underline-offset:2px; }
+
+/* sidebar pill */
+.convo-pill {
+  flex:none; margin-left:6px; font-family:var(--fm); font-size:9.5px; font-weight:500;
+  letter-spacing:.03em; text-transform:uppercase; padding:2px 7px; border-radius:999px;
+  background:var(--gold-soft); color:var(--gold); border:1px solid var(--gold-line);
+}
+.convo-check { flex:none; width:13px; height:13px; margin-left:6px; color:var(--ink-3); }
+.convo-fail { flex:none; width:6px; height:6px; border-radius:50%; background:var(--danger); margin-left:6px; }
+
+/* workflow catalog + editor (settings) */
+.conn-actions { display:flex; align-items:center; gap:6px; flex:none; }
+.conn-actions form { margin:0; }
+.wf-steps { display:flex; flex-direction:column; gap:10px; margin-top:4px; }
+.wf-steps-list { display:flex; flex-direction:column; gap:10px; }
+.wf-step-row {
+  display:flex; gap:10px; align-items:flex-start; cursor:grab;
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:12px; box-shadow:var(--sh-sm);
+}
+.wf-step-row:active { cursor:grabbing; }
+.wf-step-row.is-dragging { opacity:.5; cursor:grabbing; }
+/* interactive children keep their own cursors */
+.wf-step-name, .wf-step-prompt { cursor:text; }
+.wf-step-gate, .wf-gate-opt input, .wf-step-del { cursor:pointer; }
+.wf-step-grip { color:var(--faint); font-size:14px; line-height:1; user-select:none; padding-top:7px; }
+.wf-step-fields { flex:1; min-width:0; display:flex; flex-direction:column; gap:8px; }
+
+/* header row: title · gate · delete */
+.wf-step-head { display:flex; align-items:center; gap:8px; }
+.wf-step-name {
+  flex:1; min-width:0; font-family:var(--fd); font-weight:600; font-size:14px; color:var(--ink);
+  background:none; border:none; outline:none; padding:2px 0;
+  border-bottom:1px solid transparent;
+}
+.wf-step-name::placeholder { color:var(--faint); font-weight:500; }
+.wf-step-name:focus { border-bottom-color:var(--line-2); }
+/* Auto | Gate segmented toggle (radios) */
+.wf-step-gate { flex:none; display:inline-flex; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:2px; }
+.wf-gate-opt { display:inline-grid; }
+.wf-gate-opt input { grid-area:1/1; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+.wf-gate-opt span {
+  grid-area:1/1; display:grid; place-items:center; pointer-events:none;
+  font-family:var(--fm); font-size:11px; color:var(--ink-3);
+  padding:4px 11px; border-radius:6px; transition:background-color .12s, color .12s;
+}
+.wf-gate-opt input:checked + span { background:var(--card); color:var(--ink); box-shadow:var(--sh-sm); }
+.wf-gate-opt--gate input:checked + span { color:var(--gold); }
+.wf-gate-opt input:focus-visible + span { box-shadow:0 0 0 3px var(--accent-glow); }
+.wf-step-del {
+  flex:none; display:grid; place-items:center; width:28px; height:28px;
+  border:none; border-radius:7px; background:none; color:var(--ink-3); cursor:pointer;
+  transition:background-color .13s, color .13s;
+}
+.wf-step-del:hover { background:var(--danger-soft); color:var(--danger); }
+.wf-step-del svg { width:15px; height:15px; }
+.wf-step-prompt {
+  width:100%; box-sizing:border-box; resize:vertical;
+  font-family:var(--fm); font-size:12.5px; line-height:1.5; color:var(--ink);
+  background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:9px 11px; outline:none;
+  transition:border-color .14s, box-shadow .14s;
+}
+.wf-step-prompt::placeholder { color:var(--faint); }
+.wf-step-prompt:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
+
+/* add-step: a dashed "new card" affordance matching the step cards */
+.wf-step-add {
+  display:flex; align-items:center; justify-content:center; gap:7px; width:100%;
+  padding:12px; cursor:pointer; font:inherit; font-family:var(--fb);
+  font-size:13px; font-weight:600; color:var(--ink-3);
+  background:none; border:1px dashed var(--line-2); border-radius:12px;
+  transition:border-color .13s, color .13s, background-color .13s;
+}
+.wf-step-add:hover { border-color:var(--accent); color:var(--ink); background:var(--card); }
+.wf-step-add:active { transform:scale(.99); }
+.wf-step-add svg { width:15px; height:15px; }
+
+/* slash-command palette group header (skills / workflows) */
+.skill-palette-group {
+  font-family:var(--fm); font-size:10px; font-weight:500; letter-spacing:.1em;
+  color:var(--faint); text-transform:uppercase; padding:8px 9px 4px;
+}
+
+/* selected-workflow chip in the new-chat composer */
+.composer-wf-chip { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 12px 0; }
+.wf-launch-project {
+  appearance:none; -webkit-appearance:none;
+  font-family:var(--fm); font-size:11px; color:var(--ink-2);
+  background:var(--bg); border:1px solid var(--line); border-radius:999px;
+  padding:4px 10px; cursor:pointer;
+}
+.wf-launch-project:hover { border-color:var(--line-2); }
+.auto-chip {
+  display:inline-flex; align-items:center; gap:7px;
+  font-family:var(--fm); font-size:11px; font-weight:500; color:var(--gold);
+  background:var(--gold-soft); border:1px solid var(--gold-line); border-radius:999px; padding:4px 10px;
+}
+.auto-chip svg { width:12px; height:12px; }
+.auto-chip-x { background:none; border:none; color:var(--gold); cursor:pointer; opacity:.7; padding:0; font-size:11px; line-height:1; }
+.auto-chip-x:hover { opacity:1; }
+
+/* gate feedback box */
+.wf-gate-form { margin:0; }
+.wf-gate-input {
+  width:100%; box-sizing:border-box; margin:12px 18px 0; width:calc(100% - 36px);
+  font-family:var(--fm); font-size:12.5px; line-height:1.5; color:var(--ink);
+  background:var(--bg); border:1px solid var(--line); border-radius:9px;
+  padding:9px 11px; outline:none; resize:vertical; min-height:42px;
+  transition:border-color .14s, box-shadow .14s;
+}
+.wf-gate-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-glow); }
+.wf-gate-input::placeholder { color:var(--faint); }
+
+/* workflow step-prompt instruction — a step boundary, not a user bubble
+   and not a toggle (the old chevron read as an expandable disclosure). */
+.msg-step {
+  display:flex; align-items:baseline; gap:11px;
+  max-width:80%; align-self:flex-start; margin-left:45px;
+  padding:7px 0 7px 13px; border-left:2px solid var(--line-2);
+}
+.msg-step-tag {
+  flex:none; font-family:var(--fm); font-size:9px; font-weight:600;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--faint);
+}
+.msg-step .chat-content { font-size:13px; color:var(--ink-2); }
+.msg-step .chat-content p { margin:0 0 .35rem; }
+.msg-step .chat-content > :last-child { margin-bottom:0; }

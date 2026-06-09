@@ -1,0 +1,44 @@
+<%# Root id is the broadcast/replace target. Actionable by any team member
+    regardless of the conversation's read-only state — the controller authorizes. %>
+<div id="workflow_gate" class="wf-gate-region">
+  <% if run.awaiting_approval? && (task = run.tasks.awaiting_approval.first) %>
+    <% work = wf_gated_work(run, task) %>
+    <div class="wf-gate">
+      <div class="wf-gate-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>
+        </svg>
+      </div>
+      <div class="wf-gate-card">
+        <div class="wf-gate-top">
+          <span class="wf-gate-eyebrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Review needed
+          </span>
+          <h3 class="wf-gate-title"><%= task.name.presence || "Approval needed" %></h3>
+          <p class="wf-gate-desc">The agent paused here on purpose. Approve to let it continue, or reject to stop the run.</p>
+        </div>
+        <% if work&.content.present? %>
+          <details class="wf-gate-review">
+            <summary>View the step output</summary>
+            <div class="body chat-content"><%= markdown(work.content) %></div>
+          </details>
+        <% end %>
+        <%= form_with url: approve_workflow_run_path(run), method: :post, class: "wf-gate-form" do %>
+          <textarea name="feedback" rows="2" class="wf-gate-input"
+                    placeholder="Optional — tell the agent what to change, then Request changes."></textarea>
+          <div class="wf-gate-bar">
+            <span class="wf-gate-meta">Routed to your team</span>
+            <button type="submit" formaction="<%= reject_workflow_run_path(run) %>"
+                    class="btn btn-ghost btn-sm">Cancel run</button>
+            <button type="submit" formaction="<%= request_changes_workflow_run_path(run) %>"
+                    class="btn btn-ghost btn-sm">Request changes</button>
+            <button type="submit" class="btn btn-primary btn-sm">Approve &amp; continue</button>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

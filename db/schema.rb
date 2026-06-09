@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_06_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_08_120004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -193,6 +193,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_06_120000) do
     t.string "tool_call_id"
     t.jsonb "tool_calls", default: [], null: false
     t.datetime "updated_at", null: false
+    t.boolean "workflow_generated", default: false, null: false
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["conversation_id"], name: "index_messages_on_one_in_progress_turn", unique: true, where: "((role = 1) AND (streaming_status = ANY (ARRAY[0, 1])))"
   end
@@ -241,6 +242,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_06_120000) do
     t.index ["updated_by_id"], name: "index_skills_on_updated_by_id"
   end
 
+  create_table "tasks", force: :cascade do |t|
+    t.bigint "approved_by_id"
+    t.bigint "assistant_message_id"
+    t.datetime "created_at", null: false
+    t.datetime "decided_at"
+    t.integer "gate", default: 0, null: false
+    t.string "name"
+    t.integer "position", null: false
+    t.text "prompt"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workflow_run_id", null: false
+    t.index ["approved_by_id"], name: "index_tasks_on_approved_by_id"
+    t.index ["assistant_message_id"], name: "index_tasks_on_assistant_message_id"
+    t.index ["workflow_run_id", "position"], name: "index_tasks_on_workflow_run_id_and_position", unique: true
+  end
+
   create_table "teams", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -269,6 +287,34 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_06_120000) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  create_table "workflow_runs", force: :cascade do |t|
+    t.bigint "conversation_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "status", default: 0, null: false
+    t.bigint "team_id", null: false
+    t.string "trigger_summary"
+    t.datetime "updated_at", null: false
+    t.bigint "workflow_id"
+    t.index ["conversation_id"], name: "index_workflow_runs_on_conversation_id", unique: true
+    t.index ["team_id"], name: "index_workflow_runs_on_team_id"
+    t.index ["workflow_id"], name: "index_workflow_runs_on_workflow_id"
+  end
+
+  create_table "workflows", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "default_project_id"
+    t.string "description"
+    t.boolean "enabled", default: true, null: false
+    t.string "name", null: false
+    t.jsonb "steps", default: [], null: false
+    t.bigint "team_id", null: false
+    t.jsonb "trigger_config", default: {}, null: false
+    t.integer "trigger_source", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["default_project_id"], name: "index_workflows_on_default_project_id"
+    t.index ["team_id"], name: "index_workflows_on_team_id"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "connector_credentials", "connectors"
@@ -292,4 +338,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_06_120000) do
   add_foreign_key "skills", "teams"
   add_foreign_key "skills", "users", column: "created_by_id"
   add_foreign_key "skills", "users", column: "updated_by_id"
+  add_foreign_key "tasks", "messages", column: "assistant_message_id", on_delete: :nullify
+  add_foreign_key "tasks", "users", column: "approved_by_id", on_delete: :nullify
+  add_foreign_key "tasks", "workflow_runs", on_delete: :cascade
+  add_foreign_key "workflow_runs", "conversations", on_delete: :cascade
+  add_foreign_key "workflow_runs", "teams"
+  add_foreign_key "workflow_runs", "workflows", on_delete: :nullify
+  add_foreign_key "workflows", "projects", column: "default_project_id", on_delete: :nullify
+  add_foreign_key "workflows", "teams"
 end
