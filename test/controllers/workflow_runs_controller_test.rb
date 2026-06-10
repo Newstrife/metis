@@ -19,6 +19,88 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     run
   end
 
+  def shared_team
+    team = Team.create!(name: "Acme")
+    team.memberships.create!(user: @user, role: :owner)
+    team
+  end
+
+  # Sign in a fresh member of `team` and switch their session into it.
+  def join_as_teammate(team)
+    mate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    team.memberships.create!(user: mate, role: :member)
+    sign_in mate
+    post switch_team_path(team)
+  end
+
+  test "a team-visible run opens read-only for a teammate; personal stays private" do
+    team = shared_team
+    open_run = WorkflowRun.start(team: team, user: @user, visibility: :team,
+                                 steps: [ { "name" => "a", "prompt" => "a" } ])
+    private_run = WorkflowRun.start(team: team, user: @user,
+                                    steps: [ { "name" => "a", "prompt" => "a" } ])
+    assert private_run.conversation.visibility_personal?, "personal is the default"
+
+    join_as_teammate(team)
+    get conversation_path(open_run.conversation)
+    assert_response :success
+    assert_match "Read-only", response.body
+
+    get conversation_path(private_run.conversation)
+    assert_response :not_found
+  end
+
+  test "a teammate cannot act on a personal run's gate" do
+    team = shared_team
+    conversation = @user.conversations.create!(team: team)
+    run = team.workflow_runs.create!(conversation: conversation, status: :awaiting_approval)
+    run.tasks.create!(position: 0, gate: :approval, status: :awaiting_approval)
+
+    join_as_teammate(team)
+    post approve_workflow_run_path(run), as: :turbo_stream
+    assert_response :not_found
+    assert run.reload.awaiting_approval?
+
+    conversation.update!(visibility: :team)
+    post approve_workflow_run_path(run), as: :turbo_stream
+    assert_response :success
+    assert run.reload.running?
+  end
+
+  test "the composer's visibility pick reaches the run conversation" do
+    workflow = @team.workflows.create!(name: "W", steps: [ { "name" => "a", "prompt" => "a" } ])
+    post workflow_runs_path, params: { workflow_id: workflow.id, content: "go", visibility: "team" }
+    assert WorkflowRun.order(:id).last.conversation.visibility_team?
+  end
+
+  test "an awaiting run pins in a teammate's sidebar and shared tab" do
+    team = shared_team
+    conversation = @user.conversations.create!(team: team, visibility: :team, title: "ZZ team run")
+    run = team.workflow_runs.create!(conversation: conversation, status: :awaiting_approval)
+    run.tasks.create!(position: 0, gate: :approval, status: :awaiting_approval)
+
+    join_as_teammate(team)
+    get conversations_path
+    assert_select ".convos-pinned .convo", text: /team run/i
+    get conversations_path(filter: "team")
+    assert_select "#convos-list .convo", text: /team run/i
+  end
+
+  test "the run note names the claimer once a delegated task is claimed" do
+    conversation = @user.conversations.create!(team: @team)
+    run = @team.workflow_runs.create!(conversation: conversation, status: :awaiting_local)
+    task = run.tasks.create!(position: 0, name: "impl", status: :running, delegated: true)
+
+    get conversation_path(conversation)
+    assert_match "waiting for a machine with a bridge token", response.body
+    assert_match "Waiting for a machine", response.body
+
+    task.update!(claimed_by_user: @user, claimed_by: "Apollo")
+    get conversation_path(conversation)
+    assert_match "#{@user.display_label}&#39;s Apollo is working on this step", response.body
+    assert_match "On #{@user.display_label}&#39;s machine", response.body
+  end
+
   test "the gate on the final step reads finish, mid-run reads continue" do
     run = gated_run
     get conversation_path(run.conversation)
@@ -105,6 +187,8 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     gate = run.tasks.find_by(position: 1)
     assert gate.completed?
     assert_equal @user, gate.approved_by
+    review = run.conversation.messages.where(kind: :review).last
+    assert_equal %(#{@user.display_label} approved "review"), review.content
   end
 
   test "reject cancels the run" do
@@ -121,13 +205,15 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert run.reload.running?
     assert run.tasks.find_by(position: 1).running?
-    assert_equal "open a PR too", run.conversation.messages.user.order(:created_at).last.content
+    feedback = run.conversation.messages.user.order(:created_at).last
+    assert feedback.review?
+    assert_equal "#{@user.display_label} requested changes — open a PR too", feedback.content
   end
 
   test "an injected step prompt renders as a step instruction, not a user bubble" do
     run = gated_run
     run.conversation.messages.create!(
-      role: :user, content: "implement the spec", streaming_status: :done, workflow_generated: true
+      role: :user, content: "implement the spec", streaming_status: :done, kind: :step_prompt
     )
     get conversation_path(run.conversation)
     assert_response :success

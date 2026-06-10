@@ -3,7 +3,7 @@ class ConversationsController < ApplicationController
 
   layout "chat"
 
-  before_action :set_conversation, only: %i[cancel archive unarchive star unstar update share unshare]
+  before_action :set_conversation, only: %i[cancel archive unarchive star unstar update share unshare toggle_visibility]
   before_action :set_sidebar, only: %i[index show archived]
 
   def index
@@ -25,18 +25,21 @@ class ConversationsController < ApplicationController
       return render_composer_error(nil, error)
     end
 
-    conversation = current_user.conversations.create!(team: current_team, settings: chat_settings)
+    conversation = current_user.conversations.create!(
+      team: current_team, settings: chat_settings, visibility: composed_visibility
+    )
     start_turn(conversation, content, uploads)
     redirect_to conversation
   end
 
-  # Own conversations open normally; a teammate's conversation that was
-  # shared with the team opens read-only (same chat view, no composer).
-  # Mutating actions still go through the owner-scoped set_conversation,
-  # so read-only here can't be escalated.
+  # Own conversations open normally; a teammate's team-visible conversation
+  # opens read-only (same chat view, no composer). The public share link is
+  # a separate door (shared_conversations#show). Mutating actions still go
+  # through the owner-scoped set_conversation, so read-only here can't be
+  # escalated.
   def show
     @conversation = current_user.conversations.find_by(id: params[:id]) ||
-                    current_team.conversations.shared.find(params[:id])
+                    current_team.conversations.visibility_team.find(params[:id])
     @read_only = @conversation.user_id != current_user.id
     @messages = @conversation.messages.chronological
   end
@@ -85,14 +88,19 @@ class ConversationsController < ApplicationController
   end
 
   def share
-    newly_shared = !@conversation.shared?
     @conversation.generate_share_token!
-    @conversation.broadcast_shared_to_team! if newly_shared && !@conversation.team.personal?
     respond_with_panel "conversations/share"
   end
 
   def unshare
     @conversation.revoke_share!
+    respond_with_panel "conversations/share"
+  end
+
+  # Flip in-app team visibility — separate from the public share link.
+  def toggle_visibility
+    @conversation.update!(visibility: @conversation.visibility_team? ? :personal : :team)
+    @conversation.broadcast_team_tab_dot! if @conversation.visibility_team? && !@conversation.team.personal?
     respond_with_panel "conversations/share"
   end
 

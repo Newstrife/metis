@@ -63,6 +63,31 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
   end
 
+  test "the composer's visibility pick sets the conversation's visibility" do
+    sign_in @user
+    post conversations_path, params: { content: "hi team", visibility: "team" }
+    assert Conversation.order(:id).last.visibility_team?
+
+    post conversations_path, params: { content: "hi me" }
+    assert Conversation.order(:id).last.visibility_personal?
+  end
+
+  test "toggle_visibility flips team access and is owner-only" do
+    conversation = @user.conversations.create!(title: "mine")
+    sign_in @user
+
+    patch visibility_conversation_path(conversation), as: :turbo_stream
+    assert conversation.reload.visibility_team?
+    patch visibility_conversation_path(conversation), as: :turbo_stream
+    assert conversation.reload.visibility_personal?
+
+    stranger = User.create!(email: "x-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    sign_in stranger
+    patch visibility_conversation_path(conversation), as: :turbo_stream
+    assert_response :not_found
+    assert conversation.reload.visibility_personal?
+  end
+
   test "share mints a token and renders the panel via turbo stream" do
     conversation = @user.conversations.create!(title: "to share")
     sign_in @user
@@ -305,11 +330,11 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     get conversations_path
 
     assert_response :success
-    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "active"), text: "Mine"
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "active"), text: "Me"
     assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "starred"), text: "Starred"
-    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "shared"), count: 0
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "team"), count: 0
     assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "archived"), count: 0
-    assert_select ".convo-tab.on", text: "Mine"
+    assert_select ".convo-tab.on", text: "Me"
   end
 
   test "a shared team shows the Shared tab" do
@@ -320,19 +345,25 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
 
     get conversations_path
     assert_response :success
-    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "shared")
-    assert_select ".convo-tabs a.convo-tab #shared-tab-dot[hidden]"
+    assert_select ".convo-tabs a.convo-tab[href=?]", conversations_path(filter: "team")
+    assert_select ".convo-tabs a.convo-tab #team-tab-dot[hidden]"
   end
 
-  test "sharing in a team broadcasts the shared-tab dot to the team" do
+  test "opening to the team broadcasts the shared-tab dot; a public link does not" do
     team = Team.create!(name: "Acme")
     @user.memberships.create!(team: team, role: :owner)
     conversation = @user.conversations.create!(team: team, title: "Shareable")
     sign_in @user
 
     assert_turbo_stream_broadcasts(team, count: 1) do
+      patch visibility_conversation_path(conversation), as: :turbo_stream
+    end
+    assert conversation.reload.visibility_team?
+
+    link_broadcasts = capture_turbo_stream_broadcasts(team) do
       post share_conversation_path(conversation), as: :turbo_stream
     end
+    assert_empty link_broadcasts, "a public link should not ping the team"
     assert conversation.reload.shared?
   end
 
@@ -342,23 +373,24 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     teammate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
     team.memberships.create!(user: teammate, role: :member)
 
-    teammate_shared = teammate.conversations.create!(team: team, title: "Teammate shared")
-    teammate_shared.generate_share_token!
+    teammate.conversations.create!(team: team, title: "Teammate shared", visibility: :team)
     teammate.conversations.create!(team: team, title: "Teammate private")
-
-    mine = @user.conversations.create!(team: team, title: "My shared")
-    mine.generate_share_token!
+    @user.conversations.create!(team: team, title: "My shared", visibility: :team)
+    # A public link alone no longer surfaces a chat to the team.
+    linked = teammate.conversations.create!(team: team, title: "Teammate linked")
+    linked.generate_share_token!
 
     sign_in @user
     post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
-    get conversations_path(filter: "shared")
+    get conversations_path(filter: "team")
 
     assert_response :success
     assert_select "#convos-list .convo .tt", text: "Teammate shared"
     assert_select "#convos-list .convo .tt", text: "My shared"
     assert_select "#convos-list .convo .tt", text: "Teammate private", count: 0
+    assert_select "#convos-list .convo .tt", text: "Teammate linked", count: 0
     assert_select "#convos-list .convo .convo-avatar"
-    assert_select ".convo-tab.on", text: "Shared"
+    assert_select ".convo-tab.on", text: "Team"
   end
 
   test "the shared filter routes every row to the in-app chat view" do
@@ -366,12 +398,11 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     @user.memberships.create!(team: team, role: :owner)
     teammate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
     team.memberships.create!(user: teammate, role: :member)
-    shared = teammate.conversations.create!(team: team, title: "Theirs")
-    shared.generate_share_token!
+    shared = teammate.conversations.create!(team: team, title: "Theirs", visibility: :team)
 
     sign_in @user
     post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
-    get conversations_path(filter: "shared")
+    get conversations_path(filter: "team")
 
     assert_response :success
     assert_select "#convos-list .convo[href=?][data-turbo-frame=main]", conversation_path(shared)
@@ -382,7 +413,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     @user.memberships.create!(team: team, role: :owner)
     teammate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
     team.memberships.create!(user: teammate, role: :member)
-    shared = teammate.conversations.create!(team: team, title: "Theirs")
+    shared = teammate.conversations.create!(team: team, title: "Theirs", visibility: :team)
     shared.generate_share_token!
     shared.messages.create!(role: :user, content: "hi")
     shared.messages.create!(
@@ -402,7 +433,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     # The public share link stays available (read-only), but not owner controls.
     assert_select ".chat-actions .share .share-panel-url[value=?]",
                   shared_conversation_url(token: shared.share_token)
-    assert_select ".chat-actions .share-panel-revoke", count: 0
+    assert_select ".chat-actions .access-switch", count: 0
     assert_select ".chat-actions form[action=?]", archive_conversation_path(shared), count: 0
     # A shared view hides the whole activity block (reasoning + tool calls),
     # like the public share template; the answer text remains.
@@ -453,7 +484,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
 
     sign_in @user
     post switch_team_path(team), headers: { "HTTP_REFERER" => root_path }
-    get conversations_path(filter: "shared")
+    get conversations_path(filter: "team")
 
     assert_response :success
     assert_select "#convos-list .convo", count: 0
@@ -470,7 +501,7 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "#convos-list .convo .tt", text: "Live"
     assert_select "#convos-list .convo .tt", text: "Done", count: 0
-    assert_select ".convo-tab.on", text: "Mine"
+    assert_select ".convo-tab.on", text: "Me"
   end
 
   test "star marks a conversation as starred via turbo stream" do

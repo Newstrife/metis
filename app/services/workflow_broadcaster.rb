@@ -45,13 +45,18 @@ class WorkflowBroadcaster
     )
   end
 
-  # Owner's stream — a no-op if their sidebar row isn't currently rendered.
+  # Every member's stream for a team-visible run, only the owner's for a
+  # personal one — a private run's status must not transit teammates'
+  # streams. A no-op for anyone whose row isn't currently rendered.
   def refresh_sidebar
-    Turbo::StreamsChannel.broadcast_replace_to(
-      @conversation.user,
-      target: dom_id(@conversation, :wf_status),
-      partial: "workflow_runs/sidebar_pill",
-      locals: { conversation: @conversation, run: @run }
-    )
+    members = @conversation.visibility_team? ? @conversation.team.members : [ @conversation.user ]
+    members.each do |member|
+      Turbo::StreamsChannel.broadcast_replace_to(
+        member,
+        target: dom_id(@conversation, :wf_status),
+        partial: "workflow_runs/sidebar_pill",
+        locals: { conversation: @conversation, run: @run }
+      )
+    end
   end
 end

@@ -9,21 +9,26 @@ class WorkflowRun < ApplicationRecord
                   completed: 3, failed: 4, cancelled: 5, awaiting_local: 6 }, default: :pending
 
   scope :active,   -> { where(status: %i[pending running awaiting_approval awaiting_local]) }
-  scope :awaiting, -> { where(status: :awaiting_approval) }
+  # Runs a human (or their machine) must act on for the run to move.
+  scope :awaiting, -> { where(status: %i[awaiting_approval awaiting_local]) }
 
   def active?
     pending? || running? || awaiting_approval? || awaiting_local?
   end
 
   # `input` is the run's subject — folded into the first step's prompt.
+  # `visibility` is the launcher's choice from the composer: a team-visible
+  # run is openable by any member, who can act on its gates and claim its
+  # local steps.
   def self.start(team:, user:, workflow: nil, project: nil, steps: nil,
-                 input: nil, settings: {}, trigger_summary: "Started by you")
+                 input: nil, settings: {}, visibility: :personal,
+                 trigger_summary: "Started by you")
     steps ||= workflow&.steps || []
     run = transaction do
       # No title — auto-titling names each run from its first turn, so runs
       # of one workflow get distinct names.
       conversation = user.conversations.create!(
-        team: team, project: project, settings: settings || {}
+        team: team, project: project, settings: settings || {}, visibility: visibility
       )
       run = create!(
         team: team, workflow: workflow, conversation: conversation,
@@ -57,6 +62,7 @@ class WorkflowRun < ApplicationRecord
     return unless task
 
     task.update!(status: :completed, approved_by: by, decided_at: Time.current)
+    append_review %(#{reviewer(by)} approved "#{task.name.presence || "the step"}")
     running!
     WorkflowAdvanceJob.perform_later(id)
   end
@@ -84,27 +90,52 @@ class WorkflowRun < ApplicationRecord
     end
   end
 
+  # Cancels at a gate, or while a delegated step sits waiting for (or on)
+  # a machine — a parked run must always be killable. A result reported
+  # after the cancel no-ops (complete_delegated_task! requires running).
   def reject_current_gate!(by: nil)
-    task = tasks.awaiting_approval.first
+    task = tasks.awaiting_approval.first || tasks.dispatched.first
     return unless task
 
+    waited_on_local = task.running?
     task.update!(status: :rejected, approved_by: by, decided_at: Time.current)
+    append_review(if waited_on_local
+      %(#{reviewer(by)} cancelled the run while "#{task.name.presence || "the step"}" waited on a machine)
+    else
+      %(#{reviewer(by)} rejected "#{task.name.presence || "the step"}" and cancelled the run)
+    end)
     cancelled!
   end
 
-  # Re-run the gated step with the human's feedback as the prompt; it gates
-  # again when done, so the reviewer can iterate instead of only approving.
+  # Re-run the gated step with the human's feedback; it gates again when
+  # done, so the reviewer can iterate instead of only approving. A cloud
+  # step re-runs as a turn with the feedback as its prompt; a delegated
+  # step re-dispatches to the machine with the feedback folded in — never
+  # as a cloud turn (the engine would wait forever for a local report).
   def request_changes!(feedback, by: nil)
     return if feedback.blank?
 
     task = tasks.awaiting_approval.first
     return unless task
 
-    task.update!(status: :running, approved_by: by)
-    running!
-    user, assistant = ConversationTurn.start(conversation, content: feedback)
-    task.update!(assistant_message: assistant)
-    WorkflowBroadcaster.new(self).append_turn(user, assistant)
+    if task.delegated?
+      task.update!(
+        status: :running, approved_by: by, dispatched_at: Time.current,
+        claimed_by: nil, claimed_by_user: nil, result: {},
+        prompt: "#{task.prompt}\n\nRequested changes: #{feedback}"
+      )
+      append_review "#{reviewer(by)} requested changes — #{feedback}"
+      awaiting_local!
+      WorkflowBroadcaster.new(self).refresh
+    else
+      task.update!(status: :running, approved_by: by)
+      running!
+      user, assistant = ConversationTurn.start(
+        conversation, content: "#{reviewer(by)} requested changes — #{feedback}", kind: :review
+      )
+      task.update!(assistant_message: assistant)
+      WorkflowBroadcaster.new(self).append_turn(user, assistant)
+    end
   end
 
   private
@@ -112,14 +143,26 @@ class WorkflowRun < ApplicationRecord
   # The delegated step's timeline trace — a plain message, never a turn.
   def append_local_report(task)
     line = task.result_failed? ? "Failed" : "Done"
-    line += " on #{task.claimed_by.presence || "your machine"}"
+    line += " on #{task.claimed_label.presence || "a local machine"}"
     line += " — #{task.result_summary}" if task.result_summary
     url = task.result_artifact_urls.first
     line += " → #{url}" if url
 
     message = conversation.messages.create!(
-      role: :assistant, content: line, streaming_status: :done, workflow_generated: true
+      role: :assistant, content: line, streaming_status: :done, kind: :local_report
     )
     WorkflowBroadcaster.new(self).append_report(message)
+  end
+
+  # A gate decision's timeline trace — a plain message, never a turn.
+  def append_review(text)
+    message = conversation.messages.create!(
+      role: :user, content: text, streaming_status: :done, kind: :review
+    )
+    WorkflowBroadcaster.new(self).append_report(message)
+  end
+
+  def reviewer(by)
+    by&.display_label || "The reviewer"
   end
 end
