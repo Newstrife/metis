@@ -57,6 +57,7 @@ Rails.application.routes.draw do
     end
 
     resource :account, only: %i[show update destroy], controller: "settings/accounts"
+    post "account/bridge_token", to: "settings/accounts#bridge_token", as: :account_bridge_token
     resource :profile, only: %i[show update]
 
     post  "profile/detect_timezone", to: "profiles#detect_timezone", as: :detect_timezone_profile
@@ -85,6 +86,20 @@ Rails.application.routes.draw do
         delete "files/:file_id",          action: :destroy_file,  as: :destroy_file
         get    "files/:file_id/download", action: :download_file, as: :download_file
       end
+    end
+  end
+
+  # Bridge pull API — a local agent claims delegated workflow steps and
+  # reports results (docs/local-bridge.md). Authed by the user's bridge
+  # token, not a session.
+  namespace :api do
+    namespace :bridge do
+      get  "tasks",            to: "tasks#index"
+      get  "tasks/next",       to: "tasks#claim"
+      post "tasks/:id/events", to: "tasks#events"
+      post "tasks/:id/result", to: "tasks#result"
+      post "mcp",              to: "mcp#handle"
+      get  "skill",            to: "skill#show"
     end
   end
 

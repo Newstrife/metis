@@ -26,6 +26,9 @@ class WorkflowAdvanceJob < ApplicationJob
   def settle(run)
     task = run.tasks.running.first
     return :continue unless task
+    # A delegated step settles via the pull API's result report, not here
+    # — never fail it for lacking an assistant message.
+    return :wait if task.delegated?
 
     case task.assistant_message&.streaming_status
     when "done"
@@ -49,6 +52,7 @@ class WorkflowAdvanceJob < ApplicationJob
   def advance(run)
     task = run.tasks.next_pending.first
     return run.completed! if task.nil?
+    return dispatch_step(run, task) if task.delegated?
     return start_step(run, task) if task.prompt.present?
 
     # Blank prompt (only via direct runs — authored steps require one): an
@@ -65,8 +69,30 @@ class WorkflowAdvanceJob < ApplicationJob
   def start_step(run, task)
     task.running!
     run.running! unless run.running?
-    user, assistant = ConversationTurn.start(run.conversation, content: task.prompt, workflow_generated: true)
+    user, assistant = ConversationTurn.start(run.conversation, content: step_prompt(run, task), workflow_generated: true)
     task.update!(assistant_message: assistant)
     WorkflowBroadcaster.new(run).append_turn(user, assistant)
+  end
+
+  # A delegated step's outcome never enters the agent session, so the
+  # reports of the delegated steps just before this one fold into its prompt.
+  def step_prompt(run, task)
+    reports = run.tasks.completed.where(position: ...task.position).order(position: :desc)
+                 .take_while(&:delegated?).reverse.map { |prior| delegated_report(prior) }
+    [ *reports, task.prompt ].join("\n\n")
+  end
+
+  def delegated_report(task)
+    line = %(Step "#{task.name}" ran on the user's machine and reported: #{task.result_summary || task.result["status"]})
+    urls = task.result_artifact_urls
+    line += " (#{urls.join(", ")})" if urls.any?
+    line
+  end
+
+  # Park the run for a local machine — no turn, no ChatJob. It resumes
+  # when a result is reported (WorkflowRun#complete_delegated_task!).
+  def dispatch_step(run, task)
+    task.update!(status: :running, dispatched_at: Time.current)
+    run.awaiting_local!
   end
 end

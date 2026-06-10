@@ -6,13 +6,13 @@ class WorkflowRun < ApplicationRecord
   has_many :tasks, -> { order(:position) }, dependent: :destroy
 
   enum :status, { pending: 0, running: 1, awaiting_approval: 2,
-                  completed: 3, failed: 4, cancelled: 5 }, default: :pending
+                  completed: 3, failed: 4, cancelled: 5, awaiting_local: 6 }, default: :pending
 
-  scope :active,   -> { where(status: %i[pending running awaiting_approval]) }
+  scope :active,   -> { where(status: %i[pending running awaiting_approval awaiting_local]) }
   scope :awaiting, -> { where(status: :awaiting_approval) }
 
   def active?
-    pending? || running? || awaiting_approval?
+    pending? || running? || awaiting_approval? || awaiting_local?
   end
 
   # `input` is the run's subject — folded into the first step's prompt.
@@ -36,7 +36,8 @@ class WorkflowRun < ApplicationRecord
           position: i,
           name: step["name"] || step[:name],
           prompt: prompt,
-          gate: step["gate"] || step[:gate] || :auto
+          gate: step["gate"] || step[:gate] || :auto,
+          delegated: (step["run"] || step[:run]).to_s == "local"
         )
       end
       run
@@ -60,6 +61,29 @@ class WorkflowRun < ApplicationRecord
     WorkflowAdvanceJob.perform_later(id)
   end
 
+  # The local agent reported back — the settle-equivalent for a delegated
+  # step, mirroring the post-step shape WorkflowAdvanceJob#settle runs.
+  def complete_delegated_task!(task, result:)
+    return unless task.delegated? && task.running?
+
+    task.update!(result: result)
+    append_local_report(task)
+
+    if task.result_failed?
+      task.failed!
+      failed!
+      WorkflowBroadcaster.new(self).refresh
+    elsif task.approval?
+      task.awaiting_approval!
+      awaiting_approval!
+      WorkflowBroadcaster.new(self).refresh
+    else
+      task.completed!
+      running!
+      WorkflowAdvanceJob.perform_later(id)
+    end
+  end
+
   def reject_current_gate!(by: nil)
     task = tasks.awaiting_approval.first
     return unless task
@@ -81,5 +105,21 @@ class WorkflowRun < ApplicationRecord
     user, assistant = ConversationTurn.start(conversation, content: feedback)
     task.update!(assistant_message: assistant)
     WorkflowBroadcaster.new(self).append_turn(user, assistant)
+  end
+
+  private
+
+  # The delegated step's timeline trace — a plain message, never a turn.
+  def append_local_report(task)
+    line = task.result_failed? ? "Failed" : "Done"
+    line += " on #{task.claimed_by.presence || "your machine"}"
+    line += " — #{task.result_summary}" if task.result_summary
+    url = task.result_artifact_urls.first
+    line += " → #{url}" if url
+
+    message = conversation.messages.create!(
+      role: :assistant, content: line, streaming_status: :done, workflow_generated: true
+    )
+    WorkflowBroadcaster.new(self).append_report(message)
   end
 end

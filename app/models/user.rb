@@ -82,6 +82,30 @@ class User < ApplicationRecord
     teams.find_by(personal: true)
   end
 
+  # The bridge token (docs/local-bridge.md): digest stored, plaintext
+  # returned once, regenerating revokes. update_column — an internally
+  # minted digest must not be blocked by unrelated profile validations.
+  def generate_bridge_token!
+    token = "mbt_#{SecureRandom.urlsafe_base64(32)}"
+    update_column(:bridge_token_digest, self.class.bridge_token_digest(token))
+    token
+  end
+
+  def self.authenticate_bridge_token(token)
+    return if token.blank?
+
+    find_by(bridge_token_digest: bridge_token_digest(token))
+  end
+
+  def self.bridge_token_digest(token)
+    Digest::SHA256.hexdigest(token)
+  end
+
+  # Presence stamp — drives only the "is your machine connected" hint.
+  def bridge_seen!
+    update_column(:bridge_seen_at, Time.current)
+  end
+
   NOREPLY_EMAIL_SUFFIX = ".users.noreply.metis".freeze
 
   # Addresses we'd never have set if the user had given us a real one.
