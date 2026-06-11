@@ -1,53 +1,46 @@
 ---
 name: writing-spec
-description: Write an implementation spec as a workflow step — the self-contained brief a coding agent (often on a teammate's machine) implements and a later review step verifies. Use when a workflow step asks you to write, design, or revise a spec for a change.
+description: Write an implementation spec for a software change — a self-contained brief that a developer or coding agent can implement correctly without access to this conversation. Use when asked to write, design, or revise a spec, design doc, or implementation plan for a feature, fix, or change.
 ---
 
-# Writing a spec inside a workflow
+# Writing implementation specs
 
-Your spec is a step in a gated workflow, and three different readers
-consume it:
+A spec is a handoff. Assume the implementer has only two things: your
+spec and a checkout of the repository. They will build exactly what is
+written — every gap becomes their guess, and reviewers will verify the
+result against your text. Completeness beats brevity; spend length on
+substance, never padding.
 
-1. **Reviewers at the gate** — humans who approve, or send it back with
-   feedback, possibly several rounds. They read fast; structure for
-   skimming and decisions.
-2. **The implementer** — a coding agent, often on a teammate's machine
-   via the local bridge. It receives your spec as its *entire brief*:
-   no session, no chat history, no chance to ask you anything. It will
-   implement exactly what is written — every gap becomes its guess, and
-   a wrong guess costs a full gate-and-redispatch round trip.
-3. **The review step** — a later cloud turn that checks the resulting
-   PR *against your spec*. Every requirement you state will be
-   verified; anything vague is unverifiable and therefore unenforced.
+## Deliverables — always both
 
-**Completeness beats brevity.** The spec travels to the implementer in
-full, so write what correctness requires — but spend the length on
-substance, not padding: a reviewer still has to hold it in their head.
+1. **Save the spec as a markdown file** in the working directory
+   (`<kebab-title>-spec.md`) so it ships as a downloadable artifact.
+2. **Include the full spec text in your reply** — the message is the
+   version people review and quote.
 
 ## The closed-world test
 
-Before gating, reread the spec pretending you've never seen this
-conversation and have only the spec plus a checkout of the repo. The
-repo gives the implementer code, conventions (CLAUDE.md / AGENTS.md),
-and existing patterns — your spec must supply everything else:
+Before finishing, reread the spec as someone who has never seen this
+conversation. The repository already gives them code, conventions
+(CLAUDE.md / AGENTS.md), and existing patterns — the spec must supply
+everything else:
 
 - **Intent** — what the user gets and why it's wanted.
-- **Decisions already made** — choices from the incubation rounds and
-  rejected alternatives, so the implementer doesn't relitigate them.
-- **Hidden constraints** — invariants and guardrails that are not
-  visible in the code (security boundaries, "we deliberately don't…",
-  deploy-window concerns, product promises).
+- **Decisions already made** — choices settled during discussion and
+  the alternatives rejected, so the implementer doesn't relitigate them.
+- **Hidden constraints** — invariants not visible in the code: security
+  boundaries, deliberate non-features, compatibility or deploy concerns,
+  product promises.
 - **Exact contracts** — data shapes, payloads, state transitions, error
   paths, user-facing copy. Write them precisely (real JSON keys, real
   enum values, verbatim strings), not as prose.
 - **Anchors into the repo** — real file paths, class/method names, and
-  an existing exemplar to imitate when one exists ("mirror how
-  `approve_current_gate!` re-enters the engine"). Verify the names
+  an existing exemplar to imitate when one exists. Verify the names
   exist before writing them down.
 
-If a question is still open, do not hand off ambiguity: either resolve
-it and record the decision, or state the default you chose and why —
-the gate reviewer can overrule it cheaply; the implementer can't.
+Never hand off ambiguity: resolve open questions and record the
+decision, or state the default you chose and why — a reviewer can
+overrule a stated default cheaply; an implementer can't.
 
 ## Shape
 
@@ -63,8 +56,8 @@ empty:
 What changes for the user and why. Intent, not mechanism.
 
 ## Context & decisions
-What the implementer can't recover from the repo: choices made at the
-gates, rejected alternatives, hidden constraints, relevant history.
+What the implementer can't recover from the repo: settled choices,
+rejected alternatives, hidden constraints, relevant history.
 
 ## Requirements
 Numbered, declarative, individually verifiable:
@@ -88,31 +81,23 @@ decision is an open question in disguise.
 What an eager implementer might do that you explicitly don't want.
 
 ## Acceptance
-How the review step verifies each requirement: runnable commands
-(lint, tests, curl) and observable behaviors, ideally mapped R-by-R.
+How a reviewer verifies each requirement: runnable commands (lint,
+tests, curl) and observable behaviors, ideally mapped R-by-R.
 ```
 
-Numbered requirements with mapped acceptance are what make the chain
-work end to end: the implementer builds to R1–Rn, the reviewer ticks
-R1–Rn against the diff, and nothing rides on shared memory.
+Numbered requirements with mapped acceptance are the traceability
+spine: the implementer builds to R1–Rn, the reviewer ticks R1–Rn
+against the diff, and nothing rides on shared memory.
 
 ## Rules
 
 - **Self-contained or it doesn't exist.** Never write "as discussed
-  above" or lean on chat context — inline whatever matters.
+  above" or lean on conversation context — inline whatever matters.
 - **Stay at spec altitude.** Describe behavior and contracts, not
-  implementations. If you're writing method bodies, you're doing the
-  implementer's step — except where exactness *is* the requirement
+  implementations — except where exactness *is* the requirement
   (payloads, copy, shapes), where verbatim is correct.
-- **Expect to be revised.** When the gate sends feedback, rewrite the
-  spec in place as a clean next version — fold the feedback in; don't
-  append a changelog or argue with the review.
+- **Revise in place.** When feedback comes back, rewrite the spec as a
+  clean next version — fold the feedback in (and update the saved
+  file); don't append a changelog or argue with the review.
 - **Right-size the ask.** One spec, one landable PR. If the goal needs
   more, spec the first slice and name the rest in Out of scope.
-
-## When you publish
-
-Emit the full spec as your message body — it travels to the
-implementer whole, and is the version the gate reviews. Also saving it
-as a file artifact (`<kebab-title>-spec.md`) is welcome for download,
-but the message text is the source of truth.
