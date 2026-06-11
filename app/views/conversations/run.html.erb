@@ -1,0 +1,38 @@
+<% content_for :title, @conversation.display_title %>
+
+<main class="chat">
+  <%= turbo_stream_from @conversation %>
+
+  <header class="chat-head">
+    <div style="flex:1; min-width:0">
+      <h1 class="chat-title">
+        <span id="<%= dom_id(@conversation, :title) %>"><%= @conversation.display_title %></span>
+      </h1>
+      <div class="chat-sub">
+        <span><%= @workflow_run.trigger_summary %></span>
+        <%= render "workflow_runs/meta", run: @workflow_run %>
+      </div>
+    </div>
+    <div class="chat-actions">
+      <%= link_to conversation_path(@conversation, view: "chat"),
+            class: "btn btn-ghost btn-sm" do %>
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 10a2 2 0 0 1-2 2H6.5L3 14.5V4a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2z"/>
+          <path d="M6 6.5h5M6 9h3"/>
+        </svg>
+        Chat
+      <% end %>
+    </div>
+  </header>
+
+  <div class="stream">
+    <div class="wf-tl-wrap">
+      <%# The gate card renders inline, under the step it blocks; the whole
+          timeline is one broadcast region, so it stays live. %>
+      <%= render "workflow_runs/timeline", run: @workflow_run, conversation: @conversation %>
+    </div>
+  </div>
+
+  <%= render "workflow_runs/run_status", run: @workflow_run %>
+</main>

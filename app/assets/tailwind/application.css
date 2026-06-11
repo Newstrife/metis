@@ -633,14 +633,15 @@ img.avatar { background:none; object-fit:cover; }
   padding:11px 15px; box-shadow:0 6px 16px var(--accent-glow);
 }
 .msg-stamp { font-family:var(--fm); font-size:10px; color:var(--faint); margin-top:6px; }
-.msg-sender { display:flex; align-items:center; gap:6px; justify-content:flex-end; margin-bottom:4px; }
+.msg-user-row { display:flex; align-items:flex-end; justify-content:flex-end; gap:9px; }
 .msg-sender-avatar {
-  width:16px; height:16px; border-radius:50%; flex:none;
+  width:28px; height:28px; border-radius:50%; flex:none;
   overflow:hidden; object-fit:cover; display:inline-grid; place-items:center;
   background:linear-gradient(145deg,#5a7d8f,#3e5d6e); color:#fff;
-  font-weight:600; font-size:7px;
+  font-weight:600; font-size:11px; box-shadow:var(--sh-sm);
 }
-.msg-sender-name { font-size:11.5px; color:var(--ink-3); font-weight:500; line-height:1; }
+/* Keep the stamp under the bubble edge, not under the avatar rail. */
+.msg-user--attributed .msg-stamp { margin-right:37px; }
 
 /* assistant message */
 .msg-ai { display:flex; gap:13px; }
@@ -2034,9 +2035,6 @@ body.drawer-open { overflow:hidden; }
   --gold-line:color-mix(in srgb, var(--gold) 46%, var(--card));
 }
 
-/* progress rail */
-.wf-rail-wrap { border-bottom:1px solid var(--line); background:var(--canvas); }
-
 /* workflow identity in the chat-header meta row */
 .wf-meta { display:inline-flex; align-items:center; gap:9px; }
 .wf-meta-name { display:inline-flex; align-items:center; gap:5px; text-decoration:none; color:var(--ink-2); }
@@ -2053,39 +2051,119 @@ body.drawer-open { overflow:hidden; }
 .wf-meta-state--completed { color:var(--ok); background:var(--ok-soft); }
 .wf-meta-state--failed { color:var(--danger); background:var(--danger-soft); }
 .wf-meta-state--cancelled { color:var(--ink-3); }
-.wf-rail {
-  display:flex; align-items:flex-start; gap:0;
-  max-width:760px; margin:0 auto; padding:11px 28px 7px; overflow-x:auto;
+
+/* Run timeline — the run page's default view (chat is the toggle). */
+.wf-tl-wrap { max-width:860px; margin:0 auto; padding:20px 28px 8px; }
+.wf-tl { display:flex; flex-direction:column; }
+.wf-tl-item { display:flex; gap:16px; position:relative; padding-bottom:18px; }
+.wf-tl-item:not(:last-child)::before {
+  content:""; position:absolute; left:13px; top:34px; bottom:-2px; width:2px; background:var(--line-2);
 }
-.wf-step { display:flex; flex-direction:column; align-items:center; flex:1; min-width:90px; position:relative; }
-.wf-step:not(:first-child)::before {
-  content:""; position:absolute; top:11px; left:calc(-50% + 11px);
-  width:calc(100% - 22px); height:2px; background:var(--line-2);
+.wf-tl-node {
+  width:28px; height:28px; border-radius:50%; flex:none; z-index:1; margin-top:8px;
+  display:grid; place-items:center;
+  background:var(--card); border:2px solid var(--line-2);
+  font-family:var(--fm); font-size:11px; font-weight:600; color:var(--ink-3);
 }
-.wf-step.done::before, .wf-step.current::before, .wf-step.running::before { background:var(--accent); }
-.wf-node {
-  width:24px; height:24px; border-radius:50%; flex:none; z-index:1;
-  display:grid; place-items:center; font-family:var(--fm); font-size:11px;
-  background:var(--card); border:2px solid var(--line-2); color:var(--faint);
+.wf-tl-node svg { width:13px; height:13px; }
+.wf-tl-node.done { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+.wf-tl-node.failed { background:var(--danger-soft); border-color:var(--danger-line); color:var(--danger); }
+.wf-tl-node.running, .wf-tl-node.current { border-color:var(--accent); color:var(--accent-fg); }
+.wf-tl-node.gate { background:var(--gold-soft); border-color:var(--gold); color:var(--gold); }
+.wf-tl-card {
+  flex:1; min-width:0; background:var(--card); border:1px solid var(--line);
+  border-radius:14px; padding:14px 18px; box-shadow:var(--sh-sm);
 }
-.wf-node svg { width:13px; height:13px; }
-.wf-step.done .wf-node { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
-.wf-step.running .wf-node { border-color:var(--accent); color:var(--accent-fg); }
-.wf-step.current .wf-node { border-color:var(--gold); background:var(--gold-soft); color:var(--gold); box-shadow:0 0 0 4px var(--gold-soft); }
-.wf-step.failed .wf-node { border-color:var(--danger-line); background:var(--danger-soft); color:var(--danger); }
+.wf-tl-item.gate .wf-tl-card { border-color:var(--gold); }
+.wf-tl-top { display:flex; align-items:baseline; gap:12px; }
+.wf-tl-title { font-size:14.5px; font-weight:600; color:var(--ink); margin:0; flex:1; min-width:0; }
+.wf-tl-time { font-family:var(--fm); font-size:10.5px; color:var(--ink-3); white-space:nowrap; }
+.wf-tl-body { font-size:13.5px; color:var(--ink-2); margin:6px 0 0; line-height:1.5; word-break:break-word; }
+.wf-tl-body b { color:var(--ink); font-weight:600; }
+.wf-tl-meta { display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.wf-tl-meta .tag { font-family:var(--fm); font-size:10.5px; }
+.wf-tl-turnlink { font-family:var(--fm); font-size:11px; color:var(--accent-fg); text-decoration:none; }
+.wf-tl-turnlink:hover { text-decoration:underline; }
+/* A running step's live turn, embedded in its card. Capped — the full
+   stream lives in the chat view. */
+.wf-tl-live { margin-top:8px; }
+.wf-tl-live .chat-content { max-height:280px; overflow-y:auto; font-size:13.5px; }
+
+/* Steps that haven't happened yet recede; they brighten as the run
+   reaches them. */
+.wf-tl-item.pending { opacity:.55; }
+
+/* The step being worked right now reads as the page's live element:
+   a glow flowing around the card, pulsing badge in its time slot. The
+   gold treatment stays reserved for gates. */
+@property --wf-sweep { syntax:"<angle>"; inherits:false; initial-value:0deg; }
+.wf-tl-item.running .wf-tl-card {
+  position:relative;
+  border-color:color-mix(in srgb, var(--accent) 30%, var(--line));
+  box-shadow:var(--sh-md);
+}
+.wf-tl-item.running .wf-tl-card::before {
+  content:""; position:absolute; inset:-3px; z-index:-1; border-radius:17px;
+  background:conic-gradient(from var(--wf-sweep),
+    transparent 0turn, transparent .58turn,
+    var(--accent-glow) .79turn, transparent .99turn);
+  animation:wf-sweep 3.2s linear infinite;
+}
+@keyframes wf-sweep { to { --wf-sweep:360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .wf-tl-item.running .wf-tl-card { box-shadow:0 0 0 3px var(--accent-soft), var(--sh-md); }
+  .wf-tl-item.running .wf-tl-card::before { animation:none; background:none; }
+}
+.wf-tl-running {
+  display:inline-flex; align-items:center; gap:6px;
+  font-weight:600; color:var(--accent-fg);
+}
+.wf-tl-running::before {
+  content:""; width:6px; height:6px; border-radius:50%; flex:none;
+  background:currentColor; animation:convo-pulse 1.6s ease-in-out infinite;
+}
+
+/* A turn deep-linked from the workflow timeline wears the same accent
+   ring as the running step card — kept, marking the linked turn. */
+.anchor-flash .ai-card, .anchor-flash .bubble {
+  border-color:color-mix(in srgb, var(--accent) 30%, var(--line));
+  box-shadow:0 0 0 3px var(--accent-soft), var(--sh-md);
+}
+
+/* Unclaimed local step: how to claim it, and where the bridge lives. */
+.wf-tl-localguide { margin-top:8px; font-size:13px; color:var(--ink-2); line-height:1.6; }
+.wf-tl-localguide a { color:var(--accent-fg); }
+.wf-tl-localguide-sub { margin-top:4px; font-size:12px; color:var(--ink-3); }
+.wf-tl-claim {
+  display:inline-flex; align-items:center; gap:5px; cursor:pointer;
+  font-family:var(--fm); font-size:12px; border:none; border-radius:6px;
+  padding:2px 8px; background:var(--accent-soft); color:var(--accent-fg);
+}
+.wf-tl-claim svg { width:11px; height:11px; }
+.wf-tl-claim .ico-check { display:none; }
+.wf-tl-claim.is-copied .ico-copy { display:none; }
+.wf-tl-claim.is-copied .ico-check { display:inline; }
+
+/* The gate partial inline on the timeline: the wf-tl-node stands in for
+   the partial's own mark. */
+.wf-tl-gate-inline { flex:1; min-width:0; }
+.wf-tl-gate-inline .wf-gate { margin-top:0; gap:0; }
+.wf-tl-gate-inline .wf-gate-mark { display:none; }
+.wf-tl-gate-by { display:flex; align-items:center; gap:7px; margin-top:8px; font-size:12.5px; color:var(--gold); font-weight:600; }
+.wf-tl-gate-avatar {
+  width:20px; height:20px; border-radius:50%; flex:none;
+  overflow:hidden; object-fit:cover; display:inline-grid; place-items:center;
+  background:linear-gradient(145deg,#5a7d8f,#3e5d6e); color:#fff;
+  font-weight:600; font-size:8px;
+}
+.wf-tl-gate-by .tag { font-family:var(--fm); font-size:10px; }
+/* Run totals, compact, riding the header meta tags. */
+.wf-meta-stats {
+  font-family:var(--fm); font-size:10.5px; color:var(--ink-3);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+
 .wf-pulse { width:8px; height:8px; border-radius:50%; background:currentColor; animation:convo-pulse 1.6s ease-in-out infinite; }
-.wf-step.running .wf-pulse { background:var(--accent-fg); }
-.wf-step.current .wf-pulse { background:var(--gold); }
-.wf-label {
-  font-family:var(--fm); font-size:10.5px; font-weight:500; margin-top:8px;
-  text-align:center; color:var(--faint); line-height:1.3; max-width:108px;
-}
-.wf-step.done .wf-label, .wf-step.running .wf-label { color:var(--ink-2); }
-.wf-step.current .wf-label { color:var(--ink); font-weight:600; }
-.wf-gate-tag {
-  display:block; margin-top:2px; font-family:var(--fm); font-size:8.5px;
-  letter-spacing:.06em; text-transform:uppercase; color:var(--gold);
-}
 
 /* gate card (in the message thread) */
 .wf-gate-region:empty { display:none; }
@@ -2288,17 +2366,25 @@ body.drawer-open { overflow:hidden; }
    and not a toggle (the old chevron read as an expandable disclosure). */
 .msg-step {
   display:flex; align-items:baseline; gap:11px;
-  max-width:80%; align-self:flex-start; margin-left:45px;
-  padding:7px 0 7px 13px; border-left:2px solid var(--line-2);
+  align-self:stretch; margin-left:45px;
+  padding:10px 16px;
+  background:var(--card); border:1px solid var(--line);
+  border-left:3px solid var(--line-2);
+  border-radius:6px 14px 14px 6px; box-shadow:var(--sh-sm);
 }
 .msg-step-tag {
   flex:none; font-family:var(--fm); font-size:9px; font-weight:600;
   letter-spacing:.12em; text-transform:uppercase; color:var(--faint);
 }
+.msg-step-time {
+  margin-left:auto; flex:none; padding-left:14px;
+  font-family:var(--fm); font-size:10px; color:var(--faint); white-space:nowrap;
+}
 .msg-step .chat-content { font-size:13px; color:var(--ink-2); }
 .msg-step .chat-content p { margin:0 0 .35rem; }
 .msg-step .chat-content > :last-child { margin-bottom:0; }
-.msg-step--local { border-left-color:var(--gold); }
-.msg-step--local .msg-step-tag { color:var(--gold); }
-.msg-step--review { border-left-color:var(--accent); }
-.msg-step--review .msg-step-tag { color:var(--accent-fg); }
+/* Gold = review, matching the timeline's gate cards. */
+.msg-step--review { border-left-color:var(--gold); }
+.msg-step--review .msg-step-tag { color:var(--gold); }
+.msg-step--local { border-left-color:var(--accent); }
+.msg-step--local .msg-step-tag { color:var(--accent-fg); }

@@ -44,6 +44,9 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     join_as_teammate(team)
     get conversation_path(open_run.conversation)
     assert_response :success
+    assert_select ".wf-tl", count: 1
+
+    get conversation_path(open_run.conversation, view: "chat")
     assert_match "Read-only", response.body
 
     get conversation_path(private_run.conversation)
@@ -94,11 +97,14 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     get conversation_path(conversation)
     assert_match "waiting for a machine with a bridge token", response.body
     assert_match "Waiting for a machine", response.body
+    assert_select ".wf-tl-localguide .wf-tl-claim[data-copy-text-value=?]", "claim next task"
+    assert_select ".wf-tl-localguide a[href=?]", account_path
 
     task.update!(claimed_by_user: @user, claimed_by: "Apollo")
     get conversation_path(conversation)
     assert_match "#{@user.display_label}&#39;s Apollo is working on this step", response.body
     assert_match "On #{@user.display_label}&#39;s machine", response.body
+    assert_select ".wf-tl-localguide", count: 0
   end
 
   test "the gate on the final step reads finish, mid-run reads continue" do
@@ -215,9 +221,10 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     run.conversation.messages.create!(
       role: :user, content: "implement the spec", streaming_status: :done, kind: :step_prompt
     )
-    get conversation_path(run.conversation)
+    get conversation_path(run.conversation, view: "chat")
     assert_response :success
     assert_select ".msg-step", text: /implement the spec/
+    assert_select ".msg-step .msg-step-time", count: 1
     assert_select ".msg-user .bubble", text: /implement the spec/, count: 0
   end
 
@@ -230,13 +237,65 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     assert run.reload.awaiting_approval?
   end
 
-  test "the conversation view renders the rail and the gate card" do
+  test "the run timeline shows turn stats, the gate decision, and totals" do
+    conversation = @user.conversations.create!
+    workflow = @team.workflows.create!(name: "Ship", steps: [ { "name" => "spec", "prompt" => "p" } ])
+    run = @team.workflow_runs.create!(conversation: conversation, workflow: workflow, status: :completed)
+    msg = conversation.messages.create!(
+      role: :assistant, streaming_status: :done,
+      content: "Wrote the **spec** and opened a PR.\n\n| a | b |\n|---|---|\n| 1 | 2 |",
+      started_at: 10.minutes.ago, finished_at: 9.minutes.ago,
+      model_key: "claude-opus-4-8", input_tokens: 18_200, output_tokens: 1_100, cost: 0.064
+    )
+    run.tasks.create!(position: 0, name: "spec", gate: :approval, status: :completed,
+                      assistant_message: msg, approved_by: @user, decided_at: 5.minutes.ago)
+
+    get conversation_path(conversation)
+    assert_response :success
+    assert_select ".wf-tl-title", text: "Triggered"
+    assert_match "workflow <b>Ship</b>", response.body
+    assert_select ".wf-tl-body", text: /Wrote the spec and opened a PR/
+    assert_select ".wf-tl-body", text: /[|*#]/, count: 0
+    assert_select ".wf-tl-meta .tag", text: "claude-opus-4-8"
+    assert_select ".wf-tl-meta .tag", text: "18.2k in · 1.1k out"
+    assert_select ".wf-tl-meta .tag", text: "$0.06"
+    assert_select ".wf-tl-turnlink[href=?]",
+                  conversation_path(conversation, view: "chat", turn: msg.id),
+                  text: "view turn →"
+    assert_select ".wf-tl-item.gate .wf-tl-title", text: "Gate · spec"
+    assert_match "paused 4m", response.body
+    assert_select ".wf-tl-gate-by", text: /#{@user.display_label}.*approved/m
+    assert_select ".wf-meta-stats", text: /1 step.*1 gate.*agent 1m 0s.*\$0\.06/m
+    assert_select "a", text: /Chat/
+  end
+
+  test "a running step's card embeds the live turn regions the chat streams into" do
+    conversation = @user.conversations.create!
+    run = @team.workflow_runs.create!(conversation: conversation, status: :running)
+    msg = conversation.messages.create!(
+      role: :assistant, content: "", streaming_status: :pending, started_at: Time.current
+    )
+    run.tasks.create!(position: 0, name: "spec", status: :running, assistant_message: msg)
+
+    get conversation_path(conversation)
+    assert_response :success
+    assert_select ".wf-tl-live ##{ActionView::RecordIdentifier.dom_id(msg)}_body"
+    assert_select ".wf-tl-live ##{ActionView::RecordIdentifier.dom_id(msg)}_activity"
+    assert_select ".wf-tl-live ##{ActionView::RecordIdentifier.dom_id(msg)}_indicator"
+  end
+
+  test "the run page renders the timeline and gate; the chat view stays plain" do
     run = gated_run
     get conversation_path(run.conversation)
     assert_response :success
-    assert_select "#workflow_rail"
+    assert_select ".wf-tl", count: 1
     assert_select "#workflow_gate"
     assert_match "Review needed", response.body
     assert_match "the spec", response.body
+
+    get conversation_path(run.conversation, view: "chat")
+    assert_select "#workflow_rail", count: 0
+    assert_select "#workflow_meta", count: 0
+    assert_select "a", text: /Workflow/
   end
 end

@@ -11,26 +11,35 @@ class WorkflowBroadcaster
   def refresh
     @run.tasks.reload
     replace("workflow_meta", "workflow_runs/meta")
-    replace("workflow_rail", "workflow_runs/rail")
     replace("workflow_gate", "workflow_runs/gate")
     replace("composer", "workflow_runs/run_status")
+    refresh_run_page
     refresh_sidebar
   end
 
   # An engine-started turn has no controller to append its message rows (the
   # chat path does that in create.turbo_stream), so do it here — else
   # ChatBroadcaster's streaming has no DOM to land in until a refresh.
+  # The run page rides along so the step card flips to running.
   def append_turn(user_message, assistant_message)
     append_message(user_message, forkable: false)
     append_message(assistant_message, forkable: true)
+    refresh_run_page
   end
 
   # A delegated step's report line (WorkflowRun#append_local_report).
   def append_report(message)
     append_message(message, forkable: false)
+    refresh_run_page
   end
 
   private
+
+  # The header stats ride in workflow_meta, so it refreshes with the timeline.
+  def refresh_run_page
+    replace("workflow_timeline", "workflow_runs/timeline", conversation: @conversation)
+    replace("workflow_meta", "workflow_runs/meta")
+  end
 
   def append_message(message, forkable:)
     Turbo::StreamsChannel.broadcast_append_to(
