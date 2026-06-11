@@ -30,6 +30,20 @@ class ConversationTest < ActiveSupport::TestCase
     assert_equal [ @user, teammate ], @conversation.participants
   end
 
+  test "solo? is true for an untouched personal-team conversation, false once a teammate speaks" do
+    assert @conversation.solo?
+
+    teammate = User.create!(email: "solo-mate@example.com", password: "password123")
+    @conversation.messages.create!(role: :user, content: "feedback", streaming_status: :done, sender: teammate)
+    refute Conversation.find(@conversation.id).solo?
+  end
+
+  test "solo? is false in a shared team even with one participant" do
+    team = Team.create!(name: "Acme")
+    @user.memberships.create!(team: team, role: :owner)
+    refute @user.conversations.create!(team: team).solo?
+  end
+
   test "turn_in_progress? is false with no in-flight assistant message" do
     refute @conversation.turn_in_progress?
   end

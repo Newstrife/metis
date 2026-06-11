@@ -11,12 +11,14 @@
 <% elsif message.user? %>
   <%# User: a contained bubble on the accent fill, aligned right.
       Sender falls back to the owner on rows predating the column. %>
-  <% sender = message.sender || message.conversation.user %>
   <div id="<%= dom_id(message) %>" class="msg-user">
-    <div class="msg-sender">
-      <%= avatar_for sender, size: 16, css: "msg-sender-avatar" %>
-      <span class="msg-sender-name"><%= sender.display_label %></span>
-    </div>
+    <% unless message.conversation.solo? %>
+      <% sender = message.sender || message.conversation.user %>
+      <div class="msg-sender">
+        <%= avatar_for sender, size: 16, css: "msg-sender-avatar" %>
+        <span class="msg-sender-name"><%= sender.display_label %></span>
+      </div>
+    <% end %>
     <div class="bubble">
       <% if message.attachments? %>
         <%= render "messages/attachments", message: message %>

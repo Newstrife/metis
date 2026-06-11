@@ -22,6 +22,30 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".sidebar .convo .tt", text: "Existing"
   end
 
+  test "a solo personal conversation shows no avatars in the sidebar or sender row in the chat" do
+    conversation = @user.conversations.create!(title: "Just me")
+    conversation.messages.create!(role: :user, content: "hi", streaming_status: :done, sender: @user)
+    sign_in @user
+
+    get conversation_path(conversation)
+    assert_response :success
+    assert_select ".sidebar .convo .convo-avatars", count: 0
+    assert_select ".msg-sender", count: 0
+  end
+
+  test "a conversation a teammate has spoken in shows avatars and sender rows" do
+    teammate = User.create!(email: "mate@example.com", password: "password123")
+    conversation = @user.conversations.create!(title: "Us")
+    conversation.messages.create!(role: :user, content: "hi", streaming_status: :done, sender: @user)
+    conversation.messages.create!(role: :user, content: "yo", streaming_status: :done, sender: teammate)
+    sign_in @user
+
+    get conversation_path(conversation)
+    assert_response :success
+    assert_select ".sidebar .convo .convo-avatars", count: 1
+    assert_select ".msg-sender", count: 2
+  end
+
   test "starting a new chat creates a conversation with the first message" do
     sign_in @user
     assert_difference -> { @user.conversations.count }, 1 do

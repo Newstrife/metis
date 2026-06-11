@@ -99,7 +99,7 @@ conversation" the design calls for.
   natural fit, and it keeps Metis from having to drive anything.
 - **[ACP](https://agentclientprotocol.com)** (Agent Client Protocol) —
   demoted to a **daemon-internal detail**. ACP matters only if/when a
-  `metis-bridge` daemon drives a *headless* agent unattended (Phase 3); it
+  `metis-bridge` daemon drives a *headless* agent unattended (Phase 4); it
   normalizes Claude Code / Codex / Gemini / pi behind one stdio protocol.
   In the lightest v1 (the user's own Claude Code pulls via MCP) there is
   no ACP — the agent *is* the client.
@@ -128,7 +128,7 @@ server** and the **daemon** are both thin clients of it, added later:
                               ▲                         ▲
         ── pulls (outbound) ──┤                         ├── pulls (outbound) ──
                               │                         │
-        Phase 2: MCP server   │                         │  Phase 3: metis-bridge daemon
+        Phase 2: MCP server   │                         │  Phase 4: metis-bridge daemon
         (user's Claude Code   │                         │  (polls, spawns pi/Claude Code
          self-pulls via       │                         │   via ACP, reports — unattended)
          .mcp.json tools)     │                         │
@@ -155,7 +155,11 @@ workflow slug + base36 id) accepted anywhere a task id is — claim
 Claims and returns the next dispatched delegated task (FIFO), or a
 specific one via `?id=` — `204` when the queue is empty, `409` when the
 requested id is no longer claimable. Claiming stamps `task.claimed_by`
-(the client name).
+(the client name). `?project=` narrows the FIFO to tasks under one
+project — how an unattended client avoids blind-claiming work for a repo
+it doesn't have. Like `X-Bridge-Client`, it's self-reported scoping per
+request, not a capability registry; the interactive MCP loop gets the
+same effect by list-then-pick.
 
 ```jsonc
 // 200
@@ -193,7 +197,12 @@ binding.)
 ```
 
 Appended to the task for the run timeline. Lightweight and optional — a
-client that only reports a final result is fine.
+client that only reports a final result is fine. Progress doubles as the
+**liveness signal and the cancellation channel**: every post stamps the
+task's `last_reported_at` (see *Reliability* below), and a post against a
+task that is no longer live — run cancelled, step rejected, claim
+reclaimed — returns `410 Gone`, which means **stop work now**. The served
+skill teaches both halves.
 
 ### `POST /api/bridge/tasks/:id/result`
 
@@ -212,6 +221,9 @@ Metis records the result on the `Task`, optionally appends the timeline
 summary line, sets the task `completed` (or `awaiting_approval` if the step
 carries a review gate), flips the run back to `running`, and enqueues
 `WorkflowAdvanceJob` — the exact re-entry `approve_current_gate!` uses.
+A result posted after the task died (reclaimed, cancelled) is discarded
+with `410 Gone` — the claim that holds the task wins, not the last
+writer.
 
 ## Auth — a per-user token, no device registry
 
@@ -252,6 +264,46 @@ is no `Device` row, no enrollment flow, no `metis bridge login` CLI.
   until a client pulls it; `users.bridge_seen_at` only drives
   *notification* ("your laptop is offline"), never blocks the engine.
 
+## Reliability: reclaim, retry, cancellation
+
+Delegation is only as trustworthy as its failure story. A laptop that
+dies mid-task must not park a run on `awaiting_local` forever — the same
+hang class the engine already had fixed once at the gate level. Three
+server-side mechanisms close it, none of which require the client to be
+well-behaved.
+
+**Progress is the heartbeat.** There is no heartbeat endpoint. Claiming,
+posting an event, and posting a result all stamp
+`tasks.last_reported_at` — the liveness signal *is* the work. A claimed
+task that goes silent is indistinguishable from a dead client, by
+design.
+
+**Stale-claim sweeper.** A recurring job reclaims claims that have gone
+silent past a TTL (minutes-scale, tuned to the progress cadence the
+skill teaches): the task returns to the unclaimed pool — `claimed_by`
+cleared, a reclaim counter bumped — and the run stays `awaiting_local`,
+so the next pull picks it up with no human in the loop. After N reclaims
+the task fails and the run notifies: a step that keeps killing its
+client should surface, not cycle. Claiming itself is guarded by
+`FOR UPDATE SKIP LOCKED`, so two clients racing `next` can never
+double-claim.
+
+**Failure classes are not interchangeable.** *Infrastructure* failures
+(a reclaim, a claim that never started) re-dispatch silently — a laptop
+crash should never read as a failed step. *Agent-reported* failures
+(`"status": "failed"` in the result) fail the step and surface to the
+human — the agent tried and couldn't, and retrying that burns time on
+work that needs a person. Conflating the two either turns flaky networks
+into noise or auto-retries judgment calls.
+
+**Cancellation propagates on contact.** When a run is cancelled or a
+step rejected while a client holds the task, the client's next `events`
+or `result` post returns `410 Gone` and it stops. The attended loop
+learns this from the served skill; the Phase 4 daemon upgrades it to
+active status polling and terminates the agent process. v1 accepts the
+window between cancellation and the next post — bounded by the progress
+cadence, not by the turn.
+
 ## VISION posture — cleaner than the runtime design
 
 [`VISION.md`](../VISION.md) holds **no second agent backend**. The
@@ -261,7 +313,7 @@ is no second adapter, no second streaming path, no Metis-operated agent
 process. The local agent is the **user's own tool on the user's own
 machine**, reached through a task API that looks like any other connector.
 v1 needs no ACP at all (the user's Claude Code self-pulls); ACP only
-appears inside an optional daemon in Phase 3, behind one normalized stdio
+appears inside an optional daemon in Phase 4, behind one normalized stdio
 protocol — argued there, not assumed here.
 
 ## Build phases
@@ -317,14 +369,56 @@ protocol — argued there, not assumed here.
     -o ~/.claude/skills/metis-bridge/SKILL.md
   ```
 
-### Phase 3 — Daemon + ACP (unattended)
-- `metis-bridge` daemon polls the REST surface, spawns the agent
-  (`pi --mode rpc`, or Claude Code / Codex via ACP over stdio), reports
-  back. For hands-off automation and non-pi agents.
+### Phase 3 — Delegation reliability
+- Migration: `tasks.last_reported_at` + `tasks.reclaims_count`; stamped
+  on claim, events, result.
+- Recurring sweeper job: silent claims past the TTL return to the
+  unclaimed pool; the reclaim cap fails the task and notifies.
+- `410 Gone` from `events` / `result` when the task is no longer live;
+  the served skill teaches stop-on-410 and a progress cadence.
+- `?project=` claim filter on `next`.
+- **Tests:** a silent claim is reclaimed and re-claimable; the reclaim
+  cap fails the step; a result after reclaim is discarded with 410; a
+  cancelled run 410s the next progress post; reclaim never fires while
+  events keep arriving.
 
-### Phase 4 — Notifications + live progress
+### Phase 4 — Daemon + ACP (unattended)
+
+`metis-bridge` daemon polls the REST surface, spawns the agent
+(`pi --mode rpc`, or Claude Code / Codex via ACP over stdio), reports
+back — hands-off automation, non-pi agents. The daemon spec bakes in
+what the attended loop can't:
+
+- **Worktree-per-task.** Clone once into a local repo cache; every task
+  runs in its own `git worktree`, never on a checkout doing other duty.
+  (Learned live: the first dogfood run switched the dev server's branch
+  and knocked the bridge API off the very server it was reporting to.
+  Until the daemon exists, the coding-step prompt says so.)
+- **Resume pointers with a machine guard.** Record
+  `(client, work_dir, agent_session_id)` on the task as work proceeds;
+  offer it back on the next claim for the same project. Same machine →
+  resume the session in the same worktree; different machine → start
+  fresh. Continuity across delegated steps without pretending agent
+  sessions cross machines.
+- **Semantic-inactivity watchdog, no wall clock.** A session still
+  emitting events is never killed for running long — long local turns
+  are the point of delegation. Kill only after N minutes of *silence*,
+  then report a failed result so the reclaim path isn't needed.
+- **Active cancellation.** Poll task status between agent events;
+  terminate the agent process when the task dies server-side — the
+  unattended upgrade of stop-on-410.
+- **Argument hygiene.** Per-CLI blocklists strip user-supplied args that
+  would break the driving protocol (output-format / mode flags), and
+  each CLI's resume-id quirks are normalized behind the ACP seam.
+- **Workdir GC.** TTL cleanup of done-task worktrees; artifact-only
+  cleanup (`node_modules`-class regenerable dirs) for tasks still open,
+  so a daemon machine stays usable after a month of tasks.
+
+### Phase 5 — Notifications + live progress
 - Push-notify dispatched tasks (in-app, email, Slack); optional SSE tickle
-  to cut poll latency; optional progress streaming into the run card.
+  to cut poll latency; optional progress streaming into the run card. The
+  data path stays pull — a tickle only wakes the poller early, it never
+  carries the work.
 
 ## Open questions
 
@@ -338,16 +432,11 @@ protocol — argued there, not assumed here.
   (`pr_url`, diff stat) without verifying it. A later step can verify
   (CI, a cloud review turn), but v1 trusts the report. Worth a note in the
   gate copy.
-- **Claim contention.** Two clients both `GET next-task` — FIFO claim
-  with a single-claim DB guard (SKIP LOCKED).
-- **Repo binding.** How `repo_hint` resolves to a local checkout — the
-  daemon/agent's own cwd, or a client-side config map (project → path).
-- **Mid-flight loss.** A client claims a task then never reports
-  (laptop dies). A reclaim window: `dispatched_at` past a TTL returns the
-  task to the unclaimed pool.
-- **Worktree isolation.** Learned live: a delegated task whose target
-  repo's checkout is doing other duty (serving the dev instance, holding
-  a feature branch mid-work) must not switch that checkout's branch —
-  the first dogfood run briefly knocked the bridge API off the dev
-  server it was reporting to. The Phase 3 daemon should run tasks in a
-  `git worktree`; until then the coding-step prompt should say so.
+- **Repo binding.** The `?project=` claim filter settles *which task* a
+  client takes; how a project resolves to a path on disk stays the
+  client's job — the agent's own cwd judgment in the attended loop, a
+  project → path config map in the daemon.
+
+(Settled since the first draft: claim contention → `SKIP LOCKED` guard;
+mid-flight loss → the stale-claim sweeper; worktree isolation → the
+Phase 4 worktree-per-task rule. See *Reliability* and Phase 4.)

@@ -99,6 +99,13 @@ class Conversation < ApplicationRecord
     ).order(:id).to_a
   end
 
+  # A team-of-one conversation nobody else has touched — identity rows
+  # and sidebar avatars are noise there. Shared teams keep attribution
+  # even solo, so members can tell whose row it is.
+  def solo?
+    team.personal? && participants.one?
+  end
+
   TITLE_MAX = 60
 
   def display_title
