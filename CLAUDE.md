@@ -68,12 +68,17 @@ keeps the raw payload for native view helpers.
 
 (For the full turn-flow diagram, see `docs/architecture.md`.)
 
-1. `MessagesController#create` creates a `user` message and a `pending`
-   `assistant` message, then enqueues `ChatJob`.
+1. `ConversationTurn.start` is the single place a turn is born — it creates a
+   `user` message and a `pending` `assistant` message, then enqueues `ChatJob`.
+   The composer (`MessagesController` via the `Composing` concern) and the
+   workflow engine both go through it.
 2. `ChatJob#perform` runs one turn: it gets the adapter, calls `#stream`, and
    for each `UiEvent` hands it to `ChatBroadcaster` while buffering text.
 3. `ChatBroadcaster` maps each `UiEvent` to a Turbo Stream broadcast on the
    conversation's stream.
+4. When the turn settles, `ChatJob` calls `WorkflowRun.signal_turn_finished`
+   — a no-op for a normal chat, a re-enqueue of `WorkflowAdvanceJob` when a
+   workflow run drives the conversation.
 
 **Division of labor:** `ChatJob` owns *persistence* (writing the final message
 content + `streaming_status`); `ChatBroadcaster` owns the *live DOM*. Keep
@@ -173,15 +178,41 @@ auto-discovered from cwd). Metis layers two sources into
 `/settings/skills` UI. Like uploads and `.mcp.json`, this tree is a
 projected input — rewritten each turn, never durable. See `docs/skills.md`.
 
+### Workflows & the local bridge
+
+A `Workflow` (team-owned, jsonb `steps`) launches a `WorkflowRun` — one
+backing `Conversation`, one `Task` per step. `WorkflowAdvanceJob` is the
+engine: it starts each step as a normal turn via `ConversationTurn.start`,
+parks the run on `awaiting_approval` when a step's `gate` is `approval`
+(approve / request changes / reject in the run UI), and on `awaiting_local`
+when a step is **delegated** — dispatched to the user's own machine instead
+of running as a cloud turn. Run visibility is the launcher's choice
+(`Conversation#visibility`): a team-visible run is openable by any member,
+who can act on its gates and claim its local steps. `WorkflowBroadcaster`
+owns the run's live DOM. See `docs/workflows.md`.
+
+The **local bridge** (`docs/local-bridge.md`) is the delegation transport:
+a pull API under `app/controllers/api/bridge/` (REST + a hosted MCP server
++ a self-documenting skill endpoint), bearer-authed by a per-user token
+(`User#bridge_token_digest`, generated in account settings). A local agent
+claims a dispatched task (`Task.claim_next_for`, `FOR UPDATE SKIP LOCKED`),
+works it in the user's own checkout, and reports a result; the run resumes.
+Metis never drives the user's machine — the local agent pulls.
+
+A conversation can also be **forked** from any assistant turn
+(`Agent::ConversationForker`; `Conversation#forked_from_message`).
+
 ## Conventions
 
 - **Tenancy is `Team`-only.** Every ownable resource (`Conversation`,
-  `Connector`, future projects/skills) has `belongs_to :team`. A user's
-  personal account is a team of one. Authorization is always
-  `resource.team.members.include?(user)` — no `User`-vs-`Team` branch,
-  no polymorphic `owner`. See `docs/tenancy.md` and `docs/teams.md`.
-- Models use integer enums: `Conversation#backend`, `Message#role`,
-  `Message#streaming_status`.
+  `Connector`, `Project`, `Skill`, `Workflow`, `WorkflowRun`) has
+  `belongs_to :team`. A user's personal account is a team of one.
+  Authorization is always `resource.team.members.include?(user)` — no
+  `User`-vs-`Team` branch, no polymorphic `owner`. See `docs/tenancy.md`
+  and `docs/teams.md`.
+- Models use integer enums: `Conversation#visibility`, `Message#role`,
+  `Message#streaming_status`, `Message#kind`, `Connector#transport`,
+  `WorkflowRun#status`, `Task#status`, `Task#gate`, `Membership#role`.
 - Test parallelization is gated behind a high threshold (`threshold: 5000`
   in `test/test_helper.rb`) on purpose — parallel workers share the
   filesystem and race on per-conversation scratch paths.
