@@ -91,6 +91,14 @@ class Conversation < ApplicationRecord
     update!(starred_at: nil)
   end
 
+  # The owner first, then every teammate who has sent a message here
+  # (composer or workflow gate). Memoized — the sidebar asks per row.
+  def participants
+    @participants ||= [ user ] + User.with_attached_avatar.where(
+      id: messages.where(role: :user).where.not(sender_id: [ nil, user_id ]).distinct.select(:sender_id)
+    ).order(:id).to_a
+  end
+
   TITLE_MAX = 60
 
   def display_title
