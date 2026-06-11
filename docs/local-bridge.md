@@ -1,6 +1,8 @@
 # Local bridge (design + build plan)
 
-> Status: **design + build plan**, not yet implemented. Companion to
+> Status: **shipped through Phase 3** (token + presence, delegation core,
+> hosted MCP facade, delegation reliability); Phases 4–5 (daemon + ACP,
+> notifications) are design. Companion to
 > [`workflows.md`](workflows.md) — the bridge is how a workflow's
 > *implementation step* runs on the user's own machine instead of a
 > Metis-operated sandbox.
@@ -369,11 +371,13 @@ protocol — argued there, not assumed here.
     -o ~/.claude/skills/metis-bridge/SKILL.md
   ```
 
-### Phase 3 — Delegation reliability
+### Phase 3 — Delegation reliability ✅
 - Migration: `tasks.last_reported_at` + `tasks.reclaims_count`; stamped
-  on claim, events, result.
-- Recurring sweeper job: silent claims past the TTL return to the
-  unclaimed pool; the reclaim cap fails the task and notifies.
+  on claim and events.
+- `ReclaimSilentBridgeTasksJob` (recurring, every 5 minutes): silent
+  claims past `METIS_BRIDGE_CLAIM_TTL_MINUTES` (default 15) return to
+  the unclaimed pool; at `METIS_BRIDGE_RECLAIM_CAP` (default 3) the
+  task fails and the run surfaces it.
 - `410 Gone` from `events` / `result` when the task is no longer live;
   the served skill teaches stop-on-410 and a progress cadence.
 - `?project=` claim filter on `next`.
@@ -436,6 +440,14 @@ what the attended loop can't:
   client takes; how a project resolves to a path on disk stays the
   client's job — the agent's own cwd judgment in the attended loop, a
   project → path config map in the daemon.
+- **Attended-claim ergonomics — deferred until the Phase 4 daemon.**
+  Two known frictions in stop-and-go attended work, parked on purpose:
+  a result against a *running-but-unclaimed* task 410s even when no one
+  else wants the claim (it should atomically re-claim and be accepted),
+  and stepping away has no voluntary *release* — the sweeper reclaim
+  bumps `reclaims_count`, so deliberate pauses share a strike counter
+  with crashed machines. Revisit once a workable daemon shows which
+  frictions remain.
 
 (Settled since the first draft: claim contention → `SKIP LOCKED` guard;
 mid-flight loss → the stale-claim sweeper; worktree isolation → the
