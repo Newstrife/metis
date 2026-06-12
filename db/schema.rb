@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_11_202514) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_12_000250) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -248,6 +248,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_11_202514) do
   create_table "tasks", force: :cascade do |t|
     t.bigint "approved_by_id"
     t.bigint "assistant_message_id"
+    t.datetime "claimed_at"
     t.string "claimed_by"
     t.bigint "claimed_by_user_id"
     t.datetime "created_at", null: false
@@ -281,6 +282,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_11_202514) do
   create_table "users", force: :cascade do |t|
     t.text "about_you"
     t.string "avatar_url"
+    t.string "bridge_client"
     t.datetime "bridge_seen_at"
     t.string "bridge_token_digest"
     t.datetime "created_at", null: false
@@ -305,6 +307,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_11_202514) do
   create_table "workflow_runs", force: :cascade do |t|
     t.bigint "conversation_id", null: false
     t.datetime "created_at", null: false
+    t.text "input"
     t.integer "status", default: 0, null: false
     t.bigint "team_id", null: false
     t.string "trigger_summary"

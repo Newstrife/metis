@@ -26,6 +26,7 @@ class Api::Bridge::TasksControllerTest < ActionDispatch::IntegrationTest
     assert_equal "implement", body["prompt"]
     assert_equal "mikes-mbp", run.tasks.first.reload.claimed_by
     assert @user.reload.bridge_seen_at.present?
+    assert_equal "mikes-mbp", @user.bridge_client
   end
 
   test "claim returns 204 when nothing is dispatched" do
@@ -171,6 +172,19 @@ class Api::Bridge::TasksControllerTest < ActionDispatch::IntegrationTest
          params: { kind: "log", text: "running tests" }, headers: auth
     assert_response :accepted
     assert_equal "running tests", task.reload.progress.last["text"]
+  end
+
+  test "claim and progress broadcast the run page live" do
+    run = dispatch_run
+    assert_turbo_stream_broadcasts(run.conversation) do
+      get "/api/bridge/tasks/next", headers: auth.merge("X-Bridge-Client" => "apollo")
+    end
+
+    task = run.tasks.first
+    assert_turbo_stream_broadcasts(run.conversation) do
+      post "/api/bridge/tasks/#{task.id}/events",
+           params: { kind: "log", text: "working — running tests" }, headers: auth
+    end
   end
 
   test "claim and events stamp the liveness heartbeat" do

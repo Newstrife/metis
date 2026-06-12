@@ -90,7 +90,8 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the run note names the claimer once a delegated task is claimed" do
-    conversation = @user.conversations.create!(team: @team)
+    project = @team.projects.create!(name: "R&D")
+    conversation = @user.conversations.create!(team: @team, project: project)
     run = @team.workflow_runs.create!(conversation: conversation, status: :awaiting_local)
     task = run.tasks.create!(position: 0, name: "impl", status: :running, delegated: true)
 
@@ -105,6 +106,32 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     assert_match "#{@user.display_label}&#39;s Apollo is working on this step", response.body
     assert_match "On #{@user.display_label}&#39;s machine", response.body
     assert_select ".wf-tl-localguide", count: 0
+  end
+
+  test "a project-less delegated step warns that daemons cannot auto-claim it" do
+    conversation = @user.conversations.create!(team: @team)
+    run = @team.workflow_runs.create!(conversation: conversation, status: :awaiting_local)
+    run.tasks.create!(position: 0, name: "impl", status: :running, delegated: true)
+
+    get conversation_path(conversation)
+    assert_match "This run has no project", response.body
+    assert_select ".wf-tl-localguide a[href=?]", account_path, count: 0
+  end
+
+  test "a claimed delegated step shows the elapsed ticker and latest progress" do
+    conversation = @user.conversations.create!(team: @team)
+    run = @team.workflow_runs.create!(conversation: conversation, status: :awaiting_local)
+    task = run.tasks.create!(position: 0, name: "impl", status: :running, delegated: true,
+                             claimed_by_user: @user, claimed_by: "Apollo", claimed_at: 3.minutes.ago)
+
+    get conversation_path(conversation)
+    assert_select ".wf-tl-live .working-status[data-elapsed-timer-started-at-value=?]",
+                  (task.claimed_at.to_i * 1000).to_s
+    assert_select ".wf-tl-live .wf-tl-body", count: 0, message: "no progress yet — ticker only"
+
+    task.log_progress!({ "kind" => "log", "text" => "working — running tests" })
+    get conversation_path(conversation)
+    assert_select ".wf-tl-live .wf-tl-body", text: "working — running tests"
   end
 
   test "the gate on the final step reads finish, mid-run reads continue" do
@@ -158,6 +185,7 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     run = WorkflowRun.last
     assert_equal workflow, run.workflow
     assert_equal project, run.conversation.project
+    assert_equal "for the launch composer feature", run.input
     first = run.tasks.first
     assert_match "for the launch composer feature", first.prompt
     assert_match "write the spec", first.prompt
@@ -282,6 +310,19 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".wf-tl-live ##{ActionView::RecordIdentifier.dom_id(msg)}_body"
     assert_select ".wf-tl-live ##{ActionView::RecordIdentifier.dom_id(msg)}_activity"
     assert_select ".wf-tl-live ##{ActionView::RecordIdentifier.dom_id(msg)}_indicator"
+  end
+
+  test "the trigger card quotes the input; a delegated result renders in full" do
+    workflow = @team.workflows.create!(name: "PR Review", steps: [ { "name" => "Local review", "prompt" => "p", "run" => "local" } ])
+    run = WorkflowRun.start(team: @team, user: @user, workflow: workflow, input: "Review chagel/metis#66")
+    long = "Verdict: **APPROVE** — " + ("finding detail " * 30)
+    run.tasks.first.update!(status: :completed, result: { "status" => "completed", "summary" => long })
+
+    get conversation_path(run.conversation)
+    assert_response :success
+    assert_select ".wf-tl-quote", text: /Review chagel\/metis#66/
+    assert_select ".wf-tl-result strong", text: "APPROVE"
+    assert_select ".wf-tl-result", text: /(finding detail ){29}/
   end
 
   test "the run page renders the timeline and gate; the chat view stays plain" do
