@@ -240,7 +240,9 @@ mode). Regenerating revokes the old token — that *is* revocation; there
 is no `Device` row, no enrollment flow, no `metis bridge login` CLI.
 
 - Token scopes: pull dispatched tasks across the user's teams, post
-  progress + results.
+  progress + results. Claiming obeys run visibility: a personal run's
+  steps are claimable only by its launcher's machines; a team-visible
+  run's steps are pooled across every member's daemon.
 - Presence is one column: `users.bridge_seen_at`, stamped on every
   authenticated pull — drives the "is your machine connected" hint only.
 - Machine identity is self-reported per request (`X-Bridge-Client`) and
@@ -478,6 +480,12 @@ What shipped, against the spec:
   client takes; how a project resolves to a path on disk stays the
   client's job — the agent's own cwd judgment in the attended loop, a
   project → path config map in the daemon.
+- **Explicit per-step assignee — deferred until cost attribution bites.**
+  Team-visible pooling means the claimer's machine spends the claimer's
+  agent subscription. If teammates' daemons "helpfully" claiming heavy
+  steps becomes friction, add an `assignee` (a person, defaulting to
+  the launcher) folded into `claimable_by` — never a machine pin; which
+  of their machines serves it stays their daemon's business.
 - **Attended-claim ergonomics — deferred until the Phase 4 daemon.**
   Two known frictions in stop-and-go attended work, parked on purpose:
   a result against a *running-but-unclaimed* task 410s even when no one

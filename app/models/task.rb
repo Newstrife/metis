@@ -20,8 +20,14 @@ class Task < ApplicationRecord
   # Both nil: tasks claimed before claimed_by_user existed must not
   # re-enter the queue mid-deploy.
   scope :unclaimed, -> { where(claimed_by_user_id: nil, claimed_by: nil) }
+  # Claiming obeys the same visibility rule as every other surface: a
+  # personal run's steps belong to its launcher's machines only; a
+  # team-visible run's steps are pooled across the team's daemons.
   scope :delegated_for, ->(user) {
-    joins(:workflow_run).where(delegated: true, workflow_runs: { team_id: user.team_ids })
+    joins(workflow_run: :conversation)
+      .where(delegated: true, workflow_runs: { team_id: user.team_ids })
+      .where("conversations.visibility = :team OR conversations.user_id = :user",
+             team: Conversation.visibilities[:team], user: user.id)
   }
   scope :claimable_by, ->(user) { delegated_for(user).running.unclaimed }
   # Claimed and silent past the cutoff — reclaim candidates. Progress is

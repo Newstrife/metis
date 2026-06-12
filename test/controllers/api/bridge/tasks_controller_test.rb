@@ -115,6 +115,34 @@ class Api::Bridge::TasksControllerTest < ActionDispatch::IntegrationTest
     assert_response :conflict
   end
 
+  test "a personal run's task is invisible to teammates; team-visible stays pooled" do
+    team = Team.create!(name: "Acme")
+    team.memberships.create!(user: @user, role: :owner)
+    mate = User.create!(email: "mate-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    team.memberships.create!(user: mate, role: :member)
+
+    personal = WorkflowRun.start(team: team, user: @user, steps: [ LOCAL ])
+    WorkflowAdvanceJob.perform_now(personal.id)
+    shared = WorkflowRun.start(team: team, user: @user, steps: [ LOCAL ], visibility: :team)
+    WorkflowAdvanceJob.perform_now(shared.id)
+
+    mate_auth = { "Authorization" => "Bearer #{mate.generate_bridge_token!}" }
+    get "/api/bridge/tasks", headers: mate_auth
+    ids = JSON.parse(response.body)["tasks"].map { |t| t["task_id"] }
+    assert_equal [ shared.tasks.first.id ], ids, "only the team-visible task is listed"
+
+    get "/api/bridge/tasks/next", params: { id: personal.tasks.first.id }, headers: mate_auth
+    assert_response :conflict
+
+    get "/api/bridge/tasks/next", headers: mate_auth
+    assert_equal shared.tasks.first.id, JSON.parse(response.body)["task_id"],
+                 "a teammate's daemon pools on the team-visible run"
+
+    get "/api/bridge/tasks/next", headers: auth
+    assert_equal personal.tasks.first.id, JSON.parse(response.body)["task_id"],
+                 "the launcher still claims their personal run"
+  end
+
   test "claim with another team's task id returns 409, not the task" do
     run = dispatch_run
     stranger = User.create!(email: "w-#{SecureRandom.hex(4)}@example.com", password: "password123")
