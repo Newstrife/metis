@@ -144,12 +144,16 @@ class Api::Bridge::TasksControllerTest < ActionDispatch::IntegrationTest
     task_id = JSON.parse(response.body)["task_id"]
 
     post "/api/bridge/tasks/#{task_id}/result",
-         params: { status: "completed", summary: "done", artifacts: [ { type: "pr", url: "http://x/1" } ] },
+         params: { status: "completed", summary: "done", agent: "claude",
+                   model: "anthropic/claude-opus-4-8",
+                   artifacts: [ { type: "pr", url: "http://x/1" } ] },
          headers: auth
     assert_response :ok
     task = run.tasks.first.reload
     assert task.completed?
     assert_equal "done", task.result["summary"]
+    assert_equal "claude", task.result_agent
+    assert_equal "anthropic/claude-opus-4-8", task.result_model
     assert run.reload.running?   # single step → completion runs via the enqueued advance
   end
 
@@ -232,6 +236,32 @@ class Api::Bridge::TasksControllerTest < ActionDispatch::IntegrationTest
     assert_response :gone
     assert task.reload.rejected?
     assert_empty task.result
+  end
+
+  test "show reports status and claim holder for cancellation polling" do
+    run = dispatch_run
+    task = Task.claim_next_for(@user, client: "mikes-mbp")
+
+    get "/api/bridge/tasks/#{task.ref}", headers: auth
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "running", body["status"]
+    assert_equal "mikes-mbp", body["claimed_by"]
+
+    task.reclaim!
+    run.reject_current_gate!(by: @user)
+    get "/api/bridge/tasks/#{task.id}", headers: auth
+    body = JSON.parse(response.body)
+    assert_equal "rejected", body["status"]
+    assert_nil body["claimed_by"]
+  end
+
+  test "show is scoped to the user's teams" do
+    run = dispatch_run
+    stranger = User.create!(email: "x-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    get "/api/bridge/tasks/#{run.tasks.first.id}",
+        headers: { "Authorization" => "Bearer #{stranger.generate_bridge_token!}" }
+    assert_response :not_found
   end
 
   test "a result after reclaim is discarded with 410" do

@@ -192,12 +192,20 @@ who can act on its gates and claim its local steps. `WorkflowBroadcaster`
 owns the run's live DOM. See `docs/workflows.md`.
 
 The **local bridge** (`docs/local-bridge.md`) is the delegation transport:
-a pull API under `app/controllers/api/bridge/` (REST + a hosted MCP server
-+ a self-documenting skill endpoint), bearer-authed by a per-user token
+a pull API under `app/controllers/api/bridge/` (REST core + an
+unadvertised MCP facade + a skill endpoint serving the daemon's
+setup/ops guide), bearer-authed by a per-user token
 (`User#bridge_token_digest`, generated in account settings). A local agent
 claims a dispatched task (`Task.claim_next_for`, `FOR UPDATE SKIP LOCKED`),
 works it in the user's own checkout, and reports a result; the run resumes.
-Metis never drives the user's machine — the local agent pulls.
+A recurring sweeper reclaims claims that go silent (progress posts are the
+heartbeat), and `events`/`result` answer `410 Gone` once a task is
+cancelled or reclaimed. Metis never drives the user's machine — the local
+agent pulls. **`clients/metis/`** is the unattended client: a Go daemon
+(`metis`, stdlib-only, its own `go test` suite + CI job) that polls one or
+more deployments, runs pi / Claude Code / Codex headless in per-task git
+worktrees under `~/.metis/`, and installs as a login service via
+`metis install`.
 
 A conversation can also be **forked** from any assistant turn
 (`Agent::ConversationForker`; `Conversation#forked_from_message`).
