@@ -218,12 +218,16 @@ point — N workflows × M projects, not N×M bespoke things:
 
 Where the link lives:
 
-- **Run level — yes, and nearly free.** A run owns one Conversation, and
+- **Run level — yes, and required.** A run owns one Conversation, and
   `Conversation belongs_to :project` already exists. `WorkflowRun.start`
   takes a `project:` and sets it on the conversation; `Agent::Identity`
   then feeds that project's `about` into `AGENTS.md` on every step turn —
   no new identity code. **No `project_id` on `workflow_runs`**:
-  `run.conversation.project` is the single source of truth.
+  `run.conversation.project` is the single source of truth. A project is
+  mandatory: `WorkflowRun.start` raises without one (the launch UI
+  resolves explicit pick → workflow default), and a project with active
+  runs can't be deleted — daemons claim delegated steps per project, so a
+  project-less run could never be auto-claimed.
 - **Workflow (template) level — optional default only.** A nullable
   `Workflow#default_project_id` pre-selects context at launch but is
   overridable. Keep templates project-agnostic so "Triage Sentry error"

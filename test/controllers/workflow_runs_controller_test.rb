@@ -35,9 +35,10 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
 
   test "a team-visible run opens read-only for a teammate; personal stays private" do
     team = shared_team
-    open_run = WorkflowRun.start(team: team, user: @user, visibility: :team,
+    project = team.projects.create!(name: "Vis")
+    open_run = WorkflowRun.start(team: team, user: @user, project: project, visibility: :team,
                                  steps: [ { "name" => "a", "prompt" => "a" } ])
-    private_run = WorkflowRun.start(team: team, user: @user,
+    private_run = WorkflowRun.start(team: team, user: @user, project: project,
                                     steps: [ { "name" => "a", "prompt" => "a" } ])
     assert private_run.conversation.visibility_personal?, "personal is the default"
 
@@ -71,7 +72,9 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "the composer's visibility pick reaches the run conversation" do
-    workflow = @team.workflows.create!(name: "W", steps: [ { "name" => "a", "prompt" => "a" } ])
+    project = @team.projects.create!(name: "R&D")
+    workflow = @team.workflows.create!(name: "W", default_project: project,
+                                       steps: [ { "name" => "a", "prompt" => "a" } ])
     post workflow_runs_path, params: { workflow_id: workflow.id, content: "go", visibility: "team" }
     assert WorkflowRun.order(:id).last.conversation.visibility_team?
   end
@@ -106,16 +109,6 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     assert_match "#{@user.display_label}&#39;s Apollo is working on this step", response.body
     assert_match "On #{@user.display_label}&#39;s machine", response.body
     assert_select ".wf-tl-localguide", count: 0
-  end
-
-  test "a project-less delegated step warns that daemons cannot auto-claim it" do
-    conversation = @user.conversations.create!(team: @team)
-    run = @team.workflow_runs.create!(conversation: conversation, status: :awaiting_local)
-    run.tasks.create!(position: 0, name: "impl", status: :running, delegated: true)
-
-    get conversation_path(conversation)
-    assert_match "This run has no project", response.body
-    assert_select ".wf-tl-localguide a[href=?]", account_path, count: 0
   end
 
   test "a claimed delegated step shows the elapsed ticker and latest progress" do
@@ -208,8 +201,10 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "create from the composer uses the typed content as input and the picked model" do
+    project = @team.projects.create!(name: "R&D")
     workflow = @team.workflows.create!(
-      name: "Triage", steps: [ { "name" => "spec", "prompt" => "write the spec", "gate" => "approval" } ]
+      name: "Triage", default_project: project,
+      steps: [ { "name" => "spec", "prompt" => "write the spec", "gate" => "approval" } ]
     )
     # The composer posts `content` (not `input`) alongside workflow_id + model.
     post workflow_runs_path(workflow_id: workflow.id, content: "the launch composer", model: "claude-opus-4-8")
@@ -224,6 +219,23 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     workflow = @team.workflows.create!(name: "W", steps: [ { "name" => "a", "prompt" => "a", "gate" => "auto" } ])
     post workflow_runs_path(workflow_id: workflow.id, project_id: other.id)
     assert_equal other, WorkflowRun.last.conversation.project
+  end
+
+  test "create without a resolvable project is rejected" do
+    workflow = @team.workflows.create!(name: "W", steps: [ { "name" => "a", "prompt" => "a", "gate" => "auto" } ])
+
+    assert_no_difference -> { WorkflowRun.count } do
+      post workflow_runs_path(workflow_id: workflow.id, content: "go")
+    end
+    assert_response :unprocessable_entity
+    assert_match "Pick a project to launch this workflow", response.body
+
+    # Another team's project id doesn't resolve either.
+    foreign = Team.create!(name: "Elsewhere").projects.create!(name: "Theirs")
+    assert_no_difference -> { WorkflowRun.count } do
+      post workflow_runs_path(workflow_id: workflow.id, project_id: foreign.id)
+    end
+    assert_response :unprocessable_entity
   end
 
   test "approve completes the gate, resumes the run, and enqueues an advance" do
@@ -329,7 +341,8 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
 
   test "the trigger card quotes the input; a delegated result renders in full" do
     workflow = @team.workflows.create!(name: "PR Review", steps: [ { "name" => "Local review", "prompt" => "p", "run" => "local" } ])
-    run = WorkflowRun.start(team: @team, user: @user, workflow: workflow, input: "Review chagel/metis#66")
+    run = WorkflowRun.start(team: @team, user: @user, workflow: workflow,
+                            project: @team.projects.create!(name: "Cards"), input: "Review chagel/metis#66")
     long = "Verdict: **APPROVE** — " + ("finding detail " * 30)
     run.tasks.first.update!(status: :completed, result: { "status" => "completed", "summary" => long })
 
