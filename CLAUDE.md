@@ -157,7 +157,12 @@ the OAuth/DCR flow).
   install/auth UI.
 - `Agent::McpConfig` renders a `.mcp.json` per turn into the workspace
   from the team's enabled connectors. It is a projected input, never
-  durable.
+  durable. When the deployment is GitHub-App-auth configured and an admin
+  enables it on the team's github connector (`bot_enabled`,
+  `bot_installation_id` — a per-team installation picker), McpConfig stages
+  a second `github_bot` server bearing a minted installation token so the
+  agent can act as `<slug>[bot]` (used by the reviewing-code skill to post
+  PR reviews). Off by default — the token is installation-wide.
 - OAuth flows live under `app/services/oauth_broker/`,
   `omniauth_connector.rb`, and the per-provider apps
   (`{github,google,linear}_app/`). Provider API keys for the LLM are
@@ -181,15 +186,19 @@ projected input — rewritten each turn, never durable. See `docs/skills.md`.
 ### Workflows & the local bridge
 
 A `Workflow` (team-owned, jsonb `steps`) launches a `WorkflowRun` — one
-backing `Conversation`, one `Task` per step. `WorkflowAdvanceJob` is the
-engine: it starts each step as a normal turn via `ConversationTurn.start`,
-parks the run on `awaiting_approval` when a step's `gate` is `approval`
-(approve / request changes / reject in the run UI), and on `awaiting_local`
-when a step is **delegated** — dispatched to the user's own machine instead
-of running as a cloud turn. Run visibility is the launcher's choice
-(`Conversation#visibility`): a team-visible run is openable by any member,
-who can act on its gates and claim its local steps. `WorkflowBroadcaster`
-owns the run's live DOM. See `docs/workflows.md`.
+backing `Conversation`, one `Task` per step. A run **requires a project**:
+`WorkflowRun.start` takes `project:` and raises without one, and a project
+with active runs can't be deleted — daemons claim delegated steps per
+project, so a project-less run could never be auto-claimed. The run `input`
+is restated into every step's prompt, not just the first.
+`WorkflowAdvanceJob` is the engine: it starts each step as a normal turn via
+`ConversationTurn.start`, parks the run on `awaiting_approval` when a step's
+`gate` is `approval` (approve / request changes / reject in the run UI), and
+on `awaiting_local` when a step is **delegated** — dispatched to the user's
+own machine instead of running as a cloud turn. Run visibility is the
+launcher's choice (`Conversation#visibility`): a team-visible run is openable
+by any member, who can act on its gates and claim its local steps.
+`WorkflowBroadcaster` owns the run's live DOM. See `docs/workflows.md`.
 
 The **local bridge** (`docs/local-bridge.md`) is the delegation transport:
 a pull API under `app/controllers/api/bridge/` (REST core + an
@@ -204,8 +213,8 @@ cancelled or reclaimed. Metis never drives the user's machine — the local
 agent pulls. **`clients/metis/`** is the unattended client: a Go daemon
 (`metis`, stdlib-only, its own `go test` suite + CI job) that polls one or
 more deployments, runs pi / Claude Code / Codex headless in per-task git
-worktrees under `~/.metis/`, and installs as a login service via
-`metis install`.
+worktrees under `~/.metis/` (up to `max_workers` tasks concurrently), and
+installs as a login service via `metis install`.
 
 A conversation can also be **forked** from any assistant turn
 (`Agent::ConversationForker`; `Conversation#forked_from_message`).
@@ -220,7 +229,11 @@ A conversation can also be **forked** from any assistant turn
   and `docs/teams.md`.
 - Models use integer enums: `Conversation#visibility`, `Message#role`,
   `Message#streaming_status`, `Message#kind`, `Connector#transport`,
-  `WorkflowRun#status`, `Task#status`, `Task#gate`, `Membership#role`.
+  `WorkflowRun#status`, `Task#status`, `Task#gate`, `Workflow#trigger_source`,
+  `Membership#role`.
+- User-facing copy lives in `config/locales/*.en.yml` (split by surface:
+  `views_*`, `flash`, `mailers`, `models`, …), reached via `t(...)` / `I18n.t`
+  — not inline strings. English is the baseline.
 - Test parallelization is gated behind a high threshold (`threshold: 5000`
   in `test/test_helper.rb`) on purpose — parallel workers share the
   filesystem and race on per-conversation scratch paths.
