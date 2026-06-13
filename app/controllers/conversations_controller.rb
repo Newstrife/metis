@@ -19,7 +19,7 @@ class ConversationsController < ApplicationController
     uploads = composed_uploads
 
     if content.blank? && uploads.empty?
-      return render_composer_error(nil, "Type a message to start a conversation.")
+      return render_composer_error(nil, t("flash.composer.blank_new"))
     end
     if (error = upload_error(uploads))
       return render_composer_error(nil, error)
@@ -71,14 +71,14 @@ class ConversationsController < ApplicationController
 
   def archive
     @conversation.archive!
-    flash[:notice] = "Conversation archived."
+    flash[:notice] = t("flash.conversations.archive.notice")
     flash[:undo_archive_id] = @conversation.id # consumed by the toast Undo
     redirect_to root_path
   end
 
   def unarchive
     @conversation.unarchive!
-    flash[:notice] = "Conversation restored."
+    flash[:notice] = t("flash.conversations.unarchive.notice")
     redirect_to @conversation
   end
 
