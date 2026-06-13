@@ -8,7 +8,7 @@ import (
 func TestLaunchdPlist(t *testing.T) {
 	plist := launchdPlist("/usr/local/bin/metis", "/Users/m/.metis/daemon.log", "/opt/x/bin:/usr/bin")
 	for _, want := range []string{
-		"<string>com.metis.bridge</string>",
+		"<string>com.metiser.bridge</string>",
 		"<string>/usr/local/bin/metis</string>",
 		"<string>run</string>",
 		"<key>KeepAlive</key><true/>",
@@ -29,6 +29,25 @@ func TestLaunchdPlistEscapesXML(t *testing.T) {
 	}
 	if strings.Contains(plist, "& Co") {
 		t.Fatal("raw ampersand survived into the plist")
+	}
+}
+
+func TestLaunchdPid(t *testing.T) {
+	report := "com.metiser.bridge = {\n\tactive count = 1\n\tpid = 4242\n\tstate = running\n}"
+	if got := launchdPid(report); got != " (pid 4242)" {
+		t.Fatalf("launchdPid = %q", got)
+	}
+	if got := launchdPid("state = not running"); got != "" {
+		t.Fatalf("pidless report must yield empty, got %q", got)
+	}
+}
+
+func TestLaunchdMigrationKeepsLegacyLabelVisible(t *testing.T) {
+	if len(legacyLaunchdLabels) != 1 || legacyLaunchdLabels[0] != "com.metis.bridge" {
+		t.Fatalf("legacy labels = %v", legacyLaunchdLabels)
+	}
+	if !strings.HasSuffix(launchdPlistPathFor(legacyLaunchdLabels[0]), "com.metis.bridge.plist") {
+		t.Fatalf("legacy plist path = %q", launchdPlistPathFor(legacyLaunchdLabels[0]))
 	}
 }
 
