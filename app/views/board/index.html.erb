@@ -6,6 +6,7 @@
       <h1><%= t(".title") %></h1>
       <div class="board-sub"><%= t(".subtitle", count: @board.count) %></div>
     </div>
+    <%= render "board/actors", presence: @presence %>
   </header>
 
   <div class="board-scroll" id="board_grid">
