@@ -28,31 +28,93 @@ const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-// ---------------------------------------------------------------------------
-// HTML → plain text (no external deps needed)
-// ---------------------------------------------------------------------------
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  nbsp: " ", ensp: " ", emsp: " ",
+  lsquo: "\u2018", rsquo: "\u2019", ldquo: "\u201c", rdquo: "\u201d",
+  mdash: "\u2014", ndash: "\u2013",
+  copy: "\u00a9", reg: "\u00ae", trade: "\u2122",
+  hellip: "\u2026", middot: "\u00b7", bull: "\u2022",
+  laquo: "\u00ab", raquo: "\u00bb",
+  times: "\u00d7", divide: "\u00f7", plusmn: "\u00b1", deg: "\u00b0",
+  euro: "\u20ac", pound: "\u00a3", yen: "\u00a5",
+  larr: "\u2190", rarr: "\u2192", uarr: "\u2191", darr: "\u2193",
+  frac12: "\u00bd", frac14: "\u00bc", frac34: "\u00be",
+};
+
+function codePointToString(cp: number): string {
+  // Skip control chars (except tab, newline, CR) and invalid code points.
+  if (!Number.isFinite(cp) || cp < 0x09 || (cp > 0x0d && cp < 0x20) || cp > 0x10ffff) return "";
+  return String.fromCodePoint(cp);
+}
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => codePointToString(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_m, dec) => codePointToString(parseInt(dec, 10)))
+    .replace(/&([a-zA-Z][a-zA-Z0-9]*);/g, (m, name: string) =>
+      Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, name) ? NAMED_ENTITIES[name] : m);
+}
+
+// Extract likely main content before conversion — a cheap heuristic, not a
+// real DOM. This whole file is a zero-dependency converter because pi
+// extensions are single-file with no bundler; the upgrade path is
+// Readability + Turndown if pi ever bundles a DOM (see PR #93 discussion).
+function extractMainContent(html: string): string {
+  const main = html.match(/<main\b[^>]*>([\s\S]*)<\/main>/i);
+  if (main && main[1].trim()) return main[1];
+
+  const article = html.match(/<article\b[^>]*>([\s\S]*)<\/article>/i);
+  if (article && article[1].trim()) return article[1];
+
+  const roleMain = html.match(
+    /<([a-zA-Z][\w-]*)\b[^>]*\brole=["']main["'][^>]*>([\s\S]*)<\/\1>/i,
+  );
+  if (roleMain && roleMain[2].trim()) return roleMain[2];
+
+  const body = html.match(/<body\b[^>]*>([\s\S]*)<\/body>/i);
+  if (body && body[1].trim()) return body[1];
+
+  return html;
+}
+
+// HTML → plain text
+//
+// Entities are decoded *after* tag-stripping so a decoded '</' can't be
+// re-parsed as a closing tag — that ordering is load-bearing.
+const BLOCK_TAGS = [
+  "p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "blockquote",
+  "pre", "section", "article", "nav", "header", "footer", "aside", "main",
+  "ul", "ol", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot", "figure",
+  "figcaption", "form", "fieldset", "details", "summary", "menu", "address",
+  "caption", "colgroup",
+].join("|");
+const BLOCK_CLOSE_RE = new RegExp(`</(?:${BLOCK_TAGS})>`, "gi");
+
 function htmlToText(html: string): string {
-  return html
-    // Remove <script> and <style> blocks entirely
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    // Replace block elements with newlines
-    .replace(/<\/(p|div|li|h[1-6]|tr|blockquote|pre|section|article)>/gi, "\n")
+  // Pass 1 — structural: drop non-content, turn structure into newlines,
+  // and keep inline boundaries from fusing adjacent words.
+  let text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<br\s*\/?>/gi, "\n")
-    // Strip remaining tags
-    .replace(/<[^>]+>/g, "")
-    // Decode common HTML entities
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–")
-    // Collapse whitespace while preserving paragraph breaks
-    .replace(/[ \t]+/g, " ")
+    .replace(/<hr\s*\/?>/gi, "\n")
+    .replace(/<li\b[^>]*>/gi, "\n\u2022 ")
+    .replace(BLOCK_CLOSE_RE, "\n")
+    .replace(/<(?:h[1-6]|tr|caption)\b[^>]*>/gi, "\n")
+    .replace(/<\/[a-zA-Z][^>]*>/g, " ")
+    .replace(/<[^>]+>/g, "");
+
+  // Pass 2 — decode entities, then normalize whitespace.
+  text = decodeEntities(text);
+
+  return text
+    .replace(/[\u00A0 \t]+/g, " ")
+    .replace(/ +([.,;:!?)])/g, "$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -269,7 +331,7 @@ export default function webToolsExtension(pi: ExtensionAPI) {
 
       let text: string;
       if (contentType.includes("text/html") || raw.trimStart().startsWith("<")) {
-        text = htmlToText(raw);
+        text = htmlToText(extractMainContent(raw));
       } else {
         text = raw; // JSON, plain text, markdown, etc.
       }
