@@ -1,6 +1,6 @@
 # Simplification Patterns to Catch in Reviews
 
-Flag the *signal* — code that does too much — and propose a concrete rewrite. These are usually `suggestion:` (non-blocking). Promote to `REQUEST_CHANGES` only when complexity is hiding a bug or violating Themis conventions.
+Flag the *signal* — code that does too much — and propose a concrete rewrite. These are usually `suggestion:` (non-blocking). Promote to `REQUEST_CHANGES` only when complexity is hiding a bug or violating Metis conventions.
 
 ## Defensive Code on Internal Boundaries
 
