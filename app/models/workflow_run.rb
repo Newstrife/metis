@@ -6,14 +6,16 @@ class WorkflowRun < ApplicationRecord
   has_many :tasks, -> { order(:position) }, dependent: :destroy
 
   enum :status, { pending: 0, running: 1, awaiting_approval: 2,
-                  completed: 3, failed: 4, cancelled: 5, awaiting_local: 6 }, default: :pending
+                  completed: 3, failed: 4, cancelled: 5, awaiting_local: 6,
+                  queued: 7 }, default: :pending
 
-  scope :active,   -> { where(status: %i[pending running awaiting_approval awaiting_local]) }
-  # Runs a human (or their machine) must act on for the run to move.
-  scope :awaiting, -> { where(status: %i[awaiting_approval awaiting_local]) }
+  scope :active,   -> { where(status: %i[queued pending running awaiting_approval awaiting_local]) }
+  # Runs a human (or their machine) must act on for the run to move — a gate,
+  # a local claim, or a queued run a person must start.
+  scope :awaiting, -> { where(status: %i[queued awaiting_approval awaiting_local]) }
 
   def active?
-    pending? || running? || awaiting_approval? || awaiting_local?
+    queued? || pending? || running? || awaiting_approval? || awaiting_local?
   end
 
   # `input` is the run's subject — folded into the first step's prompt here;
@@ -22,21 +24,28 @@ class WorkflowRun < ApplicationRecord
   # run is openable by any member, who can act on its gates and claim its
   # local steps. A project is mandatory: daemons claim delegated steps per
   # project, so a project-less run could never be auto-claimed.
+  #
+  # `autostart: false` parks the run as `queued` — built, but not advanced —
+  # for a human to start with #launch!. The chat handoff queues; the composer
+  # launcher starts immediately.
   def self.start(team:, user:, project:, workflow: nil, steps: nil,
                  input: nil, settings: {}, visibility: :personal,
-                 trigger_summary: "Started by you")
+                 trigger_summary: "Started by you", autostart: true, title: nil)
     raise ArgumentError, "every workflow run needs a project" if project.nil?
 
     steps ||= workflow&.steps || []
     run = transaction do
-      # No title — auto-titling names each run from its first turn, so runs
-      # of one workflow get distinct names.
+      # With no `title:` the conversation stays untitled so auto-titling names
+      # it from its first turn; callers that won't get a useful first-turn
+      # title (the launcher, a queued handoff) pass a friendly one up front.
       conversation = user.conversations.create!(
-        team: team, project: project, settings: settings || {}, visibility: visibility
+        team: team, project: project, settings: settings || {},
+        visibility: visibility, title: title
       )
       run = create!(
         team: team, workflow: workflow, conversation: conversation,
-        trigger_summary: trigger_summary, input: input
+        trigger_summary: trigger_summary, input: input,
+        status: (autostart ? :pending : :queued)
       )
       steps.each_with_index do |step, i|
         prompt = step["prompt"] || step[:prompt]
@@ -51,8 +60,18 @@ class WorkflowRun < ApplicationRecord
       end
       run
     end
-    WorkflowAdvanceJob.perform_later(run.id)
+    WorkflowAdvanceJob.perform_later(run.id) if autostart
     run
+  end
+
+  # Start a queued run — the explicit human "go". Hands it to the engine
+  # exactly as an immediate start would. No-op once it has left the queue.
+  def launch!
+    return false unless queued?
+
+    pending!
+    WorkflowAdvanceJob.perform_later(id)
+    true
   end
 
   # ChatJob calls this when a turn settles; no-op for a normal chat.

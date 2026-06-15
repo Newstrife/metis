@@ -81,6 +81,13 @@ class WorkflowRunTest < ActiveSupport::TestCase
     assert run.tasks.second.approval?
   end
 
+  test ".start titles the conversation when a title is given" do
+    run = WorkflowRun.start(team: @team, user: @user, title: "My run",
+                            project: @team.projects.create!(name: "Titled"),
+                            steps: [ { "name" => "a", "prompt" => "a" } ])
+    assert_equal "My run", run.conversation.title
+  end
+
   test ".start defaults to a workflow's own steps" do
     workflow = @team.workflows.create!(
       name: "Two-step",
@@ -97,6 +104,40 @@ class WorkflowRunTest < ActiveSupport::TestCase
       WorkflowRun.start(team: @team, user: @user, project: nil,
                         steps: [ { "name" => "a", "prompt" => "a" } ])
     end
+  end
+
+  test ".start with autostart false queues the run and advances nothing" do
+    project = @team.projects.create!(name: "Queued")
+    run = nil
+    assert_no_enqueued_jobs(only: WorkflowAdvanceJob) do
+      run = WorkflowRun.start(team: @team, user: @user, project: project,
+                              steps: [ { "name" => "a", "prompt" => "a" } ], autostart: false)
+    end
+    assert run.queued?
+    assert run.tasks.any?, "tasks are still built up front"
+  end
+
+  test "#launch! starts a queued run and enqueues the advance job" do
+    project = @team.projects.create!(name: "Launch")
+    run = WorkflowRun.start(team: @team, user: @user, project: project,
+                            steps: [ { "name" => "a", "prompt" => "a" } ], autostart: false)
+
+    assert_enqueued_with(job: WorkflowAdvanceJob) { assert run.launch! }
+    assert run.pending?
+  end
+
+  test "#launch! is a no-op on a run that has already left the queue" do
+    run = new_run.tap(&:running!)
+    assert_no_enqueued_jobs(only: WorkflowAdvanceJob) do
+      assert_not run.launch!
+    end
+    assert run.running?
+  end
+
+  test "active and awaiting scopes include queued runs" do
+    queued = new_run.tap(&:queued!)
+    assert_includes @team.workflow_runs.active, queued
+    assert_includes @team.workflow_runs.awaiting, queued
   end
 
   test ".signal_turn_finished enqueues an advance only for an active run" do

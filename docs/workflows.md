@@ -176,8 +176,51 @@ end
 # 5. Start a run — WorkflowRun.start(workflow:, team:, user:, project:, input:)
 #    creates an untitled Conversation (auto-titled from the first turn) +
 #    run + tasks, folds `input` into step 1, then enqueues the advance job.
-#    Callers: the new-chat composer launcher and (Phase 4) triggers.
+#    Callers: the new-chat composer launcher, (Phase 4) triggers, and the
+#    in-chat handoff below.
 ```
+
+### Starting a run from inside a chat
+
+An operator can discuss a spec in a normal chat and then say "start the
+*ship* workflow on project *metis* to do this" — the agent spins the run off
+without leaving the chat. The path rides the one-directional turn stream
+rather than a callback:
+
+- A pi extension (`.pi/extensions/metis-workflow/index.ts`) registers one
+  model-callable tool, `metis_start_workflow(workflow, project?, note?)`.
+  Its handler only returns an ack — it never reaches back into Metis.
+- Metis already reads every pi event in `ChatJob`. When it sees the
+  `metis_start_workflow` tool call, `ChatJob#handoff_workflow` hands the args
+  to **`Agent::WorkflowHandoff`** (guarded — a handoff hiccup never crashes
+  the turn).
+- `WorkflowHandoff` resolves the workflow + project **by name** for the team
+  (`Workflow.named` / `Project.named`, project falling back to the chat's own
+  then the workflow default), seeds `input:` with the chat's transcript
+  (`Agent::TranscriptDigest`) plus the agent's `note`, and calls
+  `WorkflowRun.start(autostart: false)` — which **queues** the run rather than
+  starting it (see below). It then posts a `kind: :handoff` message back into
+  the chat — a link to the queued run on success, a precise error otherwise.
+
+The tool's ack is decoupled from the real outcome (Metis acts out of band),
+so the posted note — not the agent's reply — is the operator's source of
+truth. Shipping a new/changed extension reaches every runtime on deploy
+**except docker**, which bakes extensions into its image (`rake docker:image`).
+
+### The `queued` status
+
+A chat handoff shouldn't start a run blind — the operator should see what got
+seeded first. `WorkflowRun` has a `queued` status (and `WorkflowRun.start`
+takes `autostart:`, default `true`): a queued run is built (conversation +
+tasks) but **not advanced** — nothing enqueues `WorkflowAdvanceJob` until a
+human calls `WorkflowRun#launch!` (the run page's "Start run" button →
+`WorkflowRunsController#start`). The composer launcher keeps `autostart: true`
+(explicit "go now"); the chat handoff uses `autostart: false`.
+
+`queued` counts as `active` (blocks deleting its project) and `awaiting` (it
+needs a person to start it, so it shows under "needs you"). On the run board
+it's the **first column**, ahead of `running`. A future per-team auto-start
+toggle would just flip the handoff's `autostart:`.
 
 Why this is safe without new infra:
 

@@ -54,6 +54,17 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "start launches a queued run and redirects to its conversation" do
+    conversation = @user.conversations.create!
+    run = @team.workflow_runs.create!(conversation: conversation, status: :queued)
+    run.tasks.create!(position: 0, name: "a", prompt: "a", gate: :auto)
+
+    post start_workflow_run_path(run)
+
+    assert run.reload.pending?, "a queued run leaves the queue when started"
+    assert_redirected_to conversation
+  end
+
   test "a teammate cannot act on a personal run's gate" do
     team = shared_team
     conversation = @user.conversations.create!(team: team)
@@ -77,6 +88,14 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
                                        steps: [ { "name" => "a", "prompt" => "a" } ])
     post workflow_runs_path, params: { workflow_id: workflow.id, content: "go", visibility: "team" }
     assert WorkflowRun.order(:id).last.conversation.visibility_team?
+  end
+
+  test "a launcher run is titled from the workflow up front" do
+    project = @team.projects.create!(name: "R&D")
+    workflow = @team.workflows.create!(name: "Triage", default_project: project,
+                                       steps: [ { "name" => "a", "prompt" => "a" } ])
+    post workflow_runs_path, params: { workflow_id: workflow.id, content: "go" }
+    assert_equal "Triage workflow", WorkflowRun.order(:id).last.conversation.title
   end
 
   test "an awaiting run pins in a teammate's sidebar and shared tab" do
@@ -110,26 +129,29 @@ class WorkflowRunsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".wf-tl-localguide", count: 0
   end
 
-  test "an unclaimed delegated step shows a manual claim button when auto-claim is off" do
+  test "an unclaimed delegated step flags the wrapper manual when auto-claim is off" do
     @user.update!(auto_claim_tasks: false)
     conversation = @user.conversations.create!(team: @team)
     run = @team.workflow_runs.create!(conversation: conversation, status: :awaiting_local)
     task = run.tasks.create!(position: 0, name: "impl", status: :running, delegated: true)
 
     get conversation_path(conversation)
+    assert_select ".wf-tl-wrap[data-auto-claim='false']"
     assert_select ".wf-tl-claim-btn", text: "Claim"
     assert_select "form[action=?]", workflow_run_claim_run_task_path(run, task)
   end
 
-  test "auto-claim on hides the manual claim button" do
+  # Both variants render; the wrapper flag drives the per-viewer CSS toggle,
+  # so it survives the timeline's broadcast replace (which has no current_user).
+  test "auto-claim on flags the wrapper auto" do
     @user.update!(auto_claim_tasks: true)
     conversation = @user.conversations.create!(team: @team)
     run = @team.workflow_runs.create!(conversation: conversation, status: :awaiting_local)
     run.tasks.create!(position: 0, name: "impl", status: :running, delegated: true)
 
     get conversation_path(conversation)
-    assert_select ".wf-tl-claim-btn", count: 0
-    assert_match "claims it automatically", response.body
+    assert_select ".wf-tl-wrap[data-auto-claim='true']"
+    assert_select ".wf-tl-localguide-auto", text: /claims it automatically/
   end
 
   test "claim grabs the delegated step for the user, manual mode" do

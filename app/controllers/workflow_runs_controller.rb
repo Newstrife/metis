@@ -1,7 +1,7 @@
 class WorkflowRunsController < ApplicationController
   include Composing
 
-  before_action :set_run, only: %i[approve reject request_changes]
+  before_action :set_run, only: %i[approve reject request_changes start]
   before_action :set_workflow, only: :create
 
   def create
@@ -14,9 +14,16 @@ class WorkflowRunsController < ApplicationController
     run = WorkflowRun.start(
       team: current_team, user: current_user, workflow: @workflow,
       project: project, input: params[:input].presence || params[:content],
-      settings: chat_settings, visibility: composed_visibility
+      settings: chat_settings, visibility: composed_visibility,
+      title: @workflow.run_title
     )
     redirect_to run.conversation
+  end
+
+  # Start a queued run (chat handoffs queue rather than start immediately).
+  def start
+    @run.launch!
+    redirect_to @run.conversation
   end
 
   def approve

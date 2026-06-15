@@ -2289,7 +2289,13 @@ body.drawer-open { overflow:hidden; }
   box-shadow:0 0 0 3px var(--accent-soft), var(--sh-md);
 }
 
-/* Unclaimed local step: how to claim it, and where the bridge lives. */
+/* Unclaimed local step: how to claim it, and where the bridge lives. Both
+   the auto and manual variants render; the viewer's preference on the
+   wrapper decides which shows (manual is the safe default for broadcasts,
+   which carry no preference). */
+.wf-tl-localguide-auto { display:none; }
+.wf-tl-wrap[data-auto-claim="true"] .wf-tl-localguide-auto { display:block; }
+.wf-tl-wrap[data-auto-claim="true"] .wf-tl-localguide-manual { display:none; }
 .wf-tl-localguide { margin-top:8px; font-size:13px; color:var(--ink-2); line-height:1.6; }
 .wf-tl-localguide a { color:var(--accent-fg); }
 .wf-tl-localguide-sub { margin-top:4px; font-size:12px; color:var(--ink-3); }
@@ -2389,12 +2395,21 @@ body.drawer-open { overflow:hidden; }
   text-decoration:underline; text-underline-offset:2px; padding:0;
 }
 .wf-run-cancel:hover { color:var(--danger); }
+.wf-run-start {
+  font:inherit; font-weight:600; color:var(--accent-fg); background:var(--accent-soft);
+  border:1px solid var(--accent-fg); border-radius:8px; cursor:pointer; padding:4px 12px;
+}
+.wf-run-start:hover { background:var(--accent-fg); color:var(--bg); }
 
 /* sidebar pill */
 .convo-pill {
   flex:none; margin-left:6px; font-family:var(--fm); font-size:9.5px; font-weight:500;
   letter-spacing:.03em; text-transform:uppercase; padding:2px 7px; border-radius:999px;
   background:var(--gold-soft); color:var(--gold); border:1px solid var(--gold-line);
+}
+.convo-pill--start {
+  background:var(--info-soft); color:var(--info);
+  border-color:color-mix(in srgb, var(--info) 35%, transparent);
 }
 .convo-check { flex:none; width:13px; height:13px; margin-left:6px; color:var(--ink-3); }
 .convo-fail { flex:none; width:6px; height:6px; border-radius:50%; background:var(--danger); margin-left:6px; }
@@ -2544,6 +2559,9 @@ body.drawer-open { overflow:hidden; }
 .msg-step--review .msg-step-tag { color:var(--gold); }
 .msg-step--local { border-left-color:var(--accent); }
 .msg-step--local .msg-step-tag { color:var(--accent-fg); }
+/* A run spun off from this chat — same accent as a launched run pill. */
+.msg-step--handoff { border-left-color:var(--accent); }
+.msg-step--handoff .msg-step-tag { color:var(--accent-fg); }
 
 /* ═══════════════════════════════════════════════════════════
    Run Board — cross-project kanban of WorkflowRuns. Read-only.
@@ -2580,7 +2598,7 @@ body.drawer-open { overflow:hidden; }
 .board-scroll { overflow:auto; padding:0 18px 22px; flex:1; }
 .board-cols, .board-lane {
   display:grid;
-  grid-template-columns:118px repeat(4, minmax(208px, 1fr));
+  grid-template-columns:118px repeat(5, minmax(208px, 1fr));
   gap:12px;
 }
 .board-cols {
@@ -2604,6 +2622,7 @@ body.drawer-open { overflow:hidden; }
   font-variant-numeric:tabular-nums;
 }
 .board-col-dot { width:7px; height:7px; border-radius:50%; flex:none; }
+.board-col-dot--queued { background:var(--ink-3); }
 .board-col-dot--running { background:var(--accent-fg); }
 .board-col-dot--awaiting_approval { background:var(--gold); }
 .board-col-dot--awaiting_local { background:var(--info); }
@@ -2628,6 +2647,7 @@ body.drawer-open { overflow:hidden; }
 }
 .board-card:hover { box-shadow:var(--sh-md); transform:translateY(-1px); }
 .board-card-ac { position:absolute; left:0; top:0; bottom:0; width:3px; }
+.board-card-ac--queue { background:var(--ink-3); }
 .board-card-ac--run { background:var(--accent-fg); }
 .board-card-ac--appr { background:var(--gold); }
 .board-card-ac--local { background:var(--info); }

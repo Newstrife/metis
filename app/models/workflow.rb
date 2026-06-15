@@ -11,9 +11,18 @@ class Workflow < ApplicationRecord
   validate :steps_have_prompts
 
   scope :enabled, -> { where(enabled: true) }
+  # Case-insensitive name match — the agent passes a workflow name the way
+  # the operator said it, not an id (Agent::WorkflowHandoff).
+  scope :named, ->(name) { where("LOWER(name) = LOWER(?)", name.to_s.strip) }
 
   def gate_count
     steps.count { |step| step["gate"] == "approval" }
+  end
+
+  # A friendly default title for a run of this workflow, when there's no
+  # better subject to name it from (Agent::WorkflowHandoff, the launcher).
+  def run_title
+    "#{name} workflow"
   end
 
   private
