@@ -7,59 +7,53 @@
 **Self-host a team of AI agents that don't just chat — they *work*: in a
 sandbox, on your stack, with your own LLM provider.**
 
-Metis is an open, self-hostable agent platform. It puts a live, streaming
-web chat in front of a real agent that ships shell and coding tools and
-reaches your systems through connectors — running sandboxed, multi-user,
-on the provider you choose. Coding is one capability, not the boundary.
+Metis is an open, self-hostable agent platform. A real agent with shell and
+coding tools, reaching your systems through connectors — sandboxed,
+multi-user, on the provider you choose. Coding is one capability, not the
+boundary.
 
-![Metis chat UI](docs/metis-2605.png)
-<!-- TODO: replace with a short GIF of one turn — streaming, a tool call, an artifact dropped into the reply. -->
+<table>
+  <tr>
+    <td><img src="docs/metis-2606.png" alt="Run board" height="340"></td>
+    <td><img src="docs/metis-2605.png" alt="Chat UI" height="340"></td>
+  </tr>
+  <tr>
+    <td align="center">Run board — every team's work in flight</td>
+    <td align="center">Live streaming chat with the agent</td>
+  </tr>
+</table>
 
 ## Why Metis
 
-- **Agents that act, not just answer.** The agent has a shell, file tools,
-  and connectors (GitHub, Google, Linear, Metabase, …). It reads, runs,
-  edits, and hands back artifacts — sandboxed by default. Not a chat box
-  bolted to an API.
+- **Agents that act, not just answer.** Shell, file tools, and connectors
+  (GitHub, Google, Linear, Metabase, …) — the agent reads, runs, edits, and
+  hands back artifacts, sandboxed by default.
 - **Multi-user from day one.** Every resource belongs to a team, and the
   agent acts as the *right person* against the right systems — credentials
-  held per team and per member. A personal account is just a team of one.
+  per team and per member. A personal account is just a team of one.
 - **Your provider, your infrastructure.** Anthropic, OpenAI, Google, or
   whatever comes next, picked per conversation. No Metis-hosted inference,
-  no per-user key vault — you self-host the whole thing.
-- **Build your own tools, and share them.** Personal productivity is the
-  floor, not the ceiling: author skills in the UI (or have the agent write
-  them) and share them across your devices and your team.
+  no per-user key vault.
+- **Build your own tools, and share them.** Author skills in the UI (or have
+  the agent write them) and share them across your devices and your team.
 
 ## What people do with it
 
-Real work from its daily deployment — one platform, every role
-(see [Proven shape](#proven-shape)):
+Not hypothetical: Metis's sibling, **[Themis](https://pipihosting.github.io/themis/)**,
+runs daily in three languages at a company managing 1,000+ properties — one
+platform, every role:
 
-- **Engineering** — review a PR and surface the landmines green tests sail
-  past: a migration that locks existing users out, a hardcoded SMTP
-  credential, a guest fee that never made it into the order total. Judged
-  against the design intent, then filed as a Linear ticket.
-- **Operations** — run the rental operation across countries:
-  ota cancellations and calendar sync, pricing schedules, listing
-  titles, utilities and tax entry.
-- **Customer service** — draft returning-customer discount emails, chase a
-  booking price anomaly, check whether an inbound email is genuine.
-- **Leadership** — audit dashboard metric, pull kpi rankings, set up goals,
-  prep the team-meeting agenda.
-- **Anyone** — drop in multi-medias via multiple channels and get it back
-  analyzed with operational insights and suggestions; share the conversation
-  with a teammate.
+- **Engineering** — review a PR for the landmines green tests sail past
+  (a locking migration, a hardcoded credential, a fee missing from the
+  total), then file it as a Linear ticket.
+- **Operations** — run the rental operation across countries: OTA
+  cancellations and calendar sync, pricing schedules, utilities and tax.
+- **Customer service** — draft discount emails, chase a booking anomaly,
+  check whether an inbound email is genuine.
+- **Leadership** — audit dashboard metrics, pull KPI rankings, prep the
+  team-meeting agenda.
 
-## Proven shape
-
-Metis didn't start from a blank page. Its sibling, **[Themis](https://pipihosting.github.io/themis/)**,
-runs daily across engineering, operations, customer service, and
-leadership at a company managing 1,000+ properties — reviewing PRs, filing
-tickets, auditing dashboards, and running the rental operation in three
-languages. The kind of internal platform people stop noticing because it
-has folded into how they work.
-Themis is Claude-only (built on the Claude Agent SDK); Metis is the open,
+Themis is Claude-only (Claude Agent SDK); Metis is the open,
 provider-agnostic form of the same shape, built on **[pi](https://pi.dev)**,
 a fast, open agent harness. The lessons come along; the lock-in does not.
 
@@ -82,45 +76,24 @@ a fast, open agent harness. The lessons come along; the lock-in does not.
 ## Quickstart
 
 First, copy the env template and set at least one provider key (e.g.
-`ANTHROPIC_API_KEY`) so the agent can talk to a model — both setups below
-load `.env`:
+`ANTHROPIC_API_KEY`) so the agent can talk to a model:
 
 ```sh
 cp .env.example .env   # then edit it: set ANTHROPIC_API_KEY (or another provider)
 ```
 
-Then pick **native** or **Docker**; either serves the app at
-http://localhost:3000.
-
-### Native
-
-Run the app directly on your machine. Prerequisites: **Ruby 4.0.5** (see
-`.ruby-version`; `mise` recommended), **PostgreSQL**, and **pi** on your
-`PATH` for the default `local` runtime
-(`npm install -g @earendil-works/pi-coding-agent`).
-
-```sh
-bin/setup        # install deps, prepare the database, install the MCP bridge into pi
-bin/dev          # Puma + Tailwind via foreman → http://localhost:3000
-```
-
-### Docker
-
-Nothing local to install but Docker — `compose.yaml` bakes Ruby, pi, the
-MCP bridge, and the gws CLI into the dev image, runs Postgres alongside,
-and serves the agent on the `local` runtime inside the container.
+Then start it with Docker — nothing local to install but Docker.
+`compose.yaml` bakes Ruby, pi, the MCP bridge, and the gws CLI into the dev
+image, runs Postgres alongside, and serves the agent on the `local` runtime
+inside the container at http://localhost:3000.
 
 ```sh
 docker compose up --build   # first run, or after a Gemfile change
 docker compose up           # subsequent runs
 ```
 
-Either way, see [`docs/configuration.md`](docs/configuration.md) for
-runtimes, providers, and every variable.
-
-> Metis encrypts `Message#content` and `Message#reasoning` with Active
-> Record Encryption; the keys must be present in Rails credentials for
-> every environment, tests included.
+See [`docs/configuration.md`](docs/configuration.md) for runtimes,
+providers, and every variable.
 
 ## Development
 
