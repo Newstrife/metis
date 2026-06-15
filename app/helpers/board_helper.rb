@@ -8,6 +8,50 @@ module BoardHelper
     t("board.index.columns.#{column}")
   end
 
+  # The current filters as a query hash, with one facet overridable.
+  # Defaults read the controller's assigns; only non-default facets are
+  # encoded so a pristine board has a clean URL.
+  def board_filter_query(scope: @scope, done: @done, projects: @project_ids)
+    query = {}
+    query[:scope] = scope unless scope == :all
+    query[:done] = done unless done == "24h"
+    query[:projects] = projects if projects.present?
+    query
+  end
+
+  # A board URL carrying the current filters with one facet overridden.
+  def board_filter_path(**overrides)
+    board_path(board_filter_query(**overrides))
+  end
+
+  def board_scope_active?(scope)
+    @scope == scope
+  end
+
+  # Mine / Needs me are toggles: activating the live one clears back to the
+  # default (all) scope.
+  def board_scope_toggle_path(scope)
+    board_filter_path(scope: board_scope_active?(scope) ? :all : scope)
+  end
+
+  def board_done_active?(done)
+    @done == done
+  end
+
+  def board_project_selected?(project)
+    @project_ids.include?(project.id)
+  end
+
+  # The label on the projects filter button: all projects (none selected),
+  # the one selected name, or a count.
+  def board_projects_label
+    case @project_ids.size
+    when 0 then t("board.filters.projects.all")
+    when 1 then @projects.find { |project| project.id == @project_ids.first }&.name
+    else        t("board.filters.projects.count", count: @project_ids.size)
+    end
+  end
+
   # The accent class for a card, by column — except a terminal run in the
   # Done column that failed/cancelled gets the danger accent.
   def board_card_accent(run, column)

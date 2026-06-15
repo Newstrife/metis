@@ -10,6 +10,11 @@ class Board
   # bounded by the Done window.
   ACTIVE_STATUSES = %i[pending running awaiting_approval awaiting_local].freeze
 
+  SCOPES = %i[all mine needs_me].freeze
+  # The Done-column recency choices; "all" lifts the age bound entirely.
+  DONE_WINDOWS = { "24h" => 24.hours, "7d" => 7.days, "2w" => 2.weeks,
+                   "1m" => 1.month, "all" => nil }.freeze
+
   # Maps the seven WorkflowRun statuses onto the four board columns.
   COLUMN_FOR_STATUS = {
     "pending" => :running, "running" => :running,
@@ -20,13 +25,15 @@ class Board
 
   Lane = Struct.new(:project, :columns, keyword_init: true)
 
-  def self.for(team:, user:, window: DONE_WINDOW)
-    new(team: team, user: user, window: window)
+  def self.for(team:, user:, scope: :all, project_ids: [], window: DONE_WINDOW)
+    new(team: team, user: user, scope: scope, project_ids: project_ids, window: window)
   end
 
-  def initialize(team:, user:, window: DONE_WINDOW)
+  def initialize(team:, user:, scope: :all, project_ids: [], window: DONE_WINDOW)
     @team = team
     @user = user
+    @scope = scope
+    @project_ids = Array(project_ids)
     @window = window
   end
 
@@ -51,22 +58,25 @@ class Board
 
   private
 
-  attr_reader :team, :user, :window
+  attr_reader :team, :user, :scope, :project_ids, :window
 
   def runs
     @runs ||= load_runs
   end
 
   def load_runs
-    visible = team.conversations.accessible_to(user).select(:id)
-    scope = WorkflowRun.where(conversation_id: visible)
-    if window
-      scope = scope.where(status: ACTIVE_STATUSES)
-                   .or(WorkflowRun.where(conversation_id: visible, updated_at: window.ago..))
+    ids = team.conversations.board_visible(user, scope, project_ids).select(:id)
+
+    runs = WorkflowRun.where(conversation_id: ids)
+    if scope == :needs_me
+      runs = runs.awaiting
+    elsif window
+      runs = runs.where(status: ACTIVE_STATUSES)
+                 .or(WorkflowRun.where(conversation_id: ids, updated_at: window.ago..))
     end
-    scope.includes(:workflow, { tasks: :claimed_by_user },
-                   conversation: [ :project, { user: { avatar_attachment: :blob } } ])
-         .order(updated_at: :desc).to_a
+    runs.includes(:workflow, { tasks: :claimed_by_user },
+                  conversation: [ :project, { user: { avatar_attachment: :blob } } ])
+        .order(updated_at: :desc).to_a
   end
 
   def build_lanes

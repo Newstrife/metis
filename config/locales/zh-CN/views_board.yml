@@ -6,7 +6,7 @@ zh-CN:
         other: "%{count} 个运行"
       axis: "项目 / 状态"
       empty: "暂无运行。启动一个工作流后会出现在这里。"
-      read_only: "只读 · 状态由工作流引擎掌管"
+      read_only: "只读 · 状态类型基于工作流引擎"
       no_project: "无项目"
       columns:
         running: "运行中"
@@ -19,6 +19,23 @@ zh-CN:
         review_gate: "审批关卡"
         completed: "已完成"
         ago: "%{time}前"
+    filters:
+      mine: "我的"
+      needs_me: "需要我"
+      filter_project: "筛选至 %{name}"
+      projects:
+        all: "全部项目"
+        count:
+          other: "%{count} 个项目"
+        apply: "应用"
+        clear: "清除"
+      done_window:
+        label: "完成窗口"
+        "24h": "24小时"
+        "7d": "7天"
+        "2w": "2周"
+        "1m": "1个月"
+        all: "全部"
     actors:
       live: "实时"
       expand: "显示活跃对象"
@@ -29,7 +46,7 @@ zh-CN:
       machines_summary: "%{online}/%{total}"
       overflow: "+%{count}"
       people: "成员"
-      machines: "机器 · 守护客户端"
+      machines: "机器"
       reviewing: "正在审阅 %{ref}"
       no_gates: "无待处理关卡"
       idle: "空闲"
