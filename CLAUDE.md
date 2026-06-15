@@ -216,6 +216,17 @@ more deployments, runs pi / Claude Code / Codex headless in per-task git
 worktrees under `~/.metis/` (up to `max_workers` tasks concurrently), and
 installs as a login service via `metis install`.
 
+The **run board** (`BoardController`, `docs/workflows.md`) is a read-only
+cross-project view of every visible `WorkflowRun`, grouped into status
+columns (running / awaiting_approval / awaiting_local / done) within
+per-project swimlanes, plus an actor rail of who/what is acting (people
+with open gates, bridge machines with a coarse online/stale light). Two
+table-less read models back it — `Board` (the grid) and `BoardPresence`
+(the rail) — both reading `Conversation.board_visible(user, scope,
+project_ids)` so they share one visibility definition; filters are scope
+(all / mine / needs_me), project set, and a Done recency window. The
+actor rail is polled (~20s) so presence ages without a reload.
+
 A conversation can also be **forked** from any assistant turn
 (`Agent::ConversationForker`; `Conversation#forked_from_message`).
 
