@@ -35,9 +35,8 @@ class WorkflowRun < ApplicationRecord
 
     steps ||= workflow&.steps || []
     run = transaction do
-      # With no `title:` the conversation stays untitled so auto-titling names
-      # it from its first turn; callers that won't get a useful first-turn
-      # title (the launcher, a queued handoff) pass a friendly one up front.
+      # Every caller must pass a title — auto-titling skips engine-injected
+      # `kind: :step_prompt` user messages, so it never names a workflow conversation.
       conversation = user.conversations.create!(
         team: team, project: project, settings: settings || {},
         visibility: visibility, title: title
