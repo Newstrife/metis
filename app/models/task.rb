@@ -113,6 +113,24 @@ class Task < ApplicationRecord
     name.presence || "the step"
   end
 
+  def step_number
+    position + 1
+  end
+
+  def step_label
+    name.presence || "Step #{step_number}"
+  end
+
+  # The run's step outline relative to this step — the single source the
+  # cloud orientation header (Markdown) and the bridge claim payload (JSON)
+  # both render, so the two framings can't drift.
+  # [{ number:, name:, status: :done|:current|:skipped|:pending }, ...]
+  def step_overview
+    workflow_run.tasks.map do |step|
+      { number: step.step_number, name: step.step_label, status: step_status(step) }
+    end
+  end
+
   # Who's working this delegated task, for timelines: "Bob's Apollo".
   def claimed_label
     return claimed_by unless claimed_by_user
@@ -143,5 +161,17 @@ class Task < ApplicationRecord
 
   def result_model
     result["model"].presence
+  end
+
+  private
+
+  def step_status(step)
+    return :current if step.id == id
+
+    case step.status
+    when "completed" then :done
+    when "skipped" then :skipped
+    else :pending
+    end
   end
 end
