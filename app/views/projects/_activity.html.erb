@@ -1,0 +1,13 @@
+<%# locals: (activity:, pagy:) %>
+<h2 class="panel-title"><%= t('projects.activity.title') %></h2>
+
+<% if activity.empty? %>
+  <p class="field-hint"><%= t('projects.activity.empty') %></p>
+<% else %>
+  <%# The scroll container *is* the infinite-scroll element — it fills the
+      panel and the feed pages in as the sentinel nears its viewport. %>
+  <div class="activity-list" data-controller="infinite-scroll">
+    <%= render "projects/activity_items", events: activity %>
+    <%= render "projects/activity_sentinel", pagy: pagy %>
+  </div>
+<% end %>

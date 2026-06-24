@@ -26,7 +26,15 @@ class BoardControllerTest < ActionDispatch::IntegrationTest
     assert_select ".sidebar .prnav .prnav-item.on", text: /Board/
     # nav-tabs keeps the active tab in sync when a conversation opens in #main.
     assert_select ".sidebar .prnav[data-controller='nav-tabs']"
-    assert_select ".sidebar .prnav .prnav-item[data-nav-tabs-target='link']", count: 2
+    assert_select ".sidebar .prnav .prnav-item[data-nav-tabs-target='link']", count: 3
+  end
+
+  test "the board opens collapsed by default, with rail destinations" do
+    sign_in @user
+    get board_path
+    assert_response :success
+    assert_select ".app.sidebar-collapsed"
+    assert_select ".sidebar-rail a.rail-dest", minimum: 4
   end
 
   test "places a run in its status column and project lane" do

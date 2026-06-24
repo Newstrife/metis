@@ -105,10 +105,57 @@ en:
       title: "New project"
       heading: "New project"
     edit:
-      back: "Back to projects"
+      back: "Back to project"
       delete_confirm: "Delete %{name}? Attached conversations will be detached, not deleted."
+    show:
+      back: "Back to projects"
+      edit: "Edit"
+      no_repo: "No repository bound"
+      chats_count:
+        one: "%{count} chat"
+        other: "%{count} chats"
+      runs_count:
+        one: "%{count} run"
+        other: "%{count} runs"
+      events_count:
+        one: "%{count} event"
+        other: "%{count} events"
+      needs_you: "Needs you"
+      untitled: "Untitled"
+      statuses:
+        pending: "Pending"
+        running: "Running"
+        awaiting_approval: "Needs approval"
+        awaiting_local: "Awaiting local"
+        completed: "Done"
+        failed: "Failed"
+        cancelled: "Cancelled"
+        queued: "Queued"
+    activity:
+      title: "Activity"
+      empty: "No GitHub activity yet. Bind a repository above and events land here as they arrive."
+      loading: "Loading…"
+      ago: "%{time} ago"
+      lines:
+        push:
+          one: "pushed 1 commit to %{branch}"
+          other: "pushed %{count} commits to %{branch}"
+        pull_request: "%{verb} PR #%{number}: %{title}"
+        issues: "%{verb} issue #%{number}: %{title}"
+        issue_comment: "commented on #%{number}"
+        other: "%{event}"
+      verbs:
+        opened: "opened"
+        closed: "closed"
+        merged: "merged"
+        reopened: "reopened"
+        edited: "edited"
+        synchronize: "updated"
+        ready_for_review: "marked ready"
     form:
       name_hint: "A short name you recognize — \"Metis\", \"Q4 planning\", \"Mom's birthday\"."
+      github_repo_label: "GitHub repository"
+      github_repo_hint: "owner/repo — binds inbound GitHub events (PRs, pushes, issues) for this repo to this project."
       about_label: "About this project"
       about_placeholder: "What's this project about? The agent reads this on every turn in this project.\n\nName the resources it maps to — e.g. \"GitHub repo chagel/metis, Linear project Metis\"."
       about_hint: "Freeform notes — conventions, constraints, who's involved, which repo or board it maps to. Shows up in the agent's context."

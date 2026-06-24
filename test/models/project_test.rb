@@ -63,4 +63,49 @@ class ProjectTest < ActiveSupport::TestCase
       other.destroy
     end
   end
+
+  test "github_repo is normalized to a bare lowercased owner/name" do
+    project = @team.projects.create!(name: "Metis", github_repo: "https://github.com/Chagel/Metis.git")
+    assert_equal "chagel/metis", project.github_repo
+  end
+
+  test "github_repo blanks to nil so the key isn't a stray empty string" do
+    project = @team.projects.create!(name: "Metis", github_repo: "  ")
+    assert_nil project.github_repo
+  end
+
+  test "github_repo must look like owner/name" do
+    refute @team.projects.new(name: "Metis", github_repo: "not-a-repo").valid?
+    assert @team.projects.new(name: "Metis", github_repo: "owner/repo").valid?
+  end
+
+  test "binding a repo adopts already-collected orphan events for it" do
+    mine = WebhookEvent.create!(team: @team, provider: :github, event_type: "push",
+                                external_id: "e1", payload: { "repository" => { "full_name" => "Chagel/Metis" } })
+    other = WebhookEvent.create!(team: @team, provider: :github, event_type: "push",
+                                 external_id: "e2", payload: { "repository" => { "full_name" => "chagel/other" } })
+
+    project = @team.projects.create!(name: "Metis", github_repo: "chagel/metis")
+
+    assert_equal project.id, mine.reload.project_id   # case-insensitive match adopted
+    assert_nil other.reload.project_id                # different repo untouched
+  end
+
+  test "an event already claimed by another project is not re-adopted" do
+    first = @team.projects.create!(name: "First", github_repo: "chagel/metis")
+    event = WebhookEvent.create!(team: @team, provider: :github, event_type: "push",
+                                 external_id: "e3", project: first,
+                                 payload: { "repository" => { "full_name" => "chagel/metis" } })
+
+    second = @team.projects.create!(name: "Second")
+    second.update!(github_repo: "chagel/metis")
+
+    assert_equal first.id, event.reload.project_id
+  end
+
+  test "for_github_repo matches case-insensitively" do
+    project = @team.projects.create!(name: "Metis", github_repo: "chagel/metis")
+    assert_equal project, @team.projects.for_github_repo("Chagel/Metis").first
+    assert_nil @team.projects.for_github_repo("other/repo").first
+  end
 end

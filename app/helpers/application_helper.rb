@@ -136,6 +136,33 @@ module ApplicationHelper
   # hasn't picked a timezone yet — keeping the conditional in Ruby
   # avoids embedding ERB inside the `<body>` opening tag, which leaves
   # stray whitespace before the closing `>`.
+  # Sections that open collapsed (icon rail) by default — the board is a
+  # full-width grid the panel only crowds. Server-rendered to avoid a flash;
+  # the controller still honors a sticky per-section override.
+  NAV_DEFAULT_COLLAPSED = %w[board].freeze
+
+  def nav_default_collapsed?
+    NAV_DEFAULT_COLLAPSED.include?(controller_name)
+  end
+
+  # Per-project counts for the sidebar project cards — three grouped
+  # queries total, not N+1. Chats/runs honor the viewer's visibility like
+  # the dashboard; events are team-level. Returns
+  # { project_id => { chats:, runs:, events: } }.
+  def sidebar_project_stats(projects)
+    ids = projects.map(&:id)
+    return {} if ids.empty?
+
+    visible = Conversation.accessible_to(current_user)
+    chats = Conversation.where(project_id: ids).merge(visible).group(:project_id).count
+    runs = WorkflowRun.joins(:conversation).where(conversations: { project_id: ids })
+                      .merge(visible).group("conversations.project_id").count
+    events = WebhookEvent.where(project_id: ids).group(:project_id).count
+    ids.index_with do |id|
+      { chats: chats[id].to_i, runs: runs[id].to_i, events: events[id].to_i }
+    end
+  end
+
   def chat_body_attrs
     attrs = { class: "app-shell" }
     if user_signed_in? && current_user.timezone.blank?
