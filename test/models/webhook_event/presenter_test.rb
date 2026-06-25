@@ -64,10 +64,49 @@ class WebhookEvent::PresenterTest < ActiveSupport::TestCase
     assert_equal "marked ready PR #7: X", p.summary
   end
 
-  test "an unknown event type degrades to its bare name with no link" do
-    p = present("star.created", {})
-    assert_equal "star.created", p.summary
-    assert_nil p.url
+  test "a submitted review reads by its state, not the action" do
+    p = present("pull_request_review.submitted", {
+      "review" => { "state" => "approved", "html_url" => "https://gh/pr/7#r1" },
+      "pull_request" => { "number" => 7, "title" => "Ship it" }
+    })
+    assert_equal "approved PR #7: Ship it", p.summary
+    assert_equal "https://gh/pr/7#r1", p.url
+  end
+
+  test "a changes-requested review" do
+    p = present("pull_request_review.submitted", {
+      "review" => { "state" => "changes_requested" },
+      "pull_request" => { "number" => 7, "title" => "Ship it" }
+    })
+    assert_equal "requested changes on PR #7: Ship it", p.summary
+  end
+
+  test "a review comment reads like a comment, linking the comment" do
+    p = present("pull_request_review_comment.created", {
+      "pull_request" => { "number" => 7 }, "comment" => { "html_url" => "https://gh/pr/7#c9" }
+    })
+    assert_equal "commented on #7", p.summary
+    assert_equal "https://gh/pr/7#c9", p.url
+  end
+
+  test "a published release names and links it" do
+    p = present("release.published", {
+      "release" => { "name" => "v1.2.0", "html_url" => "https://gh/rel/1" }
+    })
+    assert_equal "published release v1.2.0", p.summary
+    assert_equal "https://gh/rel/1", p.url
+  end
+
+  test "a release with no name falls back to its tag" do
+    p = present("release.published", { "release" => { "tag_name" => "v1.2.0" } })
+    assert_equal "published release v1.2.0", p.summary
+  end
+
+  test "an unhandled event type degrades to a verb-first spelled-out name" do
+    assert_equal "resolved pull request review thread",
+                 present("pull_request_review_thread.resolved", {}).summary
+    assert_equal "created milestone", present("milestone.created", {}).summary
+    assert_nil present("milestone.created", {}).url
   end
 
   test "actor falls back when the payload has no sender" do
