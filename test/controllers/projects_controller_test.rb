@@ -82,6 +82,13 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to projects_path
   end
 
+  test "the delete button breaks out of the frame so the sidebar refreshes" do
+    project = team.projects.create!(name: "Metis")
+    get edit_project_path(project)
+    assert_response :success
+    assert_select "form[data-turbo-frame='_top'] button.btn-danger"
+  end
+
   test "another team's project is not accessible" do
     other = Team.create!(name: "Other")
     foreign = other.projects.create!(name: "Secret")

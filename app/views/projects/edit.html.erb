@@ -9,8 +9,10 @@
     <% end %>
     <h1 class="pane-title"><%= @project.name %></h1>
     <div style="flex:1"></div>
+    <%# Breaks out of #main so the redirect reloads the full page and the
+        sidebar project list drops the deleted project (like the form). %>
     <%= button_to t('common.delete'), project_path(@project), method: :delete, class: "btn btn-danger",
-          form: { data: { turbo_confirm: t('.delete_confirm', name: @project.name) } } %>
+          form: { data: { turbo_confirm: t('.delete_confirm', name: @project.name), turbo_frame: "_top" } } %>
   </header>
 
   <div class="pane-body">
