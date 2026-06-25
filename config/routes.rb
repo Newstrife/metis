@@ -31,7 +31,11 @@ Rails.application.routes.draw do
   # Top-level workspace surface (promoted out of /settings): index + a
   # read-only project dashboard are team-visible; create/edit/destroy
   # stay admin-gated in the controller.
-  resources :projects
+  resources :projects do
+    # On-demand list of the team's Linear projects (via the operator's
+    # connector token) to populate the project-form picker.
+    get :linear_projects, on: :collection
+  end
 
   resources :workflow_runs, only: %i[create] do
     member do
@@ -80,6 +84,10 @@ Rails.application.routes.draw do
     resources :connectors, except: :show
     get  "connectors/oauth/callback",     to: "connectors/oauth#callback", as: :connector_oauth_callback
     post "connectors/oauth/:catalog_key", to: "connectors/oauth#start",    as: :connector_oauth_start
+    # Direct Linear OAuth — an api.linear.app token for the project picker,
+    # distinct from the connector's MCP-OAuth.
+    post "connectors/linear/authorize",   to: "connectors/linear_oauth#start",    as: :connector_linear_authorize
+    get  "connectors/linear/callback",    to: "connectors/linear_oauth#callback", as: :connector_linear_callback
 
     resources :workflows, except: :show
 
@@ -120,6 +128,9 @@ Rails.application.routes.draw do
   # Linear connector. HMAC-authed, session-less (docs/workflows.md Phase 4).
   namespace :webhooks do
     post "github", to: "github#create"
+    # One endpoint for the deployment's Linear OAuth app; the app's signing
+    # secret authes, the payload's organizationId resolves the team.
+    post "linear", to: "linear#create"
   end
 
   root "conversations#index"

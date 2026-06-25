@@ -19,8 +19,17 @@ class Connector < ApplicationRecord
   # deliberate choice, not a deployment default. bot_installation_id picks
   # which installation the bot acts through when the App has several
   # (nil → GITHUB_APP_INSTALLATION_ID, else the App's sole install).
-  # See docs/connectors.md.
-  store_accessor :settings, :bot_enabled, :bot_installation_id
+  # linear_organization_id is the authorizing Linear workspace's org id,
+  # captured on OAuth — inbound app-webhook deliveries resolve to this
+  # team by matching their payload organizationId. See docs/connectors.md.
+  store_accessor :settings, :bot_enabled, :bot_installation_id, :linear_organization_id
+
+  # The team whose Linear connector owns this workspace — how
+  # Webhooks::LinearController maps an app-webhook delivery (the GitHub-App
+  # shape: one deployment webhook, resolved by the payload's org id).
+  scope :for_linear_organization, ->(org_id) {
+    where(catalog_key: "linear").where("settings ->> 'linear_organization_id' = ?", org_id.to_s)
+  }
 
   validates :name, presence: true,
                     format: { with: /\A[a-z0-9][a-z0-9_-]*\z/i },

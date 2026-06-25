@@ -37,6 +37,7 @@ class ConnectorsController < ApplicationController
     @app = @connector.catalog_app
     @credential = @connector.credential_for(current_user)
     @installations = bot_installations
+    prepare_linear_api
   end
 
   def update
@@ -47,6 +48,7 @@ class ConnectorsController < ApplicationController
     else
       @app = @connector.catalog_app
       @installations = bot_installations
+      prepare_linear_api
       render :edit, status: :unprocessable_entity
     end
   end
@@ -101,6 +103,15 @@ class ConnectorsController < ApplicationController
 
     @connector.bot_enabled = ActiveModel::Type::Boolean.new.cast(params[:connector][:bot_enabled])
     @connector.bot_installation_id = params[:connector][:bot_installation_id].presence
+  end
+
+  # The linear connector's manage page offers "Authorize project access"
+  # (the direct Linear OAuth) when the deployment has the app configured.
+  def prepare_linear_api
+    return unless @connector.catalog_key == "linear"
+
+    @linear_api_configured = LinearApp::Config.configured?
+    @linear_api_connected = @connector.credential_for(current_user)&.linear_api_bearer.present?
   end
 
   # Installations for the manage page's bot picker. A GitHub blip hides
