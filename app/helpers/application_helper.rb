@@ -145,6 +145,23 @@ module ApplicationHelper
     NAV_DEFAULT_COLLAPSED.include?(controller_name)
   end
 
+  # The team's projects, most recently active first. A project's own
+  # updated_at only moves on settings edits, so "active" means its latest
+  # conversation (chats and runs alike) or inbound event — falling back to
+  # the project timestamp for one that's seen neither. Two grouped MAX
+  # queries, sorted in Ruby.
+  def sidebar_projects(team)
+    # A query scope, not the bare association — the latter would include an
+    # unsaved built record (e.g. a failed create's @project, nil id).
+    projects = team.projects.order(:created_at).to_a
+    return projects if projects.size < 2
+
+    ids = projects.map(&:id)
+    last_conv = Conversation.where(project_id: ids).group(:project_id).maximum(:updated_at)
+    last_event = WebhookEvent.where(project_id: ids).group(:project_id).maximum(:created_at)
+    projects.sort_by { |p| -[ last_conv[p.id], last_event[p.id], p.updated_at ].compact.max.to_f }
+  end
+
   # Per-project counts for the sidebar project cards — three grouped
   # queries total, not N+1. Chats/runs honor the viewer's visibility like
   # the dashboard; events are team-level. Returns

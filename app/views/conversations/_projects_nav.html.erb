@@ -2,7 +2,7 @@
     the contextual body on projects/board. Full Turbo Drive visits (no #main
     frame) so the active highlight is server-rendered correctly. %>
 <nav class="prjnav" aria-label="<%= t('conversations.sidebar.projects') %>">
-  <% projects = current_team.projects.recent.to_a %>
+  <% projects = sidebar_projects(current_team) %>
   <% stats = sidebar_project_stats(projects) %>
   <% if projects.any? %>
     <% projects.each do |project| %>
