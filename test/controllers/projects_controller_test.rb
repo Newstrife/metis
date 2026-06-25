@@ -159,6 +159,16 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".activity-item", count: ProjectsController::ACTIVITY_PAGE_SIZE
   end
 
+  test "a turbo-stream request without a page still renders the full dashboard" do
+    # The post-create redirect inherits the form POST's turbo-stream Accept;
+    # it must navigate to the dashboard, not render the pagination stream.
+    project = team.projects.create!(name: "Metis")
+    get project_path(project), headers: { "Accept" => "text/vnd.turbo-stream.html, text/html" }
+    assert_response :success
+    assert_equal "text/html", response.media_type
+    assert_select ".pane-title", text: "Metis"
+  end
+
   test "no sentinel when a single page covers every event" do
     project = team.projects.create!(name: "Metis")
     make_events(project, 3)

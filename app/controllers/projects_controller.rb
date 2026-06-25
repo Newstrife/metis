@@ -25,8 +25,11 @@ class ProjectsController < ApplicationController
     remember_visit(@project)
     @activity_pagy, @activity = pagy(:countless, WebhookEvent.for_project(@project).recent,
                                      limit: ACTIVITY_PAGE_SIZE)
-    # Infinite-scroll fetches (show.turbo_stream) need only the next page.
-    return if params[:page].present?
+    # Only an actual infinite-scroll page (?page=) gets the turbo_stream. The
+    # post-create redirect follows with a turbo-stream Accept header it
+    # inherited from the form POST; without this it would render the
+    # pagination stream (a no-op on that page) instead of navigating here.
+    return render(:show, formats: :turbo_stream) if params[:page].present?
 
     visible = Conversation.accessible_to(current_user)
     runs = WorkflowRun.joins(:conversation)
@@ -38,6 +41,7 @@ class ProjectsController < ApplicationController
                          .includes(:conversation).order(updated_at: :desc).limit(PANEL_LIMIT)
     @conversations_total = @project.conversations.merge(visible).count
     @activity_total = WebhookEvent.for_project(@project).count
+    render :show, formats: :html
   end
 
   def new
