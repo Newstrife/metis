@@ -217,6 +217,17 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".sidebar-rail a.rail-dest", minimum: 4
   end
 
+  test "the sidebar lists projects by recent activity, not the project's own timestamp" do
+    active = team.projects.create!(name: "Active")
+    team.projects.create!(name: "Quiet")     # newer project record, but no activity
+    @user.conversations.create!(project: active)  # activity lands on the older one
+
+    get project_path(active)
+    assert_response :success
+    names = css_select(".prjnav-item .prjnav-name").map(&:text)
+    assert_equal %w[Active Quiet], names
+  end
+
   test "a sidebar project card shows name, repo, and only its non-zero stats" do
     project = team.projects.create!(name: "web", github_repo: "pipihosting/pipi-web")
     @user.conversations.create!(project: project)
