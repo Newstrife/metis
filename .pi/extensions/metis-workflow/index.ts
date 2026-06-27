@@ -9,6 +9,13 @@
  *   metis_update_workflow — edit an existing team workflow template (admin only)
  *   metis_get_workflow    — read a workflow's full step detail (live)
  *   metis_get_project     — read a project's detail + bound resources (live)
+ *   metis_list_skills     — list built-in + team skills, with status (live)
+ *   metis_create_skill    — create a team skill from SKILL.md (admin only)
+ *   metis_update_skill    — edit a team skill / toggle enabled (admin only)
+ *
+ * These manage team skills as single SKILL.md rows. Multi-file skills (with
+ * supporting assets) still go through the native file path: write
+ * .pi/skills/<slug>/ and Metis ingests it at turn end. There is no delete tool.
  *
  * All of these are BIDIRECTIONAL: the tool calls `ctx.ui.input("metis:<op>",
  * <json>)` over pi's Extension UI sub-protocol — the sandbox→host callback
@@ -99,6 +106,17 @@ function formatProject(p: {
   if (p.linear_project) lines.push(`Linear project: ${p.linear_project}`);
   if (!p.github_repo && !p.linear_project) lines.push("(no external resources bound)");
   return lines.join("\n");
+}
+
+// Render the skill list fetched from the host (Agent::SkillManager#list).
+// status is "built-in" (repo, always active), "enabled", or "disabled" (team).
+function formatSkills(
+  skills: Array<{ slug: string; description?: string | null; source?: string; status?: string }>,
+): string {
+  if (skills.length === 0) return "No skills.";
+  return skills
+    .map((s) => `- ${s.slug} [${s.status ?? s.source}]${s.description ? ` — ${s.description}` : ""}`)
+    .join("\n");
 }
 
 const StepSchema = Type.Object({
@@ -333,6 +351,97 @@ export default function metisWorkflowExtension(pi: ExtensionAPI) {
         return errorResult(`No project named "${name}" on this team (or Metis didn't answer).`);
       }
       return { content: [{ type: "text", text: formatProject(project) }], details: project };
+    },
+  });
+
+  pi.registerTool({
+    name: "metis_list_skills",
+    label: "List Metis Skills",
+    description:
+      "List all skills available to this team: the built-in repo skills (always " +
+      "active) and the team's DB skills. Each row carries a status — \"built-in\", " +
+      "\"enabled\", or \"disabled\". Disabled team skills are NOT staged into the " +
+      "workspace, so this is the only way to see them. Use before creating or " +
+      "editing a skill.",
+    promptSnippet: "List built-in and team skills with status",
+    promptGuidelines: [
+      "Use metis_list_skills to discover what skills exist — built-in vs team, and which team skills are disabled (those don't appear as files in .pi/skills/).",
+      "Built-in skills are read-only. Manage team skills with metis_create_skill / metis_update_skill.",
+    ],
+    parameters: Type.Object({}),
+
+    async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+      const skills = await hostCall(ctx, "list_skills", {});
+      if (skills === undefined) return errorResult("Can't reach Metis from this run mode.");
+      if (skills === null) return errorResult("Metis didn't answer.");
+      return { content: [{ type: "text", text: formatSkills(skills) }], details: skills };
+    },
+  });
+
+  pi.registerTool({
+    name: "metis_create_skill",
+    label: "Create Metis Skill",
+    description:
+      "Create a new team skill from a single SKILL.md. The content must have " +
+      "YAML frontmatter with `name` and `description`, then the markdown body. " +
+      "Only team admins can create. For a skill with supporting files, write " +
+      ".pi/skills/<slug>/ on disk instead. Use metis_list_skills first to avoid " +
+      "a slug collision (built-in slugs are reserved).",
+    promptSnippet: "Create a team skill from SKILL.md",
+    promptGuidelines: [
+      "Use metis_create_skill only when the operator explicitly asks to create or define a new skill.",
+      "Pass a kebab-case `slug` and the full SKILL.md `content` (frontmatter name + description, then the body). Omit `enabled` to default it on.",
+      "This returns the result directly. On failure (not a team admin, slug taken, or reserved built-in slug), relay the error.",
+    ],
+    parameters: Type.Object({
+      slug: Type.String({ description: "Kebab-case slug, e.g. \"code-review\"." }),
+      content: Type.String({ description: "Full SKILL.md content (YAML frontmatter + body)." }),
+      enabled: Type.Optional(
+        Type.Boolean({ description: "Whether the skill is active. Defaults to true." }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return hostWrite(
+        ctx,
+        "create_skill",
+        params,
+        (r) => `Created the "${r.slug}" skill${r.enabled ? "" : " (disabled)"}.`,
+      );
+    },
+  });
+
+  pi.registerTool({
+    name: "metis_update_skill",
+    label: "Update Metis Skill",
+    description:
+      "Edit an existing team skill by slug. Pass `content` to replace its " +
+      "SKILL.md, and/or `enabled` to enable/disable it — both optional, so this " +
+      "doubles as the enable/disable control. Only team admins can edit. " +
+      "Built-in skills can't be edited.",
+    promptSnippet: "Edit a team skill or toggle enabled",
+    promptGuidelines: [
+      "Use metis_update_skill only when the operator explicitly asks to change, enable, or disable an existing team skill.",
+      "Identify the skill by its exact slug. Pass `content` only to replace SKILL.md; pass `enabled` only to toggle. Omit what you aren't changing.",
+      "This returns the result directly. On failure (not a team admin, or no such team skill), relay the error.",
+    ],
+    parameters: Type.Object({
+      slug: Type.String({ description: "Slug of the team skill to edit." }),
+      content: Type.Optional(
+        Type.String({ description: "New full SKILL.md content. Omit to leave it unchanged." }),
+      ),
+      enabled: Type.Optional(
+        Type.Boolean({ description: "true to enable, false to disable. Omit to leave unchanged." }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return hostWrite(
+        ctx,
+        "update_skill",
+        params,
+        (r) => `Updated the "${r.slug}" skill${r.enabled === false ? " (disabled)" : ""}.`,
+      );
     },
   });
 }
