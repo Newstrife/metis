@@ -69,9 +69,12 @@
           <div class="msg-flag"><%= t('.stopped') %></div>
         <% end %>
 
+        <%# Same in-card footer the interactive chat uses. On a public share
+            the operational meta (tokens/cost) is private detail, so it shows
+            "model · duration" instead, and carries no actions. %>
         <div id="<%= dom_id(message) %>_foot" class="msg-foot">
           <div id="<%= dom_id(message) %>_meta"
-               class="msg-meta"><%= message_meta(message) %></div>
+               class="msg-meta"><%= local_assigns[:shared] ? assistant_shared_stamp(message) : message_meta(message) %></div>
           <% if local_assigns[:forkable] && message.done? %>
             <%= render "messages/actions", message: message %>
           <% end %>

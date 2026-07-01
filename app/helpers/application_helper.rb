@@ -56,6 +56,23 @@ module ApplicationHelper
     parts.reject(&:blank?).join(" · ")
   end
 
+  # Friendly catalog label for a turn's model ("Claude Opus 4.7"), falling
+  # back to the raw pi key. The catalog map is memoized per render so a
+  # message collection resolves in one query, not one per row.
+  def model_key_label(key)
+    return "" if key.blank?
+    (@model_label_map ||= LlmModel.pluck(:key, :label).to_h)[key] || key
+  end
+
+  # The assistant footer on a public share: "model · duration". Duration (not
+  # a wall-clock stamp) is the informative axis — a shared conversation is one
+  # instant flow, so "3m ago" on every turn says nothing, while "1m 10s" tells
+  # the reader how long that turn took.
+  def assistant_shared_stamp(message)
+    [ model_key_label(message.model_key),
+      (format_duration(message.duration) if message.duration) ].reject(&:blank?).join(" · ")
+  end
+
   # A turn's cost: "$0.0011", "$1.23". Sub-cent costs keep 4 decimals so a
   # cheap turn doesn't render as "$0.00".
   def format_cost(cost)
