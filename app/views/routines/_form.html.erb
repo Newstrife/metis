@@ -1,0 +1,129 @@
+<%= form_with model: routine, url: routine.persisted? ? routine_path(routine) : routines_path,
+      class: "conn-form",
+      data: {
+        controller: "routine-form",
+        routine_form_daily_value: t(".preview.daily"),
+        routine_form_weekly_value: t(".preview.weekly"),
+        routine_form_hourly_value: t(".preview.hourly"),
+        routine_form_monthly_value: t(".preview.monthly"),
+        routine_form_custom_preview_value: t(".preview.custom"),
+        routine_form_every_day_value: t(".preview.every_day")
+      } do |f| %>
+  <% if routine.errors.any? %>
+    <div class="flash error"><%= routine.errors.full_messages.to_sentence %></div>
+  <% end %>
+
+  <div class="field">
+    <%= f.label :name %>
+    <%= f.text_field :name, placeholder: t(".name_placeholder"), autocomplete: "off" %>
+  </div>
+
+  <div class="field">
+    <%= f.label :prompt %>
+    <%= f.text_area :prompt, rows: 5, placeholder: t(".prompt_placeholder") %>
+    <p class="field-hint"><%= t(".prompt_hint_html") %></p>
+  </div>
+
+  <div class="field">
+    <%= label_tag "routine_model", t(".model_label") %>
+    <%= select_tag "routine[model]",
+          grouped_options_for_select(Agent::Catalog.grouped_model_options, routine.run_settings["model"]),
+          include_blank: t(".model_default"), class: "team-input", id: "routine_model" %>
+    <p class="field-hint"><%= t(".model_hint") %></p>
+  </div>
+
+  <div class="field">
+    <%= f.label :trigger_source, t(".trigger_label") %>
+    <%= f.select :trigger_source,
+          Routine.trigger_sources.keys.map { |k| [ t(".trigger_kinds.#{k}"), k ] }, {},
+          class: "team-input", data: { action: "routine-form#toggle" } %>
+  </div>
+
+  <div class="field routine-sched" data-routine-form-target="scheduleSection">
+    <label><%= t(".schedule_label") %></label>
+
+    <div class="routine-sched-grid">
+      <div class="routine-sched-cell">
+        <span class="field-sublabel"><%= t(".frequency_label") %></span>
+        <%= select_tag :_frequency, options_for_select(routine_frequency_options, "daily"),
+              class: "team-input", data: { routine_form_target: "frequency", action: "routine-form#onFrequency" } %>
+      </div>
+      <div class="routine-sched-cell" data-routine-form-target="hourCell">
+        <span class="field-sublabel"><%= t(".hour_label") %></span>
+        <%= select_tag :_hour, options_for_select(routine_hour_options, 9),
+              class: "team-input", data: { routine_form_target: "hour", action: "routine-form#build" } %>
+      </div>
+      <div class="routine-sched-cell">
+        <span class="field-sublabel"><%= t(".minute_label") %></span>
+        <%= select_tag :_minute, options_for_select(routine_minute_options, 0),
+              class: "team-input", data: { routine_form_target: "minute", action: "routine-form#build" } %>
+      </div>
+    </div>
+
+    <div class="routine-sched-days" data-routine-form-target="daysRow" hidden>
+      <span class="field-sublabel"><%= t(".days_label") %></span>
+      <div class="routine-day-chips">
+        <% routine_day_options.each do |num, label| %>
+          <label class="routine-day-chip">
+            <%= check_box_tag "_days[]", num, false,
+                  data: { routine_form_target: "day", action: "routine-form#build" } %>
+            <span><%= label %></span>
+          </label>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="routine-sched-cell" data-routine-form-target="domRow" hidden>
+      <span class="field-sublabel"><%= t(".day_of_month_label") %></span>
+      <%= select_tag :_dom, options_for_select((1..31).map { |d| [ d, d ] }, 1),
+            class: "team-input", data: { routine_form_target: "dom", action: "routine-form#build" } %>
+    </div>
+
+    <p class="routine-sched-preview" data-routine-form-target="preview"></p>
+
+    <div class="routine-sched-cell" data-routine-form-target="customRow" hidden>
+      <span class="field-sublabel"><%= t(".cron_label") %></span>
+      <%= f.text_field :cron, placeholder: "0 9 * * *", autocomplete: "off",
+            class: "team-input routine-cron-expr",
+            data: { routine_form_target: "cron", action: "routine-form#onCronInput" } %>
+      <p class="field-hint"><%= t(".cron_hint_html") %></p>
+    </div>
+
+    <div class="routine-sched-cell">
+      <span class="field-sublabel"><%= t(".timezone_label") %></span>
+      <%= f.select :timezone, routine_timezone_options, {},
+            class: "team-input", data: { routine_form_target: "timezone", action: "routine-form#build" } %>
+      <p class="field-hint"><%= t(".timezone_hint") %></p>
+    </div>
+  </div>
+
+  <div class="field" data-routine-form-target="eventSection" hidden>
+    <%= f.label :event_type, t(".event_label") %>
+    <%= f.select :event_type,
+          grouped_options_for_select(routine_event_type_options(routine.event_type), routine.event_type),
+          { include_blank: t(".event_blank") }, class: "team-input" %>
+    <p class="field-hint"><%= t(".event_hint_html") %></p>
+    <%= label_tag "routine_cooldown_seconds", t(".cooldown_label"), class: "field-sublabel" %>
+    <%= number_field_tag "routine[cooldown_seconds]", routine.cooldown_seconds, min: 0,
+          class: "team-input", id: "routine_cooldown_seconds" %>
+    <p class="field-hint"><%= t(".cooldown_hint") %></p>
+  </div>
+
+  <div class="field">
+    <%= f.label :visibility, t(".visibility_label") %>
+    <%= f.select :visibility,
+          Routine.visibilities.keys.map { |k| [ t(".visibilities.#{k}"), k ] }, {}, class: "team-input" %>
+    <p class="field-hint"><%= t(".visibility_hint") %></p>
+  </div>
+
+  <div class="field">
+    <%= f.label :project_id, t(".project_label") %>
+    <%= f.collection_select :project_id, current_team.projects.recent, :id, :name,
+          { include_blank: t(".project_blank") }, class: "team-input" %>
+    <p class="field-hint"><%= t(".project_hint") %></p>
+  </div>
+
+  <div class="form-actions">
+    <%= f.submit(routine.persisted? ? t("common.save") : t(".create_routine"), class: "btn btn-primary") %>
+  </div>
+<% end %>
