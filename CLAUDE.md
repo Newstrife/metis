@@ -16,7 +16,12 @@ them, or argue them on a PR — don't drift into them.
 Metis is a Rails 8.1 web app (Ruby 4.0.5, PostgreSQL) that puts a chat UI in
 front of an agent harness. v1 ships the **pi** backend, driven via the
 `pi-agent-rb` gem. Hotwire (Turbo + Stimulus, importmap, Tailwind) renders the
-live streaming chat; Devise handles auth.
+live streaming chat; Devise handles auth. The app is PWA-installable
+(`rails/pwa` manifest + service-worker routes) and carries Hotwire Native
+groundwork for the iOS app: `hotwire_native_app?` toggles a `hotwire-native`
+body class, `Hotwire::PathConfigurationsController` serves the native path
+config, and `Users::NativeAuthController#google` accepts the iOS app's
+natively-obtained Google ID token.
 
 ## Commands
 
@@ -27,6 +32,7 @@ live streaming chat; Devise handles auth.
 - `bin/rubocop` — lint (rubocop-rails-omakase house style)
 - `bin/ci` — full CI pipeline: rubocop, bundler-audit, importmap audit, brakeman, tests, seed replant
 - `bin/brakeman` / `bin/bundler-audit` — security scans
+- `bin/rails metis:doctor` — configuration checklist: each subsystem (email, providers, runtime, storage, …) reported as configured / missing / defaulted, exit 1 on missing required config
 
 Run `bin/rubocop` and the relevant tests before committing.
 
@@ -143,7 +149,20 @@ pi's own conventions (https://pi.dev/docs/latest/providers): `ANTHROPIC_API_KEY`
 `OPENAI_API_KEY`, `GEMINI_API_KEY` (note: not `GOOGLE_API_KEY` — pi's name),
 `DEEPSEEK_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, etc. Provider API keys are a
 shared, deployment-level resource — there are no per-user keys. All unset → pi
-uses its own config. Full env-var table in `docs/configuration.md`.
+uses its own config. Full env-var table in `docs/configuration.md`;
+production deploys (Kamal, `deploy.yml` + `.kamal/secrets`) in
+`docs/deployment.md`.
+
+### Email
+
+Transactional email (invitations, password reset) goes out through the
+transport `METIS_MAIL_DELIVERY` names — production defaults to `smtp`
+(`Delivery::SmtpSettings.from_env` builds `smtp_settings` from `SMTP_*`
+env vars), development to `test`; `cloudflare` selects the
+`Delivery::Cloudflare` REST client. Sends run through `MailDeliveryJob`,
+which retries transient failures. Like provider keys, mail credentials
+are deployment-level ENV — never per-user. See
+`docs/configuration.md#email--account-access`.
 
 ### Connectors (MCP)
 
@@ -262,7 +281,8 @@ with **fugit** (IANA zone embedded as the trailing field). See
 - Models use integer enums: `Conversation#visibility`, `Message#role`,
   `Message#streaming_status`, `Message#kind`, `Connector#transport`,
   `WorkflowRun#status`, `Task#status`, `Task#gate`, `Workflow#trigger_source`,
-  `Membership#role`.
+  `Membership#role`, `Invitation#role`, `WebhookEvent#provider`,
+  `Routine#trigger_source`, `Routine#visibility`.
 - User-facing copy lives in `config/locales/*.en.yml` (split by surface:
   `views_*`, `flash`, `mailers`, `models`, …), reached via `t(...)` / `I18n.t`
   — not inline strings. English is the baseline.
