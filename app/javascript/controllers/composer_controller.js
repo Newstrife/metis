@@ -5,6 +5,8 @@ import { Controller } from "@hotwired/stimulus"
 // 1. Submit on Enter — Enter sends, Shift+Enter inserts a newline.
 //    Enter is ignored mid-IME-composition (so confirming a
 //    Chinese/Japanese candidate doesn't send) and while a turn streams.
+//    On touch devices the return key inserts a newline instead (mobile
+//    chat convention) — the send button is the only way to submit.
 //
 // 2. Auto-focus — on initial load, Turbo Drive navigation, and after a
 //    streaming turn ends. Skipped on touch-primary devices and when the
@@ -32,6 +34,12 @@ export default class extends Controller {
 
   submitOnEnter(event) {
     if (event.key !== "Enter" || event.shiftKey || event.isComposing) return
+    // Mobile chat convention is the reverse of desktop: the virtual
+    // keyboard's return key inserts a newline (it has no Shift+Enter)
+    // and the send button submits. True on touch-primary devices and in
+    // the native shells; a touchscreen laptop stays desktop because its
+    // trackpad still reports hover:hover.
+    if (this._touchPrimary()) return
 
     event.preventDefault()
     const form = this.element.form
@@ -79,7 +87,7 @@ export default class extends Controller {
   }
 
   _focusIfIdle() {
-    if (window.matchMedia("(pointer: coarse)").matches) return
+    if (this._touchPrimary()) return
     if (this._streaming(this.element.form)) return
 
     // Only treat focus on another *editable* element as a reason to bail —
@@ -96,5 +104,10 @@ export default class extends Controller {
 
   _streaming(form) {
     return form?.querySelector("#composer_actions")?.dataset.composerState === "streaming"
+  }
+
+  _touchPrimary() {
+    return document.body.classList.contains("hotwire-native") ||
+      window.matchMedia("(pointer: coarse) and (hover: none)").matches
   }
 }

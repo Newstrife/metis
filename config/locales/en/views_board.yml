@@ -6,7 +6,6 @@ en:
         project: "project"
         status: "status"
       empty: "No runs yet. Start a workflow to see it here."
-      read_only: "Read-only · status owned by the workflow engine"
       no_project: "No project"
       columns:
         queued: "Queued"
@@ -40,8 +39,6 @@ en:
         "1m": "1m"
         all: "All"
     actors:
-      live: "live"
-      expand: "Show actors"
       summary_people:
         one: "%{count} member"
         other: "%{count} members"
@@ -53,16 +50,10 @@ en:
       people: "People"
       machines: "Machines"
       reviewing: "reviewing %{ref}"
-      no_gates: "no open gates"
-      idle: "idle"
       gate_count:
         one: "%{count} gate"
         other: "%{count} gates"
       working: "working %{ref}"
-      no_task: "no task claimed"
-      online: "online"
-      stale: "stale"
       seen: "seen %{ago}"
       never: "never"
       no_machines: "No connected machines"
-      presence_note: "Presence is a coarse online / stale light from the bridge heartbeat — one signal per machine."

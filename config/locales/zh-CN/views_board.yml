@@ -6,7 +6,6 @@ zh-CN:
         project: "项目"
         status: "状态"
       empty: "暂无运行。启动一个工作流后会出现在这里。"
-      read_only: "只读 · 状态类型基于工作流引擎"
       no_project: "无项目"
       columns:
         queued: "队列中"
@@ -39,8 +38,6 @@ zh-CN:
         "1m": "1个月"
         all: "全部"
     actors:
-      live: "实时"
-      expand: "显示活跃对象"
       summary_people:
         other: "%{count} 名成员"
       gates_badge:
@@ -50,15 +47,9 @@ zh-CN:
       people: "成员"
       machines: "机器"
       reviewing: "正在审阅 %{ref}"
-      no_gates: "无待处理关卡"
-      idle: "空闲"
       gate_count:
         other: "%{count} 个关卡"
       working: "正在处理 %{ref}"
-      no_task: "未领取任务"
-      online: "在线"
-      stale: "失联"
       seen: "%{ago}前见过"
       never: "从未"
       no_machines: "无连接的机器"
-      presence_note: "在线状态是来自 bridge 心跳的粗粒度信号 — 每台机器一个信号。"

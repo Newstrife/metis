@@ -112,6 +112,9 @@ body {
   background:var(--bg);
   color:var(--ink);
   -webkit-font-smoothing:auto;
+  /* Kill the gray flash iOS draws on every tap — the touch layer below
+     provides its own feedback. */
+  -webkit-tap-highlight-color:transparent;
 }
 body.app-shell { overflow:hidden; }
 ::selection { background:var(--accent-soft); color:var(--accent-fg); }
@@ -121,6 +124,47 @@ body.app-shell { overflow:hidden; }
   border:3px solid transparent; background-clip:padding-box;
 }
 ::-webkit-scrollbar-thumb:hover { background:var(--scroll-h); background-clip:padding-box; }
+
+/* ───────────── touch ─────────────
+   Ported from themis. Interactive elements drop the legacy 300ms tap
+   delay and double-tap zoom; `manipulation` keeps pinch-zoom elsewhere. */
+a, button, [role="button"] { touch-action:manipulation; }
+
+@media (hover:none) {
+  /* Long-pressing a sidebar row pops Safari's link callout or lifts the
+     link into a drag preview — app chrome should feel native. Message
+     content keeps the default so links there stay long-pressable. */
+  .sidebar a, .sidebar button, .sidebar-toggle {
+    -webkit-touch-callout:none;
+    -webkit-user-drag:none;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+
+  /* Touch has no hover — flash the hover treatment on press instead. */
+  .convo:active, .nav-item:active, .prjnav-item:active {
+    background:var(--card); color:var(--ink);
+    transform:scale(.98);
+    transition:background-color .05s ease, transform .05s ease;
+  }
+  /* Universal fallback for everything without its own :active style. */
+  a:active, button:active, [role="button"]:active {
+    opacity:.6;
+    transition:opacity .05s ease;
+  }
+}
+
+/* Native shell: no long-press link callout / drag-lift anywhere — both
+   read as "web page inside an app". */
+.hotwire-native a, .hotwire-native button {
+  -webkit-touch-callout:none;
+  -webkit-user-drag:none;
+}
+/* iOS auto-zooms focused fields under 16px. The 768px mobile layer
+   already bumps phone fields; this covers the native shell on iPad. */
+.hotwire-native input, .hotwire-native textarea, .hotwire-native select {
+  font-size:max(16px, 1em);
+}
 
 /* ───────────── shell ───────────── */
 .app {
@@ -1206,7 +1250,7 @@ img.avatar { background:none; object-fit:cover; }
 .attach svg { width:16px; height:16px; }
 .send {
   display:grid; place-items:center; flex:none;
-  width:36px; height:36px; border:none; border-radius:10px;
+  width:36px; height:36px; border:none; border-radius:50%;
   cursor:pointer; background:var(--accent); color:var(--on-accent);
   transition:opacity .15s,color .15s,border-color .15s;
 }
@@ -2150,7 +2194,9 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .sidebar {
     position:fixed; top:0; bottom:0; left:0;
     width:84%; max-width:320px; z-index:50;
-    padding:10px 0;
+    /* The drawer spans the full screen height, so clear the notch and
+       home indicator (standalone PWA / native app; 0 in browser tabs). */
+    padding:max(10px, env(safe-area-inset-top)) 0 max(10px, env(safe-area-inset-bottom));
     background:var(--side);
     box-shadow:var(--sh-lg);
     transform:translateX(-100%);
@@ -2187,6 +2233,11 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
     text-overflow:ellipsis;
   }
   .chat-sub { margin-top:5px; gap:7px; }
+  /* Run identity row — workflow name and status only; the step/duration/
+     cost stats are desktop telemetry. */
+  .wf-meta { flex-wrap:wrap; }
+  .wf-meta-name { white-space:nowrap; }
+  .wf-meta-stats { display:none; }
   .chat-actions { gap:2px; }
   .chat-action { width:30px; height:30px; }
 
@@ -2227,10 +2278,17 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .welcome h1 { font-size:21px; }
   .welcome p { font-size:14px; }
 
-  /* Share popover — keep it inside the viewport on narrow screens. */
+  /* New-chat: same layout as before, just a taller composer — starts a
+     few lines tall (inviting to type) and grows from there via autoResize. */
+  .chat-new .composer textarea { min-height:132px; }
+
+  /* Share popover — anchored right:0 it hangs past the left viewport
+     edge on phones; pin it to the viewport under the header instead. */
   .share-panel {
-    width:min(320px, calc(100vw - 28px));
-    right:0;
+    position:fixed;
+    top:calc(max(14px, env(safe-area-inset-top)) + 52px);
+    left:50%; right:auto; transform:translateX(-50%);
+    width:min(340px, calc(100vw - 28px));
   }
 
   /* Pane (settings) bodies — tighten edges. */
@@ -2295,6 +2353,9 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .attach { width:38px; height:38px; }
   .attach svg { width:17px; height:17px; }
   .send { width:40px; height:40px; }
+  .toolcall-head { padding:7px 0; }
+  /* 16px keeps iOS from zooming when the picker opens. */
+  .model-pick select { font-size:16px; padding:8px 26px 8px 12px; }
   .convo { padding:11px 12px; }
   .nav-item { padding:11px 12px; }
   .archived-restore { padding:7px 14px; font-size:13px; }
@@ -2896,26 +2957,35 @@ body.drawer-open { overflow:hidden; }
 .board-tag { margin-left:auto; font-family:var(--fm); font-size:10px; color:var(--faint); }
 
 .board-empty { padding:60px 22px; text-align:center; font-size:13.5px; color:var(--ink-3); }
+/* Status bar: people presence left, bridge machines right. Each side is
+   a minimal trigger whose panel opens above it on hover or tap. */
 .board-foot {
-  padding:9px 22px; border-top:1px solid var(--line);
-  font-size:11px; color:var(--ink-3);
+  padding:5px 14px; border-top:1px solid var(--line);
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
 }
+.board-side { position:relative; }
+.board-side-bar {
+  display:flex; align-items:center; gap:8px;
+  background:none; border:none; border-radius:9px;
+  padding:5px 8px; cursor:pointer; color:var(--ink-2);
+  transition:background-color .13s;
+}
+.board-side:hover .board-side-bar, .board-side.open .board-side-bar { background:var(--bg); }
+.board-side-bar > svg { width:15px; height:15px; color:var(--ink-3); }
 
-/* Actors: a compact presence bar in the board header that expands into a
-   dropdown panel. The grid stays full-width. */
-.board-actors { position:relative; }
-.board-actors-bar {
-  display:flex; align-items:center; gap:10px;
-  background:var(--card); border:1px solid var(--line); border-radius:11px;
-  padding:6px 10px; cursor:pointer; color:var(--ink-2);
-  transition:border-color .15s, box-shadow .15s;
+/* Flush to the bar's top edge — a gap would break the pointer's hover
+   path from trigger to panel. */
+.board-side-panel {
+  display:none; position:absolute; bottom:100%; left:0; z-index:20;
+  width:320px; max-width:calc(100vw - 28px); max-height:min(70vh, 540px); overflow:auto;
+  background:var(--side); border:1px solid var(--line); border-radius:14px;
+  box-shadow:var(--sh-lg); padding:8px 12px;
 }
-.board-actors-bar:hover { border-color:var(--line-2); box-shadow:var(--sh-sm); }
-.board-actors.open .board-actors-bar { border-color:var(--accent-fg); }
-.board-actors-lbl {
-  font-family:var(--fm); font-size:10.5px; letter-spacing:.04em;
-  text-transform:uppercase; color:var(--ink-3);
+.board-side--r .board-side-panel { left:auto; right:0; }
+@media (hover:hover) {
+  .board-side:hover .board-side-panel { display:block; }
 }
+.board-side.open .board-side-panel { display:block; }
 
 .board-actors-stack { display:flex; align-items:center; padding-left:4px; }
 .board-actors-av {
@@ -2941,35 +3011,10 @@ body.drawer-open { overflow:hidden; }
   padding:1px 8px; border-radius:11px;
   background:var(--gold-soft); color:var(--gold);
 }
-.board-actors-mach {
-  display:flex; align-items:center; gap:6px;
-  padding-left:10px; margin-left:2px; border-left:1px solid var(--line);
-}
-.board-actors-mach svg { width:15px; height:15px; color:var(--ink-3); }
 .board-actors-ct { font-size:11px; color:var(--ink-2); }
 .board-actors-dots { display:flex; align-items:center; gap:3px; }
-.board-actors-chev { width:14px; height:14px; color:var(--ink-3); transition:transform .15s; }
-.board-actors.open .board-actors-chev { transform:rotate(180deg); }
 
-.board-actors-panel {
-  display:none; position:absolute; right:0; top:calc(100% + 8px); z-index:20;
-  width:320px; max-width:88vw; max-height:min(70vh, 540px); overflow:auto;
-  background:var(--side); border:1px solid var(--line); border-radius:14px;
-  box-shadow:var(--sh-lg); padding:6px 12px 14px;
-}
-.board-actors.open .board-actors-panel { display:block; }
 .board-actors-empty { padding:8px 7px; font-size:12px; color:var(--ink-3); }
-.board-actors-note {
-  margin-top:8px; padding:13px 7px 2px; border-top:1px solid var(--line);
-  font-size:10.5px; line-height:1.55; color:var(--ink-3);
-}
-
-.board-rsec {
-  display:flex; align-items:center; gap:8px;
-  padding:15px 6px 7px; font-size:11px; font-weight:600;
-  letter-spacing:.04em; text-transform:uppercase; color:var(--ink-3);
-}
-.board-rsec-ct { margin-left:auto; font-family:var(--fm); }
 
 .board-arow { display:flex; align-items:center; gap:10px; padding:8px 7px; border-radius:9px; }
 .board-arow:hover { background:var(--card); }
@@ -3064,3 +3109,34 @@ body.drawer-open { overflow:hidden; }
 .board-proj-link { color:inherit; text-decoration:none; }
 .board-proj-link:hover { color:var(--accent-fg); text-decoration:underline; }
 .prnav-badge-slot { display:inline-flex; }
+
+@media (max-width:768px) {
+  .board-head {
+    padding:14px 14px 12px;
+    padding-top:max(14px, env(safe-area-inset-top));
+  }
+  /* Only the title clears the floating hamburger — the filter rows
+     below sit flush left. */
+  .board-head h1 { padding-left:42px; }
+  .board-foot { padding-bottom:max(5px, env(safe-area-inset-bottom)); }
+}
+
+/* ============================================================
+   HOTWIRE NATIVE — the iOS/Android shells (body.hotwire-native).
+   Native tabs replace the sidebar's primary nav and native bars
+   own the safe areas; everything else reuses the mobile (768px)
+   layer as-is.
+   ============================================================ */
+/* No native tab bar — the sidebar drawer is the navigation, so keep its
+   primary nav and the settings "back to chat" link visible. */
+/* The native tab bar floats over the web view's bottom, and these pages
+   scroll inside inner (100dvh) containers that never see the native
+   scroll-view inset — so the last row (e.g. Save profile) would sit
+   under the bar. WebKit also ignores a scroll container's own
+   padding-bottom for scroll extent, so a real spacer child is what
+   lets it clear. Its height is the exact overlap the iOS shell measures
+   and injects as --native-bottom-inset (WebViewController); 0 until it
+   reports, so non-native contexts add nothing. */
+.hotwire-native .pane-body::after {
+  content:""; display:block; flex:none; height:var(--native-bottom-inset, 0px);
+}
