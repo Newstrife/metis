@@ -37,10 +37,10 @@ Rails.application.configure do
   # Make template changes take effect immediately.
   config.action_mailer.perform_caching = false
 
-  # Send for real when Cloudflare creds are present (e.g. on a shared dev
-  # host); otherwise accumulate in ActionMailer::Base.deliveries.
-  config.action_mailer.delivery_method =
-    ENV["CLOUDFLARE_EMAIL_API_TOKEN"].present? ? :cloudflare : :test
+  # Default :test accumulates in ActionMailer::Base.deliveries; set
+  # METIS_MAIL_DELIVERY=smtp|cloudflare to send for real (e.g. on a
+  # shared dev host). Credentials in config/initializers/mail.rb.
+  config.action_mailer.delivery_method = (ENV["METIS_MAIL_DELIVERY"].presence || "test").to_sym
 
   # Set host to be used by links generated in mailer templates. A shared
   # dev host (METIS_DEV_HOST) sits behind TLS with no explicit port.

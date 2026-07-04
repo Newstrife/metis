@@ -8,6 +8,15 @@ it). Copy the template to start, then fill in what you need:
 cp .env.example .env
 ```
 
+`.env` only feeds local runs. A **Kamal deployment** takes its
+environment from `config/deploy.yml` instead: plain values under
+`env.clear` (ERB-interpolated from `.env.deploy` at deploy time),
+secret **names** under `env.secret`, resolved at deploy through
+`.kamal/secrets` (this repo's pulls them from Rails production
+credentials). Every variable below applies the same way in both worlds —
+`.env` for development, `deploy.yml` + `.kamal/secrets` for production.
+Step-by-step deploy guide: [`deployment.md`](deployment.md).
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -23,8 +32,10 @@ cp .env.example .env
 | `DAYTONA_API_KEY` / `METIS_DAYTONA_SNAPSHOT` | required by the `daytona` runtime |
 | `DAYTONA_API_URL` / `DAYTONA_TARGET` | optional Daytona API endpoint / region |
 | `METIS_DAYTONA_AUTO_STOP_MINUTES` / `_AUTO_ARCHIVE_MINUTES` / `_AUTO_DELETE_MINUTES` | Daytona idle-lifecycle intervals, minutes (default 120 / 60 / 1440). Stop is a crash-only safety net — keep it above the longest turn. |
-| `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_EMAIL_API_TOKEN` | outbound email — see [Email & access](#email--account-access) |
-| `METIS_MAIL_FROM` | sender for all email (on the Cloudflare-verified domain) |
+| `SMTP_ADDRESS`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, … | outbound email over SMTP — see [Email & access](#email--account-access) |
+| `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_EMAIL_API_TOKEN` | outbound email via Cloudflare Email Service — see [Email & access](#email--account-access) |
+| `METIS_MAIL_DELIVERY` | mail transport: `smtp` (production default), `cloudflare`, or `test` (development default — no real send) |
+| `METIS_MAIL_FROM` | sender for all email (on a domain your transport may send for) |
 | `METIS_APP_HOST` | host for links in emails (invites, password reset) |
 | `METIS_REGISTRATION_MODE` | `invite_only` (default) or `open` |
 | `METIS_ALLOWED_DOMAINS` | comma-separated email domains that may register without an invitation in invite-only mode (default empty — off) |
@@ -128,14 +139,52 @@ into the sandbox by `Agent::Runtime::Base#sandbox_env`.
 
 ## Email & account access
 
-Transactional email — team invitations and Devise's password reset — is
-sent through **Cloudflare Email Service**'s REST API (`Delivery::Cloudflare`),
-not SMTP. Set `CLOUDFLARE_ACCOUNT_ID` and a send-scoped
-`CLOUDFLARE_EMAIL_API_TOKEN`, and point `METIS_MAIL_FROM` at an address on
-a **domain you've verified** in that Cloudflare account. `METIS_APP_HOST`
-is the host links in those emails resolve to (production; a shared dev
-host uses `METIS_DEV_HOST`). With the token unset, development falls back
-to ActionMailer's `:test` delivery (no real send).
+Transactional email — team invitations and Devise's password reset —
+goes out through the transport `METIS_MAIL_DELIVERY` names: `smtp` (the
+production default), `cloudflare`, or `test` (the development default —
+mail accumulates in `ActionMailer::Base.deliveries`, nothing is sent).
+Credentials are read from ENV in `config/initializers/mail.rb`.
+
+- **`smtp`** — Rails' built-in transport; works with any provider. Only
+  `SMTP_ADDRESS` is required:
+
+  | Variable | Default | Purpose |
+  |---|---|---|
+  | `SMTP_ADDRESS` | — | server hostname |
+  | `SMTP_PORT` | `587` | |
+  | `SMTP_USERNAME` / `SMTP_PASSWORD` | — | blank → connect without AUTH |
+  | `SMTP_AUTHENTICATION` | `plain` | `plain`, `login`, or `cram_md5` |
+  | `SMTP_DOMAIN` | — | HELO domain, if your provider requires it |
+  | `SMTP_ENABLE_STARTTLS` | `true` | upgrade to TLS after connect |
+  | `SMTP_TLS` | `false` | implicit TLS (SMTPS, port 465) |
+
+  `SMTP_ENABLE_STARTTLS` is *opportunistic*: if the server doesn't offer
+  STARTTLS the mail still goes out, in plaintext. For a server that must
+  never fall back to plaintext, use `SMTP_TLS=true` (implicit TLS).
+
+  Hosted senders — all STARTTLS on the default port 587:
+
+  | Provider | `SMTP_ADDRESS` | Credentials |
+  |---|---|---|
+  | Amazon SES | `email-smtp.<region>.amazonaws.com` | dedicated SES SMTP credentials — not your AWS access key |
+  | Mailgun | `smtp.mailgun.org` | domain SMTP login |
+  | Postmark | `smtp.postmarkapp.com` | server API token as username and password |
+  | SendGrid | `smtp.sendgrid.net` | username `apikey`, API key as password |
+  | Resend | `smtp.resend.com` | username `resend`, API key as password |
+
+- **`cloudflare`** — Cloudflare Email Service's REST API
+  (`Delivery::Cloudflare`). Set `CLOUDFLARE_ACCOUNT_ID` and a send-scoped
+  `CLOUDFLARE_EMAIL_API_TOKEN`; the sender domain must be verified in
+  that account.
+
+- **Anything a gem registers** — the value passes straight to
+  ActionMailer, so e.g. `aws-actionmailer-ses` (`sesv2`) or
+  `postmark-rails` (`postmark`) works: add the gem, configure it per its
+  README, set `METIS_MAIL_DELIVERY` to its name.
+
+`METIS_MAIL_FROM` is the sender — an address on a domain your transport
+may send for. `METIS_APP_HOST` is the host links in those emails resolve
+to (production; a shared dev host uses `METIS_DEV_HOST`).
 
 Account creation is the access boundary — every account runs the agent on
 the deployment's shared provider keys — so `METIS_REGISTRATION_MODE`
