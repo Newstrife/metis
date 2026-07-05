@@ -2792,7 +2792,7 @@ body.drawer-open { overflow:hidden; }
   margin-left:auto; flex:none; padding-left:14px;
   font-family:var(--fm); font-size:10px; color:var(--faint); white-space:nowrap;
 }
-.msg-step .chat-content { font-size:13px; color:var(--ink-2); }
+.msg-step .chat-content { flex:1; min-width:0; font-size:13px; color:var(--ink-2); }
 .msg-step .chat-content p { margin:0 0 .35rem; }
 .msg-step .chat-content > :last-child { margin-bottom:0; }
 /* Gold = review, matching the timeline's gate cards. */
