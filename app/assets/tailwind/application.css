@@ -1046,6 +1046,25 @@ img.avatar { background:none; object-fit:cover; }
 .art-action--ghost { color:var(--ink-3); border-color:transparent; background:transparent; }
 .art-action--ghost:hover { color:var(--ink); background:var(--canvas); }
 
+/* Share button in the preview header — same family as Download/Fullscreen;
+   its popover reuses the chat header's .share/.share-panel pattern. */
+.preview-share-btn {
+  height:32px; box-sizing:border-box;
+  display:inline-flex; align-items:center;
+  padding:0 12px; border-radius:8px;
+  font-family:inherit; font-size:13px; font-weight:500; line-height:1;
+  color:var(--ink); cursor:pointer;
+  background:transparent; border:1px solid var(--line);
+}
+.preview-share-btn:hover { background:var(--card); border-color:var(--line-2); }
+/* Same share glyph as the chat header's toggle (conversations/show). */
+.preview-share-btn::before {
+  content:""; width:13px; height:13px; margin-right:6px;
+  background:currentColor;
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='3.5' r='1.75'/><circle cx='4' cy='8' r='1.75'/><circle cx='12' cy='12.5' r='1.75'/><path d='M5.5 7.1l5-2.7'/><path d='M5.5 8.9l5 2.7'/></svg>") center/contain no-repeat;
+          mask:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='3.5' r='1.75'/><circle cx='4' cy='8' r='1.75'/><circle cx='12' cy='12.5' r='1.75'/><path d='M5.5 7.1l5-2.7'/><path d='M5.5 8.9l5 2.7'/></svg>") center/contain no-repeat;
+}
+
 /* preview page (standalone tab) */
 .preview-shell {
   background:var(--bg); min-height:100vh; height:100vh; height:100dvh;
@@ -1145,6 +1164,18 @@ img.avatar { background:none; object-fit:cover; }
   flex:1; min-height:0; width:100%;
   background:var(--card); border:1px solid var(--line); border-radius:10px;
 }
+.preview-pdf {
+  flex:1; min-height:0; width:100%;
+  background:var(--card); border:1px solid var(--line); border-radius:10px;
+}
+/* public shared-artifact page (same shell, no back link) */
+.preview-size { font-family:var(--fm); font-size:11px; color:var(--ink-3); flex:none; }
+.preview-image { display:block; max-width:100%; margin:0 auto; border-radius:10px; }
+.preview-none { margin:auto; color:var(--ink-3); font-size:13.5px; }
+/* Public shared-artifact page reuses the shared page's footer + brand;
+   in the fixed-height preview shell the footer must not be squeezed. */
+.preview-shell .shared-foot { flex:none; }
+.preview-shell .shared-brand { flex:none; margin-right:2px; }
 
 /* ───────────── composer ───────────── */
 .composer-wrap { padding:12px 28px 18px; }
@@ -2313,10 +2344,12 @@ body.auth-shell { min-height:100vh; display:grid; place-items:center; padding:24
   .preview-action-label { display:none; }
   .preview-back { padding:0; }
   .preview-fs { display:none; }
-  .preview-download {
+  /* Brand collapses to the mark alone in the tight public header. */
+  .preview-shell .shared-word { display:none; }
+  .preview-download, .preview-share-btn {
     width:32px; padding:0; justify-content:center;
   }
-  .preview-download::before { margin-right:0; }
+  .preview-download::before, .preview-share-btn::before { margin-right:0; }
   .preview-mode { padding:0 9px; font-size:12px; }
 
   /* Auth pages already use a centered card; just trim padding. */
@@ -2825,6 +2858,124 @@ body.drawer-open { overflow:hidden; }
   background:var(--gold); color:#231a06; border-radius:9px; padding:2px 6px;
 }
 
+/* ───────────── sharing page ───────────── */
+.sharing {
+  background:var(--canvas); border-radius:18px; box-shadow:var(--sh-lg);
+  display:flex; flex-direction:column; min-width:0; min-height:0;
+  overflow:hidden;
+}
+.sharing-head {
+  flex:none; display:flex; align-items:center; gap:14px;
+  padding:18px 22px 14px; border-bottom:1px solid var(--line);
+}
+.sharing-body { flex:1; min-height:0; overflow-y:auto; padding:18px 22px 22px; }
+.sharing-head h1 {
+  font-family:var(--fd); font-weight:700; font-size:21px; letter-spacing:-.02em;
+}
+/* Mirrors the sidebar's Me/Team tabs — same axis, same look. The kind
+   filter (all / conversations / artifacts) rides the far right. */
+.sharing-tabs { flex:none; }
+.sharing-kinds { flex:none; margin-left:auto; }
+.sharing-grid {
+  display:grid; gap:12px;
+  grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+}
+.sharing-card {
+  display:flex; flex-direction:column; gap:10px; min-width:0;
+  background:var(--card); border:1px solid var(--line); border-radius:12px;
+  padding:13px 14px 11px; box-shadow:var(--sh-sm);
+  transition:box-shadow .15s, transform .15s;
+}
+.sharing-card:hover { box-shadow:var(--sh-md); transform:translateY(-1px); }
+.sharing-card-top { display:flex; align-items:center; gap:9px; min-width:0; }
+.sharing-ico {
+  width:28px; height:28px; border-radius:8px; flex:none;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--canvas); border:1px solid var(--line); color:var(--ink-3);
+}
+.sharing-ico svg { width:15px; height:15px; }
+.sharing-title {
+  min-width:0; font-size:13.5px; font-weight:500; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  text-decoration:none;
+}
+.sharing-title:hover { text-decoration:underline; text-underline-offset:2px; }
+a.sharing-card-preview { color:inherit; text-decoration:none; }
+/* Reuses the chat card's .art-card-body variants at a fixed height so
+   a grid row of mixed types stays level. */
+.sharing-card-preview {
+  height:120px; overflow:hidden; flex:none;
+  display:flex; flex-direction:column;
+  background:var(--canvas); border:1px solid var(--line); border-radius:9px;
+}
+.sharing-card-preview .art-card-body--image { flex:1; }
+.sharing-card-preview .art-image { max-height:118px; }
+/* Conversation cards: the opening exchange, role-tinted like the chat. */
+.sharing-card-preview--chat { padding:10px 12px; gap:7px; }
+.sharing-chat-line {
+  margin:0; padding-left:9px; border-left:2px solid var(--line-2);
+  font-size:11.5px; line-height:1.5; color:var(--ink-2);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+  overflow:hidden; word-break:break-word;
+}
+.sharing-chat-line--user { border-left-color:var(--accent); color:var(--ink); }
+.sharing-menu { position:relative; margin-left:auto; flex:none; }
+/* Revealed on hover/focus; always shown while its menu is open and on
+   touch screens, where there is no hover to reveal it. */
+.sharing-kebab {
+  width:26px; height:26px; border-radius:7px; display:grid; place-items:center;
+  background:transparent; border:none; color:var(--ink-3); cursor:pointer;
+  opacity:0; transition:opacity .13s;
+}
+.sharing-card:hover .sharing-kebab,
+.sharing-card:focus-within .sharing-kebab,
+.sharing-menu.open .sharing-kebab { opacity:1; }
+@media (hover: none) {
+  .sharing-kebab { opacity:1; }
+}
+.sharing-kebab:hover { color:var(--ink); background:var(--canvas); }
+.sharing-kebab svg { width:15px; height:15px; }
+.sharing-menu-panel {
+  display:none; position:absolute; right:0; top:calc(100% + 4px); z-index:20;
+  min-width:150px; background:var(--card); border:1px solid var(--line-2);
+  border-radius:10px; box-shadow:var(--sh-lg); padding:4px;
+}
+.sharing-menu.open .sharing-menu-panel { display:block; }
+.sharing-menu-panel form { margin:0; }
+.sharing-menu-item {
+  display:block; width:100%; text-align:left;
+  padding:7px 10px; border:none; border-radius:7px; cursor:pointer;
+  background:transparent; font-size:12.5px; color:var(--ink-2);
+}
+.sharing-menu-item:hover { background:var(--canvas); color:var(--ink); }
+.sharing-stop { color:var(--danger); }
+.sharing-stop:hover { background:var(--danger-soft); color:var(--danger); }
+.sharing-card-foot { display:flex; align-items:center; gap:7px; margin-top:2px; }
+/* The one loud thing on this page: each card is a door that is open
+   to the internet right now — the dot breathes to say "live". */
+.sharing-live {
+  width:7px; height:7px; border-radius:50%; flex:none;
+  background:var(--ok); animation:sharing-live 2.6s ease-in-out infinite;
+}
+@keyframes sharing-live { 0%, 100% { opacity:1; } 50% { opacity:.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .sharing-live { animation:none; }
+}
+.sharing-time { flex:1; min-width:0; font-size:11.5px; color:var(--ink-3); }
+.sharing-card-foot form { margin:0; flex:none; }
+.sharing-stop {
+  padding:4px 9px; font-size:11.5px;
+  background:transparent; color:var(--danger);
+  border:1px solid var(--danger-line); border-radius:7px; cursor:pointer;
+}
+.sharing-stop:hover { background:var(--danger-soft); }
+.sharing-empty {
+  margin-top:22px; padding:44px 20px; text-align:center;
+  border:1px dashed var(--line); border-radius:12px; color:var(--ink-2);
+}
+.sharing-empty-title { font-size:15px; font-weight:600; color:var(--ink); margin-bottom:6px; }
+.sharing-empty-desc { font-size:13px; color:var(--ink-3); }
+
 .board {
   background:var(--canvas); border-radius:18px; box-shadow:var(--sh-lg);
   display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden;
@@ -3119,6 +3270,17 @@ body.drawer-open { overflow:hidden; }
      below sit flush left. */
   .board-head h1 { padding-left:42px; }
   .board-foot { padding-bottom:max(5px, env(safe-area-inset-bottom)); }
+
+  /* Same hamburger clearance on the sharing page; the tab groups wrap
+     under the title on a narrow screen instead of crowding it. */
+  .sharing-head {
+    flex-wrap:wrap; row-gap:8px;
+    padding:14px 14px 10px;
+    padding-top:max(14px, env(safe-area-inset-top));
+  }
+  .sharing-head h1 { padding-left:42px; }
+  .sharing-kinds { margin-left:0; }
+  .sharing-body { padding:14px; }
 }
 
 /* ============================================================

@@ -25,6 +25,35 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/data\.csv/, response.body)
   end
 
+  test "shows the header share button and popover to the conversation owner" do
+    sign_in @user
+    get artifact_preview_path(@blob.signed_id)
+
+    assert_select ".preview-header .preview-share-btn"
+    assert_select ".share .share-panel .access-switch:not(.on)"
+
+    ArtifactShare.share_blob!(blob: @blob, message: @message, user: @user)
+    get artifact_preview_path(@blob.signed_id)
+    assert_select ".share .share-panel .access-switch.on"
+    assert_select ".share .share-panel-url"
+  end
+
+  test "hides the share panel from a teammate who is not the owner" do
+    team = Team.create!(name: "Shared")
+    team.memberships.create!(user: @user, role: :owner)
+    teammate = User.create!(email: "mate@example.com", password: "password123")
+    team.memberships.create!(user: teammate, role: :member)
+    conversation = @user.conversations.create!(title: "Team chat", team: team, visibility: :team)
+    msg = conversation.messages.create!(role: :assistant, content: "x", streaming_status: :done)
+    msg.artifacts.attach(io: StringIO.new("col\na\n"), filename: "shared.csv", content_type: "text/csv")
+
+    sign_in teammate
+    get artifact_preview_path(msg.artifacts.first.blob.signed_id)
+
+    assert_response :success
+    assert_select ".preview-share", false
+  end
+
   test "404s a stranger even with a valid signed_id" do
     sign_in @stranger
     get artifact_preview_path(@blob.signed_id)
@@ -63,7 +92,7 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
     assert_select "pre.preview-text", text: /# Heading/
   end
 
-  test "renders HTML source by default; ?mode=preview renders inside a sandboxed iframe" do
+  test "renders the HTML preview by default in a sandboxed iframe; ?mode=source shows raw" do
     @message.artifacts.attach(
       io: StringIO.new("<h1>Hi</h1>"),
       filename: "page.html", content_type: "text/html"
@@ -72,15 +101,15 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
 
     sign_in @user
     get artifact_preview_path(html_blob.signed_id)
-    assert_select "pre.preview-text", text: /<h1>Hi<\/h1>/
-
-    get artifact_preview_path(html_blob.signed_id, mode: :preview)
     assert_select "iframe.preview-html"
     assert_match(/<iframe[^>]*\bsandbox="allow-scripts"/, response.body,
                  "sandbox must be present with allow-scripts but nothing else")
     refute_match(/sandbox="[^"]*allow-same-origin/, response.body,
                  "allow-same-origin alongside allow-scripts is equivalent to no sandbox — never add it")
     assert_select "button.preview-fs", text: "Fullscreen"
+
+    get artifact_preview_path(html_blob.signed_id, mode: :source)
+    assert_select "pre.preview-text", text: /<h1>Hi<\/h1>/
   end
 
   test "Fullscreen button does not appear in non-HTML previews" do
@@ -96,7 +125,7 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
     assert_select "table.preview-csv"
   end
 
-  test "404s a renderer with no preview modes (e.g. PDF — opened via blob URL, not this route)" do
+  test "renders PDFs in the browser-native viewer iframe" do
     @message.artifacts.attach(
       io: StringIO.new("%PDF-1.4 fake"),
       filename: "report.pdf",
@@ -107,6 +136,38 @@ class ArtifactPreviewsControllerTest < ActionDispatch::IntegrationTest
 
     sign_in @user
     get artifact_preview_path(pdf_blob.signed_id)
-    assert_response :not_found
+
+    assert_response :success
+    assert_select "iframe.preview-pdf"
+  end
+
+  test "renders images on the preview page with the full chrome" do
+    @message.artifacts.attach(
+      io: File.open(Rails.root.join("test/fixtures/files/sample.png")),
+      filename: "sample.png", content_type: "image/png"
+    )
+    png_blob = ActiveStorage::Blob.find_by(filename: "sample.png")
+
+    sign_in @user
+    get artifact_preview_path(png_blob.signed_id)
+
+    assert_response :success
+    assert_select "img.preview-image"
+    assert_select ".preview-share-btn"
+  end
+
+  test "a renderer with no preview modes gets the download-only page, not a 404" do
+    @message.artifacts.attach(
+      io: StringIO.new("\x00\x01binary"),
+      filename: "data.bin", content_type: "application/octet-stream"
+    )
+    bin_blob = ActiveStorage::Blob.find_by(filename: "data.bin")
+
+    sign_in @user
+    get artifact_preview_path(bin_blob.signed_id)
+
+    assert_response :success
+    assert_select "p.preview-none"
+    assert_select ".preview-share-btn"
   end
 end

@@ -1,0 +1,32 @@
+"zh-CN":
+  sharing:
+    index:
+      title: "分享"
+      tab_me: "我的"
+      tab_team: "团队"
+      filter_all: "全部"
+      filter_chats: "对话"
+      filter_artifacts: "文件"
+      empty_title: "还没有分享任何内容"
+      empty_desc: "你为对话和文件创建的公开链接会显示在这里。"
+      empty_team_title: "团队还没有分享内容"
+      empty_team_desc: "团队成员为团队可见对话创建的公开链接会显示在这里。"
+      shared_ago: "%{time}前"
+      public_label: "公开"
+      copied: "已复制"
+      actions: "分享操作"
+      copy_link: "复制链接"
+      stop_sharing: "停止分享"
+  artifact_shares:
+    panel:
+      public_link: "公开链接"
+      public_link_desc: "任何拥有链接的人都能查看此文件"
+      copy: "复制"
+      copied: "已复制"
+  shared_artifacts:
+    show:
+      view_mode: "查看模式"
+      fullscreen: "全屏"
+      download: "下载"
+      no_preview: "此文件类型暂无预览 — 请下载查看。"
+      powered_by_prefix: "由…提供"

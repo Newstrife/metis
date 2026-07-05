@@ -1,0 +1,42 @@
+<%# Share popover for the preview header, mirroring the chat header's
+    conversation panel: the .share wrapper owns the Stimulus controller
+    and open state; this panel is what create/destroy re-render over
+    Turbo. %>
+<div id="<%= dom_id(blob, :share) %>"
+     class="share-panel"
+     data-share-target="panel">
+  <div class="access-row">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6.5 9.5a3 3 0 0 0 4.4.2l2.2-2.2a3 3 0 0 0-4.2-4.2L7.7 4.5"/>
+      <path d="M9.5 6.5a3 3 0 0 0-4.4-.2L2.9 8.5a3 3 0 0 0 4.2 4.2l1.2-1.2"/>
+    </svg>
+    <div class="access-text">
+      <span class="access-title"><%= t('.public_link') %></span>
+      <span class="access-desc"><%= t('.public_link_desc') %></span>
+    </div>
+    <%= button_to(share ? artifact_share_path(share) : artifact_shares_path,
+          method: share ? :delete : :post,
+          params: share ? {} : { signed_id: blob.signed_id },
+          class: "access-switch#{' on' if share}",
+          role: "switch", "aria-checked": share.present?.to_s, "aria-label": t('.public_link'),
+          form: { data: { turbo_stream: true } }) do %>
+      <span class="access-knob"></span>
+    <% end %>
+  </div>
+
+  <% if share %>
+    <div class="share-panel-row">
+      <input type="text"
+             class="share-panel-url"
+             readonly
+             value="<%= shared_artifact_url(token: share.token) %>"
+             data-share-target="url"
+             data-action="focus->share#selectAll">
+      <button type="button"
+              class="share-panel-copy"
+              data-action="click->share#copy"
+              data-share-target="copyButton"><%= t('.copy') %></button>
+    </div>
+  <% end %>
+</div>

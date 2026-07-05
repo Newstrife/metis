@@ -1,0 +1,53 @@
+<% content_for :title, @blob.filename.to_s %>
+
+<header class="preview-header">
+  <a class="shared-brand" href="<%= root_path %>" target="_blank" rel="noopener">
+    <span class="shared-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 18.5V7l7 6.5 7-6.5v11.5"/>
+      </svg>
+    </span>
+    <span class="shared-word">Metis</span>
+  </a>
+  <h1 class="preview-title"><%= @blob.filename %></h1>
+
+  <% if @previewer.preview_modes.size > 1 %>
+    <nav class="preview-modes" aria-label="<%= t('.view_mode') %>">
+      <% @previewer.preview_modes.each do |mode| %>
+        <%= link_to mode.to_s.capitalize,
+                    shared_artifact_path(token: @share.token, mode: mode),
+                    class: "preview-mode#{' is-on' if @mode == mode}" %>
+      <% end %>
+    </nav>
+  <% end %>
+
+  <% if @partial == "previewers/html_full" %>
+    <button type="button" class="preview-fs"
+            data-action="click->fullscreen#enter">
+      <span class="preview-action-label"><%= t('.fullscreen') %></span>
+    </button>
+  <% end %>
+
+  <%= link_to download_shared_artifact_path(token: @share.token),
+              class: "preview-download" do %>
+    <span class="preview-action-label"><%= t('.download') %></span>
+  <% end %>
+</header>
+
+<main class="preview-body">
+  <% if @partial %>
+    <%# content_src keeps image/PDF bytes behind the revocable token
+        route; buffered partials (text, csv) ignore it. %>
+    <%= render @partial, previewer: @previewer, blob: @blob,
+          content_src: download_shared_artifact_path(token: @share.token, disposition: :inline) %>
+  <% else %>
+    <p class="preview-none"><%= t('.no_preview') %></p>
+  <% end %>
+</main>
+
+<footer class="shared-foot">
+  <div class="shared-foot-inner">
+    <%= t('.powered_by_prefix') %> <a href="<%= root_url %>" target="_blank" rel="noopener">Metis</a>
+  </div>
+</footer>
