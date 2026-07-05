@@ -130,7 +130,6 @@ it. No version frontmatter on the README — nothing to bump.
 After writing, both prose targets should describe the same current architecture, the
 skill should carry no claim that depends on a dead sandbox link, and its frontmatter
 `version:` should have incremented by 1. If daemon behavior changed, `clients/metis/README.md`
-and the `CLAUDE.md` daemon paragraph should agree with the Go too. Note `.pi/skills/` is
-gitignored (it ships to prod via the working-tree build), so only `CLAUDE.md` and
-`clients/metis/README.md` show in `git status` — verify the skill edits by mtime /
-re-reading, not `git status`.
+and the `CLAUDE.md` daemon paragraph should agree with the Go too.
+`.pi/skills/understanding-metis/` is tracked (allowlisted in `.gitignore`), so its
+edits show in `git status` alongside `CLAUDE.md` — commit them together.
