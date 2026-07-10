@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Metis quickstart — clone, configure, and boot the stack with one line:
+#
+#   curl -fsSL https://metiser.com/setup | bash               # install + boot
+#   curl -fsSL https://metiser.com/setup | bash -s uninstall  # remove the stack
+#
+# Served statically from public/setup by every Metis deployment.
+#
+# Boots on Docker when available, otherwise Apple's native container
+# runtime (Apple silicon, macOS 26+). Overrides: METIS_DIR, METIS_REPO,
+# METIS_RUNTIME=docker|container.
+set -euo pipefail
+
+repo=${METIS_REPO:-https://github.com/chagel/metis.git}
+dir=${METIS_DIR:-metis}
+# Already inside a checkout? Use it instead of nesting a fresh clone.
+[[ -z "${METIS_DIR:-}" && -f compose.yaml && -f .env.example ]] && dir=.
+
+command -v git >/dev/null || { echo "git is required"; exit 1; }
+
+runtime=${METIS_RUNTIME:-}
+if [[ -z "$runtime" ]]; then
+  if docker info >/dev/null 2>&1; then
+    runtime=docker
+  elif command -v container >/dev/null; then
+    runtime=container
+  else
+    echo "No container runtime found. Install Docker (https://docker.com) or,"
+    echo "on Apple silicon (macOS 26+): brew install container"
+    exit 1
+  fi
+fi
+
+if [[ "${1:-}" == "uninstall" ]]; then
+  cd "$dir" 2>/dev/null && [[ -f compose.yaml ]] ||
+    { echo "Run uninstall from the Metis checkout or its parent."; exit 1; }
+  if [[ "$runtime" == docker ]]; then
+    docker compose down --volumes --rmi local
+  else
+    bin/container-dev down
+    container volume rm metis-pgdata metis-tmp metis-tmp-css 2>/dev/null || true
+    container network rm metis 2>/dev/null || true
+    container image rm metis-dev 2>/dev/null || true
+  fi
+  echo "Removed containers, volumes, and locally built images."
+  echo "Delete the checkout itself with: rm -rf $PWD"
+  exit 0
+fi
+
+[[ -d "$dir" ]] || git clone --depth 1 "$repo" "$dir"
+cd "$dir"
+
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+  if [[ -r /dev/tty ]]; then
+    read -rp "Anthropic API key (enter to skip, edit .env later): " key < /dev/tty || key=""
+    [[ -n "$key" ]] && sed -i.bak "s/^ANTHROPIC_API_KEY=$/ANTHROPIC_API_KEY=$key/" .env
+  fi
+  rm -f .env.bak
+fi
+
+if [[ "$runtime" == docker ]]; then
+  docker compose up -d --build
+else
+  bin/container-dev
+fi
+
+echo "Waiting for Metis to boot..."
+curl -fsS --retry 60 --retry-delay 3 --retry-all-errors -o /dev/null http://localhost:3000/ 2>/dev/null
+echo "Metis is up — open http://localhost:3000 and sign in with the"
+echo "seeded dev login: admin@metis.local / password"
