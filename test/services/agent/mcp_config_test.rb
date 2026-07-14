@@ -238,6 +238,37 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
     end
   end
 
+  def add_x(scopes: XApp::Config::SCOPES.join(" "))
+    connector = add_connector(name: "x", transport: :http, catalog_key: "x",
+                              definition: { "url" => "https://api.x.com/mcp" })
+    connector.connector_credentials.create!(user: member)
+    member.oauth_grants.create!(provider: "x", access_token: "xat", refresh_token: "xrt",
+                                expires_at: 1.hour.from_now, scopes: scopes)
+    connector
+  end
+
+  test "stages the x connector with the member's bearer on X's hosted server" do
+    add_x
+    entry = rendered["mcpServers"]["x"]
+
+    assert_equal "https://api.x.com/mcp", entry["url"]
+    assert_equal "Bearer xat", entry["headers"]["Authorization"]
+  end
+
+  test "drops the x connector when the grant lacks the catalog scopes" do
+    add_x(scopes: "tweet.read users.read")
+    assert_nil rendered["mcpServers"]["x"]
+  end
+
+  test "drops the x connector when its refresh fails — the turn still renders" do
+    add_x
+    member.oauth_grants.find_by(provider: "x").update!(expires_at: 10.seconds.ago)
+
+    with_stub(XApp::Oauth, :refresh, ->(_rt) { raise XApp::Oauth::Error, "boom" }) do
+      assert_nil rendered["mcpServers"]["x"]
+    end
+  end
+
   # MCP-OAuth (DCR) connectors carry the member's token on their
   # ConnectorCredential; McpConfig injects it as the bearer (refreshing
   # when stale), with no catalog credential block.

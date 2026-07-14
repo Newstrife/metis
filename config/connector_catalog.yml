@@ -141,6 +141,29 @@ linear:
     url: https://mcp.linear.app/mcp
   auth: mcp_oauth
 
+# X (Twitter). Brokered OAuth like GitHub, but through a dedicated
+# controller (X has no omniauth sign-in strategy). X's hosted MCP server
+# takes the member's access token as a plain bearer. See docs/connectors.md.
+x:
+  name: X
+  category: Social
+  description: Analyze your X account and posts, then use the X tools you authorize.
+  transport: http
+  definition:
+    url: https://api.x.com/mcp
+  auth: oauth
+  oauth_provider: x
+  oauth_scopes:
+    - tweet.read
+    - tweet.write
+    - users.read
+    - bookmark.read
+    - bookmark.write
+    - offline.access
+  credential:
+    header: Authorization
+    format: "Bearer %{token}"
+
 google_calendar:
   name: Google Calendar
   category: Productivity

@@ -88,8 +88,10 @@ The runtime decides *where* pi runs. See `coding-runtime.md` and
 Every runtime carries the **MCP connector bridge**
 ([`pi-mcp-adapter`](https://github.com/nicobailon/pi-mcp-adapter)):
 `bin/setup` installs it into your local pi, and the `docker` image,
-`e2b` template, and `daytona` snapshot bake it in at build time. See
-`connectors.md`.
+`e2b` template, and `daytona` snapshot bake it in at build time. The
+X connector needs only deployment OAuth config (`X_CLIENT_ID`,
+`X_CLIENT_SECRET`, `X_REDIRECT_URI` — ENV first, then Rails
+credentials `x.*`). See `connectors.md`.
 
 ## Providers
 

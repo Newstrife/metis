@@ -351,6 +351,49 @@ Expand a connector's `oauth_scopes` to unlock more `gws` surface
 on that service — e.g. add `gmail.send` if you want the agent to
 send mail without going through a draft.
 
+### X — hosted MCP, brokered bearer
+
+The X connector reaches X's **hosted MCP server** (`api.x.com/mcp`)
+directly: a plain streamable-HTTP entry whose `Authorization: Bearer`
+header carries the member's current access token — the same shape as
+the GitHub connector. X offers no Dynamic Client Registration, so this
+is a **brokered OAuth** connector like GitHub/Google — but X is not a
+sign-in provider, so the flow runs through a dedicated controller
+(`Connectors::XOauthController`, authorization-code + PKCE `S256`,
+one-time 10-minute state in the initiator's session) instead of
+omniauth.
+
+- **Deployment config** — resolved per key, ENV first, then Rails
+  credentials: `X_CLIENT_ID`/`x.client_id`,
+  `X_CLIENT_SECRET`/`x.client_secret`, `X_REDIRECT_URI`/`x.redirect_uri`.
+  The redirect URI is configured, not derived, because X rejects any
+  callback that doesn't **exactly** match the app's registered URI —
+  register `https://<your-host>/settings/connectors/x/callback` in the X
+  Developer Portal and set `X_REDIRECT_URI` to the same string. All
+  three present ⇢ the marketplace tile connects; any missing ⇢ the tile
+  shows "X is not configured on this Metis deployment" (and
+  `metis:doctor` reports which key). X's API plan gates apply: the
+  hosted MCP tools need an enrolled developer account.
+- **Scopes** (asked once, on the first consent): `tweet.read
+  tweet.write users.read bookmark.read bookmark.write offline.access`.
+  Broad write consent up front is a deliberate v1 choice — there is no
+  incremental-consent flow yet.
+- **Tokens** live in the member's `(user, "x")` `OauthGrant`
+  (encrypted); the `ConnectorCredential` row is only the presence
+  marker. `OauthBroker::Clients::X` refreshes near-expiry tokens
+  (`XApp::Oauth`, HTTP Basic client auth); X **rotates the refresh
+  token on every refresh**, and `OauthGrant#absorb!` persists both
+  tokens in one save. `invalid_grant` clears the grant so the next
+  Connect re-consents; the turn still runs, just without X.
+- **Per-turn staging** — `Agent::McpConfig` stages the `x` server only
+  when the member has a usable grant, through the generic catalog
+  `credential` block: the entry's headers carry the current access
+  token as a bearer, refreshed before staging. Only the short-lived
+  access token reaches the sandbox — never the client secret or
+  refresh token. If the access token expires during a turn, the MCP
+  call fails and the broker refreshes it before the next turn. Nothing
+  is installed in the runtimes for this connector.
+
 ## Identities, not a single provider per user
 
 A user has many `Identity` rows — one per provider they've signed in
