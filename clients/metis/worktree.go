@@ -13,6 +13,21 @@ import (
 
 const metaFile = ".metis-task.json"
 
+// taskMeta is the daemon's bookkeeping stamp inside a worktree: claim
+// and settle timestamps (gc eligibility), and per-agent session
+// pointers — the transcript itself stays in the agent CLI's own store.
+type taskMeta struct {
+	ClaimedAt string                   `json:"claimed_at,omitempty"`
+	SettledAt string                   `json:"settled_at,omitempty"`
+	Status    string                   `json:"status,omitempty"`
+	Sessions  map[string]sessionRecord `json:"sessions,omitempty"`
+}
+
+type sessionRecord struct {
+	ID   string `json:"id"`
+	Step int    `json:"step"`
+}
+
 // repoLocks serializes parent-checkout git mutations: parallel workers
 // (and the gc sweep) may share one configured checkout, and concurrent
 // worktree add/prune/remove race on its .git metadata.
@@ -24,11 +39,12 @@ func lockRepo(repo string) func() {
 	return mu.(*sync.Mutex).Unlock
 }
 
-// Worktree is the per-task isolation: a git worktree off the project's
-// configured checkout, on a metis/<ref> branch — the task never touches
-// a checkout doing other duty. An existing worktree for the same ref is
-// reused: that is the machine-local resume (a re-claimed task continues
-// where this machine left off; another machine starts fresh).
+// Worktree is the per-run isolation: a git worktree off the project's
+// configured checkout, on a metis/<run-ref> branch — never a checkout
+// doing other duty. Keyed by run so consecutive delegated steps share
+// repo state; an existing worktree for the same ref is reused — the
+// machine-local resume and the step-to-step handoff alike (another
+// machine starts fresh from the checkout's HEAD).
 type Worktree struct {
 	Repo string
 	Root string
@@ -39,9 +55,13 @@ func (w Worktree) Path() string {
 	return filepath.Join(w.Root, w.Ref)
 }
 
+func (w Worktree) Branch() string {
+	return "metis/" + strings.ToLower(w.Ref)
+}
+
 func (w Worktree) Prepare() error {
 	if info, err := os.Stat(w.Path()); err == nil && info.IsDir() {
-		return w.writeMeta(map[string]any{"claimed_at": time.Now().UTC().Format(time.RFC3339)})
+		return w.claimMeta()
 	}
 	if err := os.MkdirAll(w.Root, 0o755); err != nil {
 		return err
@@ -50,12 +70,11 @@ func (w Worktree) Prepare() error {
 	if err := w.git("worktree", "prune"); err != nil {
 		return err
 	}
-	branch := "metis/" + strings.ToLower(w.Ref)
 	var err error
-	if w.branchExists(branch) {
-		err = w.git("worktree", "add", w.Path(), branch) // re-claim after gc — same branch
+	if w.branchExists(w.Branch()) {
+		err = w.git("worktree", "add", w.Path(), w.Branch()) // re-claim after gc — same branch
 	} else {
-		err = w.git("worktree", "add", w.Path(), "-b", branch)
+		err = w.git("worktree", "add", w.Path(), "-b", w.Branch())
 	}
 	if err != nil {
 		return err
@@ -63,7 +82,18 @@ func (w Worktree) Prepare() error {
 	if err := w.excludeMeta(); err != nil {
 		return err
 	}
-	return w.writeMeta(map[string]any{"claimed_at": time.Now().UTC().Format(time.RFC3339)})
+	return w.claimMeta()
+}
+
+// claimMeta marks the worktree active again: settled_at must go (it is
+// the gc eligibility signal) but everything else — the session pointers
+// above all — survives the re-claim.
+func (w Worktree) claimMeta() error {
+	return w.mergeMeta(func(meta *taskMeta) {
+		meta.ClaimedAt = time.Now().UTC().Format(time.RFC3339)
+		meta.SettledAt = ""
+		meta.Status = ""
+	})
 }
 
 // excludeMeta keeps the bookkeeping file out of the agent's commits: the
@@ -92,21 +122,71 @@ func (w Worktree) excludeMeta() error {
 }
 
 func (w Worktree) Settle(status string) error {
-	meta := map[string]any{}
+	return w.mergeMeta(func(meta *taskMeta) {
+		meta.SettledAt = time.Now().UTC().Format(time.RFC3339)
+		meta.Status = status
+	})
+}
+
+// Session pointers are the machine-local memory across a run's steps.
+// An empty id still marks "a completed session lives in this cwd" —
+// enough for the cwd-scoped --continue agents.
+func (w Worktree) SaveSession(agent, id string, step int) error {
+	return w.mergeMeta(func(meta *taskMeta) {
+		if meta.Sessions == nil {
+			meta.Sessions = map[string]sessionRecord{}
+		}
+		meta.Sessions[agent] = sessionRecord{ID: id, Step: step}
+	})
+}
+
+func (w Worktree) Session(agent string) (id string, step int, ok bool) {
+	record, ok := w.readMeta().Sessions[agent]
+	return record.ID, record.Step, ok
+}
+
+func (w Worktree) readMeta() taskMeta {
+	meta := taskMeta{}
 	if raw, err := os.ReadFile(filepath.Join(w.Path(), metaFile)); err == nil {
 		_ = json.Unmarshal(raw, &meta)
 	}
-	meta["settled_at"] = time.Now().UTC().Format(time.RFC3339)
-	meta["status"] = status
-	return w.writeMeta(meta)
+	return meta
 }
 
-func (w Worktree) writeMeta(meta map[string]any) error {
+func (w Worktree) mergeMeta(update func(*taskMeta)) error {
+	meta := w.readMeta()
+	update(&meta)
 	encoded, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(filepath.Join(w.Path(), metaFile), encoded, 0o644)
+}
+
+// CommitLeftovers enforces the commit-before-finishing contract the
+// prompt only states: uncommitted work on a completed step would be
+// invisible to later steps and swept by gc, so the daemon commits it
+// rather than trusting the agent did. Returns whether a commit was
+// made; a clean tree is a no-op. The meta file lives in info/exclude,
+// so it never rides along.
+func (w Worktree) CommitLeftovers(message string) (bool, error) {
+	status, err := exec.Command("git", "-C", w.Path(), "status", "--porcelain").Output()
+	if err != nil {
+		return false, fmt.Errorf("git status failed in %s", w.Path())
+	}
+	if strings.TrimSpace(string(status)) == "" {
+		return false, nil
+	}
+	for _, args := range [][]string{
+		{"add", "-A"},
+		{"-c", "user.name=metis", "-c", "user.email=daemon@metis.invalid", "commit", "-m", message},
+	} {
+		out, err := exec.Command("git", append([]string{"-C", w.Path()}, args...)...).CombinedOutput()
+		if err != nil {
+			return false, fmt.Errorf("git %s failed: %s", strings.Join(args, " "), strings.TrimSpace(string(out)))
+		}
+	}
+	return true, nil
 }
 
 func (w Worktree) branchExists(branch string) bool {
@@ -157,9 +237,7 @@ func gcStamp(path string, ttl time.Duration, entry os.DirEntry) (time.Time, time
 		}
 		return info.ModTime().UTC(), ttl * 3, true // orphan
 	}
-	var meta struct {
-		SettledAt string `json:"settled_at"`
-	}
+	var meta taskMeta
 	if json.Unmarshal(raw, &meta) != nil || meta.SettledAt == "" {
 		return time.Time{}, 0, false // still being worked
 	}

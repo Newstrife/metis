@@ -93,18 +93,27 @@ func (s *stubServer) resultCount() int {
 	return len(s.results)
 }
 
-// fakeAgent runs a shell script emitting {"text":…} / {"final":…} lines.
-type fakeAgent struct{ script string }
+// fakeAgent runs a shell script emitting {"text":…} / {"final":…} /
+// {"session":…} lines; resumeScript (when set) is what a Resume runs.
+type fakeAgent struct{ script, resumeScript string }
 
 func (f fakeAgent) Command(_ string, _ []string) []string {
 	return []string{"/bin/sh", "-c", f.script}
 }
 
+func (f fakeAgent) Resume(_, _ string, _ []string) []string {
+	if f.resumeScript == "" {
+		return nil
+	}
+	return []string{"/bin/sh", "-c", f.resumeScript}
+}
+
 func (f fakeAgent) Parse(line string) ParsedEvent {
 	var event struct {
-		Text  string  `json:"text"`
-		Final *string `json:"final"`
-		Model string  `json:"model"`
+		Text    string  `json:"text"`
+		Final   *string `json:"final"`
+		Model   string  `json:"model"`
+		Session string  `json:"session"`
 	}
 	if json.Unmarshal([]byte(line), &event) != nil {
 		return ParsedEvent{}
@@ -112,7 +121,7 @@ func (f fakeAgent) Parse(line string) ParsedEvent {
 	if event.Final != nil {
 		return ParsedEvent{Text: *event.Final, Final: *event.Final, HasFinal: true, Model: event.Model}
 	}
-	return ParsedEvent{Text: event.Text, Model: event.Model}
+	return ParsedEvent{Text: event.Text, Model: event.Model, SessionID: event.Session}
 }
 
 func initRepo(t *testing.T) (repo, root string) {
@@ -167,13 +176,18 @@ func testTask(ref string) *Task {
 	return task
 }
 
+func runTask(t *testing.T, stub *stubServer, cfg *Config, task *Task, agent Agent) {
+	t.Helper()
+	server := cfg.Servers[0]
+	worker := &Worker{api: NewApi(server, cfg.Client), cfg: cfg, server: server,
+		task: task, agent: agent, logf: func(string, ...any) {}}
+	worker.Run()
+}
+
 func runWorker(t *testing.T, stub *stubServer, repo, root, script, ref string, mutate func(*Config)) *Config {
 	t.Helper()
 	cfg := testConfig(stub.server.URL, repo, root, mutate)
-	server := cfg.Servers[0]
-	worker := &Worker{api: NewApi(server, cfg.Client), cfg: cfg, server: server,
-		task: testTask(ref), agent: fakeAgent{script: script}, logf: func(string, ...any) {}}
-	worker.Run()
+	runTask(t, stub, cfg, testTask(ref), fakeAgent{script: script})
 	return cfg
 }
 
@@ -194,6 +208,9 @@ func TestHappyPathStructuredResult(t *testing.T) {
 	}
 	if result["agent"] != "claude" || result["model"] != "anthropic/claude-opus-4-8" {
 		t.Fatalf("agent/model must ride with the result: %v", result)
+	}
+	if result["detail"] != "All done" {
+		t.Fatalf("the final message minus the marker must ride as detail: %v", result)
 	}
 
 	worktree := filepath.Join(testWorktreeRoot(root), "RUN-1")
@@ -296,9 +313,7 @@ func TestMissingCheckoutFailsFast(t *testing.T) {
 	cfg := testConfig(stub.server.URL, repo, root, nil)
 	task := testTask("RUN-1")
 	task.Context.Project.Name = "other-proj"
-	worker := &Worker{api: NewApi(cfg.Servers[0], cfg.Client), cfg: cfg, server: cfg.Servers[0],
-		task: task, agent: fakeAgent{script: "true"}, logf: func(string, ...any) {}}
-	worker.Run()
+	runTask(t, stub, cfg, task, fakeAgent{script: "true"})
 	result := stub.lastResult(t)
 	if result["status"] != "failed" || !strings.Contains(result["summary"].(string), "No checkout configured") {
 		t.Fatalf("result = %v", result)
@@ -328,11 +343,182 @@ func TestPromptFoldsContextAndRules(t *testing.T) {
 	repo, root := initRepo(t)
 	cfg := testConfig("http://x", repo, root, nil)
 	worker := &Worker{cfg: cfg, task: testTask("RUN-1")}
-	prompt := worker.prompt()
+	prompt := worker.prompt("metis/ship-r1", briefFresh)
 	for _, want := range []string{"implement the thing", "## Run subject\nship feature 42",
-		"earlier step: spec", "the spec", "http://a/spec.md", resultMarker, "metis/run-1"} {
+		"earlier step: spec", "the spec", "http://a/spec.md", resultMarker, "metis/ship-r1",
+		"Commit all your work"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, prompt)
 		}
+	}
+	if strings.Contains(prompt, "Session continuity") {
+		t.Fatal("a fresh prompt must not claim session continuity")
+	}
+}
+
+func TestResumedPromptSlimsPriorStepsOnlyWhenSessionIsCurrent(t *testing.T) {
+	repo, root := initRepo(t)
+	cfg := testConfig("http://x", repo, root, nil)
+	worker := &Worker{cfg: cfg, task: testTask("RUN-1")}
+
+	slim := worker.prompt("metis/run-r1", briefResumedCurrent)
+	if strings.Contains(slim, "earlier step: spec") {
+		t.Fatalf("a current session already saw the prior steps:\n%s", slim)
+	}
+	for _, want := range []string{"Session continuity", "## Run subject", "Commit all your work"} {
+		if !strings.Contains(slim, want) {
+			t.Fatalf("slim prompt missing %q:\n%s", want, slim)
+		}
+	}
+
+	stale := worker.prompt("metis/run-r1", briefResumed)
+	if !strings.Contains(stale, "earlier step: spec") || !strings.Contains(stale, "Session continuity") {
+		t.Fatalf("a resumed-but-stale session still needs the full bundle:\n%s", stale)
+	}
+}
+
+func runStep(t *testing.T, stub *stubServer, cfg *Config, runRef, ref string, number int, agent fakeAgent) {
+	t.Helper()
+	task := testTask(ref)
+	task.RunRef = runRef
+	task.Step = number
+	runTask(t, stub, cfg, task, agent)
+}
+
+func TestRunSessionResumesAcrossSteps(t *testing.T) {
+	repo, root := initRepo(t)
+	stub := newStubServer(t)
+	cfg := testConfig(stub.server.URL, repo, root, nil)
+	step := func(ref string, number int, agent fakeAgent) {
+		runStep(t, stub, cfg, "SHIP-R2", ref, number, agent)
+	}
+	step("SHIP-3", 1, fakeAgent{script: `echo '{"session":"sess-1"}'; echo '{"final":"implemented"}'`})
+
+	worktree := Worktree{Repo: repo, Root: testWorktreeRoot(root), Ref: "SHIP-R2"}
+	id, seen, ok := worktree.Session("claude")
+	if !ok || id != "sess-1" || seen != 1 {
+		t.Fatalf("session pointer = %q step %d ok %v", id, seen, ok)
+	}
+
+	step("SHIP-4", 2, fakeAgent{script: `echo '{"final":"fresh — resume was skipped"}'`,
+		resumeScript: `echo '{"final":"resumed"}'`})
+	if result := stub.lastResult(t); result["summary"] != "resumed" {
+		t.Fatalf("the second step must resume the saved session: %v", result)
+	}
+}
+
+func TestBrokenResumeFallsBackToFresh(t *testing.T) {
+	repo, root := initRepo(t)
+	stub := newStubServer(t)
+	cfg := testConfig(stub.server.URL, repo, root, nil)
+	worktree := Worktree{Repo: repo, Root: testWorktreeRoot(root), Ref: "RUN-8"}
+	if err := worktree.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	if err := worktree.SaveSession("claude", "gone-id", 1); err != nil {
+		t.Fatal(err) // e.g. the CLI's own retention swept the transcript
+	}
+	runTask(t, stub, cfg, testTask("RUN-8"), fakeAgent{script: `echo '{"final":"fresh"}'`,
+		resumeScript: `exit 1`})
+
+	result := stub.lastResult(t)
+	if result["status"] != "completed" || result["summary"] != "fresh" {
+		t.Fatalf("a dead session pointer must fall back to a fresh run: %v", result)
+	}
+}
+
+func TestKilledResumeDoesNotRetryFresh(t *testing.T) {
+	repo, root := initRepo(t)
+	stub := newStubServer(t)
+	stub.state = TaskState{Status: "rejected"} // task settled server-side
+	cfg := testConfig(stub.server.URL, repo, root, func(c *Config) { c.CancelPollInterval = 1 })
+	worktree := Worktree{Repo: repo, Root: testWorktreeRoot(root), Ref: "RUN-12"}
+	if err := worktree.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	if err := worktree.SaveSession("claude", "sess-x", 1); err != nil {
+		t.Fatal(err)
+	}
+	runTask(t, stub, cfg, testTask("RUN-12"), fakeAgent{script: `echo '{"final":"fresh — must not run"}'`,
+		resumeScript: `sleep 30`})
+
+	result := stub.lastResult(t)
+	if !strings.Contains(result["summary"].(string), "settled or claim moved") {
+		t.Fatalf("a killed resume is not a dead pointer — no fresh retry: %v", result)
+	}
+	if stub.resultCount() != 1 {
+		t.Fatalf("exactly one result must be reported, got %d", stub.resultCount())
+	}
+}
+
+func TestCompletedStepCommitsLeftovers(t *testing.T) {
+	repo, root := initRepo(t)
+	stub := newStubServer(t)
+	runWorker(t, stub, repo, root, `touch leftover.txt; echo '{"final":"done"}'`, "RUN-13", nil)
+	if result := stub.lastResult(t); result["status"] != "completed" {
+		t.Fatalf("result = %v", result)
+	}
+	worktree := filepath.Join(testWorktreeRoot(root), "RUN-13")
+	status, _ := exec.Command("git", "-C", worktree, "status", "--porcelain").Output()
+	if strings.TrimSpace(string(status)) != "" {
+		t.Fatalf("a completed step must leave a clean worktree:\n%s", status)
+	}
+	subject, _ := exec.Command("git", "-C", worktree, "log", "-1", "--format=%s").Output()
+	if !strings.Contains(string(subject), "leftover work from step RUN-13") {
+		t.Fatalf("head commit = %q, want the daemon's leftover commit", subject)
+	}
+}
+
+func TestCleanAndSelfCommittedStepsAddNoLeftoverCommit(t *testing.T) {
+	repo, root := initRepo(t)
+	stub := newStubServer(t)
+	runWorker(t, stub, repo, root, `echo '{"final":"analysis only"}'`, "RUN-14", nil)
+	count, _ := exec.Command("git", "-C", filepath.Join(testWorktreeRoot(root), "RUN-14"),
+		"rev-list", "--count", "HEAD").Output()
+	if strings.TrimSpace(string(count)) != "1" {
+		t.Fatalf("a clean step must add no commit, history = %s", count)
+	}
+
+	runWorker(t, stub, repo, root, `git config user.email t@t; git config user.name t; `+
+		`touch impl.txt; git add impl.txt; git commit -qm impl; echo '{"final":"built"}'`, "RUN-15", nil)
+	subject, _ := exec.Command("git", "-C", filepath.Join(testWorktreeRoot(root), "RUN-15"),
+		"log", "-1", "--format=%s").Output()
+	if strings.TrimSpace(string(subject)) != "impl" {
+		t.Fatalf("head = %q — an agent that committed its own work needs no leftover commit", subject)
+	}
+}
+
+func TestFailedStepSavesNoSessionPointer(t *testing.T) {
+	repo, root := initRepo(t)
+	stub := newStubServer(t)
+	runWorker(t, stub, repo, root, `echo '{"session":"s9"}'; exit 1`, "RUN-9", nil)
+	worktree := Worktree{Repo: repo, Root: testWorktreeRoot(root), Ref: "RUN-9"}
+	if _, _, ok := worktree.Session("claude"); ok {
+		t.Fatal("a failed step must not become the session the next step resumes")
+	}
+}
+
+func TestRunScopedWorktreeSharesStateAcrossSteps(t *testing.T) {
+	repo, root := initRepo(t)
+	stub := newStubServer(t)
+	cfg := testConfig(stub.server.URL, repo, root, nil)
+	step := func(ref, script string) {
+		runStep(t, stub, cfg, "SHIP-R1", ref, 0, fakeAgent{script: script})
+	}
+	step("SHIP-1", `git config user.email t@t; git config user.name t; `+
+		`touch impl.txt; git add impl.txt; git commit -qm impl; echo '{"final":"implemented"}'`)
+	step("SHIP-2", `test -f impl.txt || exit 1; echo '{"final":"reviewed"}'`)
+
+	result := stub.lastResult(t)
+	if result["status"] != "completed" || result["summary"] != "reviewed" {
+		t.Fatalf("the second step must see the first step's work: %v", result)
+	}
+	worktree := filepath.Join(testWorktreeRoot(root), "SHIP-R1")
+	branch, _ := exec.Command("git", "-C", worktree, "branch", "--show-current").Output()
+	if strings.TrimSpace(string(branch)) != "metis/ship-r1" {
+		t.Fatalf("branch = %q", branch)
+	}
+	if _, err := os.Stat(filepath.Join(testWorktreeRoot(root), "SHIP-1")); !os.IsNotExist(err) {
+		t.Fatal("no per-task worktree must be created when the server sends run_ref")
 	}
 }

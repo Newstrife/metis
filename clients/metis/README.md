@@ -3,7 +3,7 @@
 The unattended local daemon for delegated Metis workflow steps
 ([`docs/local-bridge.md`](../../docs/local-bridge.md), Phase 4). It polls
 the bridge pull API, claims tasks for the projects configured on this
-machine, runs a coding agent headless in a per-task git worktree, streams
+machine, runs a coding agent headless in a per-run git worktree, streams
 progress back, and submits the result. Metis never drives this machine —
 the daemon pulls.
 
@@ -110,13 +110,28 @@ case-insensitively, mirroring the server.
 
 1. Claim from `GET /api/bridge/tasks/next?project=…` — the payload (step
    prompt + prior steps' full outputs) is the agent's entire brief.
-2. `git worktree add` off the project checkout, branch `metis/<ref>` —
-   the task never touches a checkout doing other duty. A re-claimed
-   task whose worktree survives resumes in it.
+2. `git worktree add` off the project checkout, branch
+   `metis/<run-ref>` — never a checkout doing other duty. The worktree
+   is keyed by *run*, so consecutive delegated steps of one workflow
+   run share the branch and working tree on this machine: the prompt
+   tells each agent to commit before finishing, the daemon enforces it
+   (leftovers are committed as `metis: leftover work from step <ref>`
+   before a completed result is accepted), and the next step builds on
+   those commits. A re-claimed task whose worktree survives
+   resumes in it; another machine starts fresh from the checkout's
+   HEAD.
 3. The agent runs headless in its native JSON stream (`claude -p
    --output-format stream-json`, `pi -p --mode json`, `codex exec
    --json`), with the user's own credentials and subscription, in its
-   own process group. Unattended means no one can answer permission
+   own process group. When the worktree already holds a completed
+   session for this agent (recorded in the worktree meta after each
+   completed step), the daemon *resumes* it — `claude --resume <id>`,
+   pi `--continue` (cwd-scoped), `codex exec resume <id>` — so later
+   steps keep the earlier steps' full conversational context, and the
+   prompt skips the prior-steps re-brief the session already saw. A
+   resume that produces no output falls back to a fresh run with the
+   full context bundle; a failed step never becomes the session a
+   retry resumes. Unattended means no one can answer permission
    prompts, so claude runs with `--permission-mode bypassPermissions`
    and codex with `--full-auto` — tighten via `agent_args` if your
    deployment wants less. The inner agent is isolated from your own MCP
@@ -128,11 +143,12 @@ case-insensitively, mirroring the server.
    inactivity watchdog kills it after sustained *silence* — never for
    merely running long.
 5. The agent's final `METIS_RESULT: {…}` line (taught in the prompt)
-   becomes the structured result; its last message is the fallback. The
-   run resumes in Metis.
+   becomes the structured result; its last message is the fallback and
+   also rides along as the result *detail* — the full report later
+   workflow steps read. The run resumes in Metis.
 
-Settled worktrees are swept after `gc_ttl`; the `metis/<ref>` branch
-stays in your repo until you delete it.
+Settled worktrees are swept after `gc_ttl`; the `metis/<run-ref>`
+branch stays in your repo until you delete it.
 
 ## Development
 

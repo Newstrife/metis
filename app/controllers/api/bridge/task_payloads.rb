@@ -3,6 +3,11 @@ module Api
     # Payload builders and task scoping shared by the REST surface
     # (TasksController) and its MCP facade (McpController).
     module TaskPayloads
+      # The result contract, shared by the REST permit list and the MCP
+      # facade so the two write surfaces can't drift. artifacts is
+      # separate — it needs a nested permit shape.
+      RESULT_FIELDS = %w[status summary detail agent model].freeze
+
       private
 
       def find_delegated_task(ref_or_id)
@@ -35,6 +40,8 @@ module Api
           task_id: task.id,
           ref: task.ref,
           run_id: run.id,
+          run_ref: run.ref,
+          step: task.step_number,
           name: task.name,
           prompt: task.prompt,
           context: {
@@ -87,7 +94,7 @@ module Api
       end
 
       def step_content(task)
-        task.result_summary || task.assistant_message&.content.presence
+        task.result_detail || task.result_summary || task.assistant_message&.content.presence
       end
 
       def step_artifacts(task)
