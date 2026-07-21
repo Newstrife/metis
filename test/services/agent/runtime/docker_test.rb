@@ -102,18 +102,28 @@ class Agent::Runtime::DockerTest < ActiveSupport::TestCase
 
   test "control_session passes the configured --runtime to its throwaway container" do
     captured = nil
-    original = PiAgent.method(:session)
-    PiAgent.define_singleton_method(:session) { |*, **kw| captured = kw[:args]; fake = Object.new; def fake.close = nil; fake }
+    fake = Object.new
+    def fake.close = nil
 
-    with_docker_runtime("runsc") do
-      Agent::Runtime::Docker.control_session { |_s| nil }
+    with_stub(Agent::Runtime::Docker, :transport_factory, ->(args, _env) { captured = args; nil }) do
+      with_stub(PiAgent, :session, ->(**) { fake }) do
+        with_docker_runtime("runsc") do
+          Agent::Runtime::Docker.control_session { |_s| nil }
+        end
+      end
     end
 
     idx = captured.index("--runtime")
     assert idx, "expected --runtime in control_session args"
     assert_equal "runsc", captured[idx + 1]
-  ensure
-    PiAgent.define_singleton_method(:session, original)
+  end
+
+  test "transport_factory builds a subprocess transport wrapping docker" do
+    transport = Agent::Runtime::Docker.transport_factory([ "run", "--rm" ], {})
+                                      .call(on_message: nil, on_stderr: nil)
+
+    assert_instance_of PiAgent::Transport::Subprocess, transport
+    assert_equal [ "docker", "run", "--rm" ], transport.instance_variable_get(:@command)
   end
 
   test "docker_args forwards credential env vars with the bare-key form (no token in argv)" do

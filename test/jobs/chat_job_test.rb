@@ -41,10 +41,14 @@ class ChatJobTest < ActiveSupport::TestCase
     Agent::Adapters.define_singleton_method(:for, original)
   end
 
-  def run_with(events, **adapter_opts)
-    with_adapter(FakeAdapter.new(events, **adapter_opts)) do
+  def perform_job(adapter)
+    with_adapter(adapter) do
       ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
     end
+  end
+
+  def run_with(events, **adapter_opts)
+    perform_job(FakeAdapter.new(events, **adapter_opts))
   end
 
   test "accumulates text deltas and marks the assistant message done" do
@@ -295,9 +299,7 @@ class ChatJobTest < ActiveSupport::TestCase
       raise "pi crashed"
     end
 
-    with_adapter(raiser) do
-      ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
-    end
+    perform_job(raiser)
     assert @assistant_message.reload.errored?
   end
 
@@ -309,9 +311,7 @@ class ChatJobTest < ActiveSupport::TestCase
       raise "pi crashed"
     end
 
-    with_adapter(adapter) do
-      ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
-    end
+    perform_job(adapter)
 
     assert_equal "docker", @conversation.reload.runtime_state["runtime"]
     assert @assistant_message.reload.errored?
@@ -389,14 +389,73 @@ class ChatJobTest < ActiveSupport::TestCase
     end
     artifacts = [ { filename: "partial.txt", io: StringIO.new("got this far"), content_type: "text/plain" } ]
 
-    with_adapter(crasher.new(artifacts)) do
-      ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
-    end
+    perform_job(crasher.new(artifacts))
 
     @assistant_message.reload
     assert @assistant_message.errored?, "still marked errored — the crash is not silenced"
     assert_equal 1, @assistant_message.artifacts.count
     assert_equal "partial.txt", @assistant_message.artifacts.first.filename.to_s
+  end
+
+  # Raises `error` on the first `failures` stream calls, then replays
+  # `events` normally.
+  class FailingAdapter < FakeAdapter
+    attr_reader :stream_calls
+
+    def initialize(events, error:, failures: 1)
+      super(events)
+      @error = error
+      @failures = failures
+      @stream_calls = 0
+    end
+
+    def stream(input, images: [], files: [], &block)
+      @stream_calls += 1
+      raise @error if @stream_calls <= @failures
+
+      super
+    end
+  end
+
+  test "retries once when the adapter reports a boot timeout" do
+    adapter = FailingAdapter.new(
+      [ Agent::UiEvent.new(:text_delta, data: { delta: "recovered" }),
+        Agent::UiEvent.new(:turn_finished) ],
+      error: Agent::Adapters::BootTimeout.new("Future timed out after 30s")
+    )
+
+    perform_job(adapter)
+
+    assert_equal 2, adapter.stream_calls
+    @assistant_message.reload
+    assert @assistant_message.done?
+    assert_equal "recovered", @assistant_message.content
+  end
+
+  test "gives up after a second consecutive boot timeout" do
+    adapter = FailingAdapter.new(
+      [ Agent::UiEvent.new(:turn_finished) ],
+      error: Agent::Adapters::BootTimeout.new("Future timed out after 30s"), failures: 2
+    )
+
+    perform_job(adapter)
+
+    assert_equal 2, adapter.stream_calls
+    assert @assistant_message.reload.errored?
+  end
+
+  test "does not retry other agent timeouts" do
+    # Only the adapter-classified boot timeout is safe to re-prompt; a
+    # plain timeout may follow an acked, running turn.
+    adapter = FailingAdapter.new(
+      [ Agent::UiEvent.new(:turn_finished) ],
+      error: PiAgent::TimeoutError.new("No event received within 300s")
+    )
+
+    perform_job(adapter)
+
+    assert_equal 1, adapter.stream_calls
+    assert @assistant_message.reload.errored?
   end
 
   test "stamps finished_at even when the turn fails" do
@@ -405,9 +464,7 @@ class ChatJobTest < ActiveSupport::TestCase
       raise "pi crashed"
     end
 
-    with_adapter(raiser) do
-      ChatJob.perform_now(@conversation.id, @user_message.id, @assistant_message.id)
-    end
+    perform_job(raiser)
     assert_not_nil @assistant_message.reload.finished_at
   end
 end

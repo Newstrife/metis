@@ -14,9 +14,19 @@ class ChatJob < ApplicationJob
     # backend_session_id for --continue.
     Agent::ForkPreparer.prepare(conversation) if conversation.fork_pending?
     broadcaster = ChatBroadcaster.new(conversation, assistant_message)
-    adapter = Agent::Adapters.for(conversation)
+    boot_retried = false
+    begin
+      adapter = Agent::Adapters.for(conversation)
+      run(conversation, user_message, assistant_message, broadcaster, adapter)
+    rescue Agent::Adapters::BootTimeout => e
+      # The agent never came up, so nothing reached the model — one retry
+      # on a fresh adapter (and container) is safe.
+      raise if boot_retried
 
-    run(conversation, user_message, assistant_message, broadcaster, adapter)
+      boot_retried = true
+      Rails.logger.warn("ChatJob #{conversation_id} retrying after agent boot timeout: #{e.message}")
+      retry
+    end
   rescue StandardError => e
     Rails.logger.error("ChatJob #{conversation_id} failed: #{e.class}: #{e.message}")
     fail_message(assistant_message, broadcaster, "The agent run failed.")
