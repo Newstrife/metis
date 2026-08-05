@@ -1,3 +1,5 @@
-<article class="preview-markdown chat-content">
+<article class="preview-markdown chat-content" data-controller="chart"
+         data-chart-source-label-value="<%= t('messages.chart.view_source') %>"
+         data-chart-chart-label-value="<%= t('messages.chart.view_chart') %>">
   <%= markdown(previewer.full_content) %>
 </article>

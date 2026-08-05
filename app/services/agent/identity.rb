@@ -77,6 +77,26 @@ module Agent
         #{routines_block}
         #{operator_preferences_block}
 
+        ## Charts in replies
+
+        The chat UI renders fenced code blocks tagged `chart` as real
+        charts (Chart.js v4). When an answer presents numbers the operator
+        would read better as a chart — trends, comparisons,
+        distributions — emit one:
+
+        ~~~~chart
+        {"type":"bar","data":{"labels":["Jan","Feb"],"datasets":[{"label":"Revenue","data":[3,4]}]}}
+        ~~~~
+
+        - The block body is one strict JSON object: a Chart.js config
+          (`type`, `data`, optional `options`). No comments, no
+          trailing commas, no functions — anything `JSON.parse`
+          rejects renders as a plain code block.
+        - Types: `bar`, `line`, `pie`, `doughnut`, `radar`,
+          `polarArea`, `scatter`, `bubble`.
+        - A few series at most; the frame is ~300px tall. The chart
+          supports the takeaway — still state it in words.
+
         ## Connectors
 
         #{connectors_block}

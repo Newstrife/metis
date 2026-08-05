@@ -7,7 +7,9 @@
                        "handoff" => [ " msg-step--handoff", t('.handoff_tag') ] }.fetch(message.kind) %>
   <div id="<%= dom_id(message) %>" class="msg-step<%= modifier %>">
     <span class="msg-step-tag"><%= tag %></span>
-    <div class="chat-content"><%= markdown(message.content) %></div>
+    <div class="chat-content" data-controller="chart"
+         data-chart-source-label-value="<%= t('messages.chart.view_source') %>"
+         data-chart-chart-label-value="<%= t('messages.chart.view_chart') %>"><%= markdown(message.content) %></div>
     <span class="msg-step-time"><%= message.created_at.strftime("%b %-d · %-l:%M %p") %></span>
   </div>
 <% elsif message.user? %>
@@ -53,7 +55,9 @@
         <% end %>
 
         <div id="<%= dom_id(message) %>_body"
-             class="chat-content"><%= markdown(message.content) %></div>
+             class="chat-content" data-controller="chart"
+             data-chart-source-label-value="<%= t('messages.chart.view_source') %>"
+             data-chart-chart-label-value="<%= t('messages.chart.view_chart') %>"><%= markdown(message.content) %></div>
 
         <%= render "messages/artifacts", message: message %>
 

@@ -33,6 +33,15 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/never send\s+half-baked replies/i, out)
   end
 
+  test "documents the chart block convention for inline charts" do
+    out = render
+
+    assert_match(/## Charts in replies/, out)
+    assert_match(/tagged `chart`/, out)
+    assert_match(/Chart\.js/, out)
+    assert_match(/strict JSON/, out)
+  end
+
   test "names the runtime so the agent knows its isolation posture" do
     assert_match(/`docker`.*container/i,  render(runtime_kind: "docker"))
     assert_match(/`e2b`.*microVM/i,        render(runtime_kind: "e2b"))

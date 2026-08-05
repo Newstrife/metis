@@ -99,6 +99,9 @@ en:
       new_messages: "New messages"
       read_only_note: "Read-only — this conversation was shared with your team by %{name}."
   messages:
+    chart:
+      view_source: "View code"
+      view_chart: "View chart"
     artifact_card:
       open: "Open"
       download: "Download"

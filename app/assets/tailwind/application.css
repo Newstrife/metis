@@ -1409,6 +1409,24 @@ img.avatar { background:none; object-fit:cover; }
   background:rgba(255,255,255,.16); color:inherit;
 }
 
+/* ───────────── chart blocks (```chart → Chart.js, chart_controller.js) ───────────── */
+.chat-chart { margin:.75rem 0; }
+.chat-chart-frame {
+  position:relative; height:19rem; max-height:55vh;
+  background:var(--bg); border:1px solid var(--line); border-radius:10px;
+  padding:.6rem .8rem;
+}
+.chat-chart-toggle {
+  margin-top:.4rem; padding:.15rem .55rem;
+  font-family:var(--fm); font-size:.72rem; color:var(--ink-3);
+  background:transparent; border:1px solid var(--line); border-radius:8px;
+  cursor:pointer;
+}
+.chat-chart-toggle:hover { color:var(--ink); border-color:var(--line-2); background:var(--bg); }
+.chat-chart-source { display:none; }
+.chat-chart--show-source .chat-chart-frame { display:none; }
+.chat-chart--show-source .chat-chart-source { display:block; }
+
 /* ───────────── motion ───────────── */
 @keyframes msg-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
 .msg-user,.msg-row { animation:msg-in .4s cubic-bezier(.2,.7,.2,1) both; }

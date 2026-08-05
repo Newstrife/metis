@@ -99,6 +99,9 @@
       new_messages: "新消息"
       read_only_note: "只读 — 此对话由 %{name} 分享给你的团队。"
   messages:
+    chart:
+      view_source: "查看代码"
+      view_chart: "查看图表"
     artifact_card:
       open: "打开"
       download: "下载"
