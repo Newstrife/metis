@@ -106,6 +106,32 @@ github:
     header: Authorization
     format: "Bearer %{token}"
 
+# Local MySQL, read-only. stdio: pi spawns the server per turn via npx;
+# McpConfig merges the credential into the process env for stdio
+# connectors. Two write fences: the metis_agent MySQL account is
+# SELECT-only on device_db, and this server keeps writes disabled unless
+# its ALLOW_*_OPERATION flags are set. stdio only works under
+# Runtime::Local — sandboxed runtimes need an http-fronted server.
+mysql:
+  name: MySQL (local)
+  category: Data
+  description: Read-only SQL queries against the local device_db MySQL database.
+  transport: stdio
+  definition:
+    command: npx
+    args:
+      - "-y"
+      - "@benborla29/mcp-server-mysql"
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: "3306"
+      MYSQL_USER: metis_agent
+      MYSQL_DB: device_db
+  auth: token
+  credential:
+    header: MYSQL_PASS
+    format: "%{token}"
+
 # The Google connectors (gmail, google_calendar, google_drive) do not
 # stage an MCP server. The agent reaches Google via the `gws` CLI
 # (https://github.com/googleworkspace/cli), which Runtime::Base#sandbox_env
