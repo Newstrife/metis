@@ -98,6 +98,8 @@
       jump_to_latest: "跳到最新"
       new_messages: "新消息"
       read_only_note: "只读 — 此对话由 %{name} 分享给你的团队。"
+    model_switcher:
+      switch_model: "切换模型"
   messages:
     chart:
       view_source: "查看代码"

@@ -1,0 +1,18 @@
+<%# Owner-only in-chat model switcher. Submits on change; the choice lands
+    in Conversation#settings and applies from the next turn. Kept out of
+    _context_meter on purpose: that partial is repainted by ChatBroadcaster
+    without per-viewer context, so editability can't live there. %>
+<% selected = conversation.settings["model"].presence || Agent::Catalog.default_model %>
+<%= form_with url: conversation_path(conversation), method: :patch,
+              data: { controller: "auto-submit" }, class: "model-switch" do %>
+  <span class="model-pick">
+    <select name="model" aria-label="<%= t('.switch_model') %>"
+            data-action="change->auto-submit#submit">
+      <%= grouped_options_for_select(Agent::Catalog.grouped_model_options, selected) %>
+    </select>
+    <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+         stroke-width="1.7" aria-hidden="true">
+      <path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+<% end %>

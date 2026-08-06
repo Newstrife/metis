@@ -98,6 +98,8 @@ en:
       jump_to_latest: "Jump to latest"
       new_messages: "New messages"
       read_only_note: "Read-only — this conversation was shared with your team by %{name}."
+    model_switcher:
+      switch_model: "Switch model"
   messages:
     chart:
       view_source: "View code"

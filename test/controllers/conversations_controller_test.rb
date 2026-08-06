@@ -316,6 +316,43 @@ class ConversationsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Theirs", conversation.reload.title
   end
 
+  test "owner can switch the conversation model" do
+    provider = LlmProvider.create!(key: "kimi-coding", label: "Kimi for Coding")
+    provider.llm_models.create!(key: "k3", label: "Kimi K3", enabled: true)
+    sign_in @user
+    conversation = @user.conversations.create!(team: @user.personal_team)
+
+    patch conversation_path(conversation), params: { model: "k3" }, as: :json
+
+    assert_response :ok
+    assert_equal({ "provider" => "kimi-coding", "model" => "k3" }, conversation.reload.settings)
+  end
+
+  test "switching to an unknown model is rejected" do
+    LlmProvider.create!(key: "kimi-coding", label: "Kimi for Coding")
+      .llm_models.create!(key: "k3", label: "Kimi K3", enabled: true)
+    sign_in @user
+    conversation = @user.conversations.create!(team: @user.personal_team)
+
+    patch conversation_path(conversation), params: { model: "gpt-99" }, as: :json
+
+    assert_response :unprocessable_entity
+    assert_equal({}, conversation.reload.settings)
+  end
+
+  test "cannot switch model on another user's conversation" do
+    LlmProvider.create!(key: "kimi-coding", label: "Kimi for Coding")
+      .llm_models.create!(key: "k3", label: "Kimi K3", enabled: true)
+    other = User.create!(email: "model-other@example.com", password: "password123")
+    conversation = other.conversations.create!(team: other.personal_team)
+    sign_in @user
+
+    patch conversation_path(conversation), params: { model: "k3" }, as: :json
+
+    assert_response :not_found
+    assert_equal({}, conversation.reload.settings)
+  end
+
   # Temporarily override a constant for the duration of the block.
   # Lets us shrink SIDEBAR_PAGE_SIZE so the sentinel tests don't need
   # to create dozens of conversation fixtures.

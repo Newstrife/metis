@@ -68,6 +68,8 @@ class ConversationsController < ApplicationController
   # PATCH /conversations/:id — title-only rename. Driven by the
   # conversation-title Stimulus controller.
   def update
+    return update_model if params[:model].present?
+
     title = params[:title].to_s.strip
     return head(:unprocessable_entity) if title.blank?
 
@@ -135,6 +137,18 @@ class ConversationsController < ApplicationController
 
   def set_conversation
     @conversation = current_user.conversations.find(params[:id])
+  end
+
+  # The in-chat model switcher: the choice lands in settings and applies
+  # from the next turn (pi --continue picks up the new --provider/--model).
+  def update_model
+    model = params[:model].to_s
+    return head :unprocessable_entity unless Agent::Catalog.known_model?(model)
+
+    @conversation.update!(settings: @conversation.settings.merge(
+      "provider" => Agent::Catalog.provider_for(model), "model" => model
+    ))
+    head :ok
   end
 
   # The star/share toggles re-render their inline header panel over Turbo,
