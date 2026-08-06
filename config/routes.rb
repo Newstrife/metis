@@ -150,6 +150,11 @@ Rails.application.routes.draw do
       post "mcp",              to: "mcp#handle"
       get  "skill",            to: "skill#show"
     end
+
+    namespace :wecom do
+      post "messages",     to: "messages#create"
+      get  "messages/:id", to: "messages#show"
+    end
   end
 
   # Single inbound endpoint per provider for the deployment's GitHub App /

@@ -1,0 +1,13 @@
+{
+  "name": "wecom-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "企业微信智能机器人 ↔ Metis 双向桥接（WebSocket 长连接入站消息 + 轮询取回 Metis 回复 + 主动推送出口）",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@wecom/aibot-node-sdk": "^1.0.7"
+  }
+}
