@@ -18,6 +18,8 @@ module Metis
     # framework-default datetime/number/errors translations Rails omits for
     # non-English locales) so it doesn't carry data for ~100 others.
     config.i18n.available_locales = %i[en zh-CN]
+    # UI 默认显示中文；个人资料里仍可按用户切换回 English。
+    config.i18n.default_locale = :"zh-CN"
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
