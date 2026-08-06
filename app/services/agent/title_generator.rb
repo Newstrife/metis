@@ -42,7 +42,8 @@ module Agent
     TITLE_MODELS = {
       "anthropic" => "claude-haiku-4-5",
       "openai"    => "gpt-4o-mini",
-      "google"    => "gemini-2.5-flash"
+      "google"    => "gemini-2.5-flash",
+      "kimi-coding" => "kimi-for-coding"
     }.freeze
 
     CONTEXT_MESSAGES = 4
