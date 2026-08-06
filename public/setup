@@ -66,6 +66,6 @@ else
 fi
 
 echo "Waiting for Metis to boot..."
-curl -fsS --retry 60 --retry-delay 3 --retry-all-errors -o /dev/null http://localhost:3000/ 2>/dev/null
-echo "Metis is up — open http://localhost:3000 and sign in with the"
+curl -fsS --retry 60 --retry-delay 3 --retry-all-errors -o /dev/null http://localhost:3002/ 2>/dev/null
+echo "Metis is up — open http://localhost:3002 and sign in with the"
 echo "seeded dev login: admin@metis.local / password"

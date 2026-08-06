@@ -65,9 +65,9 @@ db_ip=$(container ls | awk '$1 == "metis-db" { sub("/.*", "", $6); print $6 }')
 container run -d --name metis-web --network metis \
   -v "$PWD:/rails" -v metis-tmp:/rails/tmp \
   --env-file .env \
-  -e RAILS_ENV=development -e PORT=3000 -e METIS_AGENT_RUNTIME=local \
+  -e RAILS_ENV=development -e PORT=3002 -e METIS_AGENT_RUNTIME=local \
   -e DATABASE_URL="postgres://metis:metis@$db_ip:5432/metis_development" \
-  -p 3000:3000 \
+  -p 3002:3002 \
   metis-dev bash -c "rm -f tmp/pids/server.pid && bin/rails db:prepare && bin/rails server -b 0.0.0.0" >/dev/null
 
 container run -d --name metis-css --network metis \
@@ -75,7 +75,7 @@ container run -d --name metis-css --network metis \
   -e RAILS_ENV=development \
   metis-dev bash -c "echo 1048576 > /proc/sys/fs/inotify/max_user_watches && bin/rails 'tailwindcss:watch[always]'" >/dev/null
 
-echo "Metis starting at http://localhost:3000"
+echo "Metis starting at http://localhost:3002"
 echo "  login: admin@metis.local / password (dev seed)"
 echo "  logs:  container logs -f metis-web"
 echo "  stop:  bin/container-dev down"

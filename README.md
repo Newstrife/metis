@@ -109,7 +109,7 @@ stack (Rails, Postgres, pi) in containers:
 curl -fsSL https://metiser.com/setup | bash
 ```
 
-Then open http://localhost:3000 and sign in with the seeded dev login
+Then open http://localhost:3002 and sign in with the seeded dev login
 (`admin@metis.local` / `password`). Uses Docker if
 you have it; on Apple silicon (macOS 26+), [Apple's native `container`
 runtime](https://github.com/apple/container) (`brew install container`)

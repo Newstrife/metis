@@ -2,7 +2,7 @@
 #
 #   docker compose up --build      # first run / after a Gemfile change
 #   docker compose up              # subsequent runs
-#   open http://localhost:3000
+#   open http://localhost:3002
 #
 # pi runs as a subprocess inside `web` (METIS_AGENT_RUNTIME=local) — agent
 # turns work fully in-container. Code is bind-mounted, so edits reload live;
@@ -39,11 +39,11 @@ services:
     env_file: .env
     environment:
       RAILS_ENV: development
-      PORT: 3000
+      PORT: 3002
       METIS_AGENT_RUNTIME: local
       DATABASE_URL: postgres://metis:metis@db:5432/metis_development
     ports:
-      - "3000:3000"
+      - "3002:3002"
     volumes:
       - .:/rails
       # Container-local tmp: the host's tmp/ holds a darwin bootsnap cache

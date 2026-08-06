@@ -57,7 +57,7 @@ Rails.application.configure do
     if (dev_host = ENV["METIS_DEV_HOST"].presence)
       { host: dev_host, protocol: "https" }
     else
-      { host: "localhost", port: 3000 }
+      { host: "localhost", port: 3002 }
     end
 
   # Print deprecation notices to the Rails logger.

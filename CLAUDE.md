@@ -25,7 +25,7 @@ natively-obtained Google ID token.
 
 ## Commands
 
-- `bin/dev` — run the app (Puma + Tailwind watch via foreman, port 3000)
+- `bin/dev` — run the app (Puma + Tailwind watch via foreman, port 3002)
 - `bin/setup` — install deps, prepare the database
 - `bin/rails test` — full test suite (Minitest)
 - `bin/rails test test/services/agent/adapters/pi_test.rb:42` — single test by file:line
