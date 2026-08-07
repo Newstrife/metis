@@ -23,6 +23,17 @@ Get-Content .env -Encoding UTF8 | ForEach-Object {
 $env:DATABASE_URL = "postgres://metis@127.0.0.1:5432/metis_development"
 
 # 3. 启动 Web 服务（端口 3002）
+# 3a. 已在运行则直接退出，避免端口冲突
+if (Get-NetTCPConnection -LocalPort 3002 -State Listen -ErrorAction SilentlyContinue) {
+  Write-Host "Metis 已在运行，直接打开 http://localhost:3002 即可"
+  exit 0
+}
+# 3b. 清理上次异常退出残留的 server.pid（进程已不在而文件还在）
+$pidFile = "tmp/pids/server.pid"
+if (Test-Path $pidFile) {
+  Remove-Item $pidFile -Force
+  Write-Host "已清理残留的 server.pid"
+}
 # 企业微信桥接（已填 WECOM_BOT_ID 且依赖已装时随 dev 一起拉起）
 if ($env:WECOM_BOT_ID -and (Test-Path "clients/wecom-bridge/node_modules")) {
   Write-Host "启动企业微信桥接 ..."
