@@ -210,6 +210,7 @@ en:
       routines: "Routines"
       models: "Models"
       developer: "Developer"
+      users: "Users"
     accounts:
       show:
         title: "Account"
@@ -235,6 +236,19 @@ en:
         delete_account: "Delete account"
         delete_account_hint: "Permanently removes your account and conversations. This cannot be undone."
         delete_account_confirm: "Delete your account? This permanently removes your conversations and cannot be undone."
+    users:
+      index:
+        title: "Users"
+        heading: "Users"
+        lead: "Deployment-level account administration. WeCom-provisioned accounts use synthetic emails, so password resets happen here, not over email."
+        all_users: "All accounts"
+        superuser: "Superuser"
+        wecom_bound: "WeCom %{userid}"
+        joined_at: "Joined %{date}"
+        new_password: "New password"
+        reset_password: "Reset password"
+        delete: "Delete"
+        delete_confirm: "Delete %{email}? Their personal workspace and conversations go with it. This cannot be undone."
     developer:
       show:
         title: "Developer"

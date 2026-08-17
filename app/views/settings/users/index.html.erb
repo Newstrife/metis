@@ -1,0 +1,49 @@
+<% content_for :title, t('.title') %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title"><%= t('.heading') %></h1>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <p class="pane-lead"><%= t('.lead') %></p>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-card-title"><%= t('.all_users') %></span>
+          <span class="settings-card-count"><%= @users.size %></span>
+        </div>
+
+        <ul class="member-list user-admin-list">
+          <% @users.each do |user| %>
+            <li class="member-row">
+              <div class="member-id">
+                <div class="member-name">
+                  <%= user.email %>
+                  <% if user.superuser? %><span class="badge-pending"><%= t('.superuser') %></span><% end %>
+                </div>
+                <div class="member-email">
+                  <% if user.wecom_userid.present? %><%= t('.wecom_bound', userid: user.wecom_userid) %> · <% end %><%= t('.joined_at', date: l(user.created_at.to_date)) %>
+                </div>
+              </div>
+
+              <div class="member-actions">
+                <%= form_with model: user, url: user_path(user), method: :patch, class: "user-admin-reset" do |f| %>
+                  <%= f.password_field :password, placeholder: t('.new_password'), autocomplete: "new-password",
+                        required: true, minlength: 6, class: "team-input" %>
+                  <%= f.submit t('.reset_password'), class: "btn btn-ghost" %>
+                <% end %>
+                <% unless user == current_user %>
+                  <%= button_to t('.delete'), user_path(user), method: :delete, class: "btn btn-danger",
+                        form: { class: "inline-form" },
+                        data: { turbo_confirm: t('.delete_confirm', email: user.email) } %>
+                <% end %>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      </section>
+    </div>
+  </div>
+</main>

@@ -105,6 +105,13 @@
         notice: "%{name} 已删除。"
         alert: "%{name} %{error}。"
     settings:
+      users:
+        update:
+          notice: "%{email} 的密码已重置。"
+          failure: "重置失败：%{errors}"
+        destroy:
+          notice: "%{email} 已删除。"
+          self: "不能删除当前登录的账号。"
       teams:
         update:
           notice: "团队已重命名。"

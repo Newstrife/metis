@@ -94,6 +94,18 @@
       </svg>
       <span><%= t('.developer') %></span>
     <% end %>
+    <% if current_user.superuser? %>
+      <%= link_to users_path,
+            class: "nav-item#{' on' if controller_name == 'users'}" do %>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="5.5" cy="5" r="2.5"/>
+          <path d="M1.5 13.5c0-2.5 1.8-4 4-4s4 1.5 4 4"/>
+          <path d="M10.5 2.8a2.5 2.5 0 0 1 0 4.4M11.5 9.7c1.6.5 2.9 1.7 2.9 3.8"/>
+        </svg>
+        <span><%= t('.users') %></span>
+      <% end %>
+    <% end %>
   </nav>
 
   <%= render "shared/user_menu" %>

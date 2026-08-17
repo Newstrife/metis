@@ -112,6 +112,13 @@ en:
         notice: "%{name} deleted."
         alert: "%{name} %{error}."
     settings:
+      users:
+        update:
+          notice: "Password reset for %{email}."
+          failure: "Reset failed: %{errors}"
+        destroy:
+          notice: "%{email} deleted."
+          self: "You can't delete the account you're signed in with."
       teams:
         update:
           notice: "Team renamed."
