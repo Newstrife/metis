@@ -217,3 +217,18 @@ google_drive:
   oauth_scopes:
     - https://www.googleapis.com/auth/drive
     - https://www.googleapis.com/auth/drive.file
+
+# Local Windows file search via voidtools Everything (es.exe). stdio
+# spawns a zero-dep Node server wrapping the CLI (GBK-decoded output,
+# so Chinese filenames work). No auth — fully local. stdio only works
+# under Runtime::Local; requires the Everything client running.
+everything_search:
+  name: Everything Search (local)
+  category: Files
+  description: Instant whole-disk file/folder name search on Windows via Everything. Supports Chinese filenames and Everything query syntax (ext:, dm:, path:, size:).
+  transport: stdio
+  definition:
+    command: node
+    args:
+      - C:\Users\xubin\tools\everything\es-mcp.mjs
+  auth: none
