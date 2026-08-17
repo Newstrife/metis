@@ -6,7 +6,7 @@
       not_superuser: "只有超级用户才能更改模型目录。"
       personal_unavailable: "该功能在你的个人工作区中不可用。"
     shared:
-      invite_only: "Metis 仅限邀请注册 — 请让团队管理员邀请你。"
+      invite_only: "小百同学仅限邀请注册 — 请让团队管理员邀请你。"
       request_failed: "该请求出了点问题 — 请重试，或刷新页面。"
     skills:
       create:
@@ -47,7 +47,7 @@
           notice: "%{name} 已连接。"
           failed: "无法完成该连接：%{message}"
       x_oauth:
-        unconfigured: "此 Metis 部署尚未配置 X。"
+        unconfigured: "此小百同学部署尚未配置 X。"
         expired: "该连接已过期 — 请重试。"
         cancelled: "连接已取消。"
         notice: "X 已连接。"
@@ -145,9 +145,9 @@
       omniauth_callbacks:
         failure:
           cancelled: "登录已取消。"
-        identity_already_linked: "此 %{provider} 账户已关联到另一个 Metis 用户。"
+        identity_already_linked: "此 %{provider} 账户已关联到另一个小百同学用户。"
         sign_in_failed: "登录失败。"
         connected: "已连接到 %{provider}。"
         github_connected: "已连接到 GitHub。请在你希望它访问的仓库上安装 Metis 应用，然后返回此处。"
       registrations:
-        domain_only: "Metis 仅限邀请注册 — 只有 %{domains} 邮箱可在无邀请的情况下注册。"
+        domain_only: "小百同学仅限邀请注册 — 只有 %{domains} 邮箱可在无邀请的情况下注册。"

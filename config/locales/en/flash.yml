@@ -6,7 +6,7 @@ en:
       not_superuser: "Only a superuser can change the model catalog."
       personal_unavailable: "That isn't available for your personal workspace."
     shared:
-      invite_only: "Metis is invite-only — ask a team admin to invite you."
+      invite_only: "小百同学 is invite-only — ask a team admin to invite you."
       request_failed: "Something went wrong with that request — try again, or reload the page."
     skills:
       create:
@@ -54,7 +54,7 @@ en:
         notice: "Linear project access authorized."
         failed: "Couldn't authorize Linear access: %{message}"
       x_oauth:
-        unconfigured: "X is not configured on this Metis deployment."
+        unconfigured: "X is not configured on this 小百同学 deployment."
         expired: "That connection expired — try again."
         cancelled: "Connection was cancelled."
         notice: "X connected."
@@ -152,9 +152,9 @@ en:
       omniauth_callbacks:
         failure:
           cancelled: "Sign-in was cancelled."
-        identity_already_linked: "This %{provider} account is already linked to another Metis user."
+        identity_already_linked: "This %{provider} account is already linked to another 小百同学 user."
         sign_in_failed: "Sign-in failed."
         connected: "Connected to %{provider}."
         github_connected: "Connected to GitHub. Install the Metis app on the repos you want it to access, then return here."
       registrations:
-        domain_only: "Metis is invite-only — only %{domains} emails may register without an invitation."
+        domain_only: "小百同学 is invite-only — only %{domains} emails may register without an invitation."

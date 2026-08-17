@@ -17,7 +17,7 @@ class DeviseMailerTest < ActionMailer::TestCase
     assert_equal [ "reset@example.com" ], mail.to
     # From the deployment sender (must be a verified domain), not Devise's
     # please-change-me placeholder.
-    assert_equal "Metis <noreply@example.com>", mail[:from].formatted.first
+    assert_equal "\"小百同学\" <noreply@example.com>", mail[:from].formatted.first
 
     # Decode quoted-printable so the link's "=" isn't mangled to "=3D".
     body = mail.text_part.body.decoded

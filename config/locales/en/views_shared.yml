@@ -9,15 +9,15 @@ en:
       no_preview: "No preview for this file type — use Download."
   layouts:
     head:
-      title: "Metis"
+      title: "小百同学"
     application:
-      title: "Metis"
-      brand: "Metis"
+      title: "小百同学"
+      brand: "小百同学"
     chat:
       open_menu: "Open menu"
       undo: "Undo"
     mailer:
-      brand: "Metis"
+      brand: "小百同学"
       tagline: "Your AI agent workspace"
     settings:
       open_menu: "Open menu"
@@ -50,7 +50,7 @@ en:
       enable_model: "Enable %{model}"
   pwa:
     manifest:
-      name: "Metis"
+      name: "小百同学"
       description: "Chat with your team's AI agent — conversations, workflows, and connectors."
   shared:
     # Set client-side by elapsed_timer_controller; %{time} is filled in JS.

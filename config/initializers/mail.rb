@@ -7,7 +7,7 @@
 # sender must be on a domain the transport may send for. See
 # docs/configuration.md#email--account-access.
 Rails.application.config.x.mail.from =
-  ENV.fetch("METIS_MAIL_FROM", "Metis <noreply@example.com>")
+  ENV.fetch("METIS_MAIL_FROM", "小百同学 <noreply@example.com>")
 
 # Retry transient delivery failures instead of dropping the email.
 Rails.application.config.action_mailer.delivery_job = "MailDeliveryJob"

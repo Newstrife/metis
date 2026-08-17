@@ -4,7 +4,7 @@
       new:
         title: "登录"
         heading: "登录"
-        subtitle: "欢迎回到 Metis。"
+        subtitle: "欢迎回到小百同学。"
         sign_in_with: "使用 %{provider} 登录"
         or: "或"
         remember_me: "记住我"
@@ -13,7 +13,7 @@
       new:
         title: "创建账户"
         heading: "创建你的账户"
-        subtitle: "开始使用 Metis。"
+        subtitle: "开始使用小百同学。"
         sign_up_with: "使用 %{provider} 注册"
         or: "或"
         minimum_password_length:
@@ -50,12 +50,12 @@
     mailer:
       reset_password_instructions:
         heading: "重置你的密码"
-        intro_prefix: "我们收到了重置你 Metis 账户密码的请求"
-        intro: "我们收到了重置你 Metis 账户（%{email}）密码的请求。"
+        intro_prefix: "我们收到了重置你小百同学账户密码的请求"
+        intro: "我们收到了重置你小百同学账户（%{email}）密码的请求。"
         reset_here: "在此重置："
         cta: "重置密码"
         ignore_notice: "如果你并未发起此请求，可以放心忽略此邮件 — 在你打开上面的链接并设置新密码之前，密码不会更改。"
-        signature: "Metis · 你的 AI 智能体工作区"
+        signature: "小百同学 · 你的 AI 智能体工作区"
   shared_conversations:
     show:
       workflow_fallback: "工作流"

@@ -116,7 +116,7 @@ class Doctor
       Check.new(:ok, "sender", @env["METIS_MAIL_FROM"])
     else
       status = Rails.env.production? ? :warn : :off
-      Check.new(status, "sender", "METIS_MAIL_FROM unset — sending as Metis <noreply@example.com>")
+      Check.new(status, "sender", "METIS_MAIL_FROM unset — sending as 小百同学 <noreply@example.com>")
     end
   end
 

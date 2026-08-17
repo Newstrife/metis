@@ -16,7 +16,7 @@ class Agent::IdentityTest < ActiveSupport::TestCase
   test "anchors the agent — Metis as identity, human-served" do
     out = render
 
-    assert_match(/You are Metis/, out)
+    assert_match(/You are 小百同学/, out)
     assert_match(/human/i, out)
     assert_match(/#{conversation.user.email}/, out)
   end

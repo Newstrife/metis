@@ -68,7 +68,7 @@ class SharedConversationsControllerTest < ActionDispatch::IntegrationTest
 
     assert_select "meta[property='og:title'][content=?]", "Shared chat"
     assert_select "meta[property='og:type'][content=?]", "article"
-    assert_select "meta[property='og:site_name'][content=?]", "Metis"
+    assert_select "meta[property='og:site_name'][content=?]", "小百同学"
     assert_select "meta[property='og:image']" do |tags|
       assert_match %r{og-default.*\.png\z}, tags.first["content"]
       assert_match %r{\Ahttps?://}, tags.first["content"]

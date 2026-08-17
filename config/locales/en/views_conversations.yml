@@ -75,7 +75,7 @@ en:
     index:
       title: "New chat"
       heading: "What's on your mind?"
-      tagline: "Metis is an open-source, self-hostable agent platform for individuals and teams."
+      tagline: "小百同学 is an open-source, self-hostable agent platform for individuals and teams."
     run:
       chat: "Chat"
     search:

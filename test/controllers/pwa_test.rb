@@ -6,7 +6,7 @@ class PwaTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     manifest = JSON.parse(response.body)
-    assert_equal "Metis", manifest["name"]
+    assert_equal "小百同学", manifest["name"]
     assert_equal "standalone", manifest["display"]
     assert manifest["theme_color"].start_with?("#")
   end

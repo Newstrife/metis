@@ -11,7 +11,7 @@
 
   <%# Open Graph — Slack, iMessage, WhatsApp, Discord, LinkedIn, Facebook %>
   <meta property="og:type" content="article">
-  <meta property="og:site_name" content="Metis">
+  <meta property="og:site_name" content="小百同学">
   <meta property="og:title" content="<%= share_title %>">
   <meta property="og:description" content="<%= share_desc %>">
   <meta property="og:url" content="<%= share_url %>">
@@ -36,7 +36,7 @@
           <path d="M5 18.5V7l7 6.5 7-6.5v11.5"/>
         </svg>
       </span>
-      <span class="shared-word">Metis</span>
+      <span class="shared-word">小百同学</span>
     </a>
     <h1 class="shared-title"><%= @conversation.display_title %></h1>
     <% if (run = @conversation.workflow_run) %>
@@ -76,6 +76,6 @@
 
 <footer class="shared-foot">
   <div class="shared-foot-inner">
-    <%= t('.powered_by_prefix') %> <a href="<%= root_url %>" target="_blank" rel="noopener">Metis</a>
+    <%= t('.powered_by_prefix') %> <a href="<%= root_url %>" target="_blank" rel="noopener">小百同学</a>
   </div>
 </footer>

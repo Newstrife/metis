@@ -21,7 +21,7 @@ Devise.setup do |config|
   # with default "from" parameter.
   # Same sender as the rest of our mail (METIS_MAIL_FROM) — it must be on
   # the Cloudflare-verified domain or Delivery::Cloudflare rejects it.
-  config.mailer_sender = ENV.fetch("METIS_MAIL_FROM", "Metis <noreply@example.com>")
+  config.mailer_sender = ENV.fetch("METIS_MAIL_FROM", "小百同学 <noreply@example.com>")
 
   # Configure the class responsible to send e-mails.
   # config.mailer = 'Devise::Mailer'

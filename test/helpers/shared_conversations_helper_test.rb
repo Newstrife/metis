@@ -31,6 +31,6 @@ class SharedConversationsHelperTest < ActionView::TestCase
   end
 
   test "share_description falls back when there is no user message" do
-    assert_equal "A conversation shared from Metis.", share_description(@conversation)
+    assert_equal "A conversation shared from 小百同学.", share_description(@conversation)
   end
 end

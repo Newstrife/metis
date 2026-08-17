@@ -9,15 +9,15 @@
       no_preview: "此文件类型暂无预览 — 请下载查看。"
   layouts:
     head:
-      title: "Metis"
+      title: "小百同学"
     application:
-      title: "Metis"
+      title: "小百同学"
       brand: "BRJ"
     chat:
       open_menu: "打开菜单"
       undo: "撤销"
     mailer:
-      brand: "Metis"
+      brand: "小百同学"
       tagline: "你的 AI 智能体工作区"
     settings:
       open_menu: "打开菜单"
@@ -50,7 +50,7 @@
       enable_model: "启用 %{model}"
   pwa:
     manifest:
-      name: "Metis"
+      name: "小百同学"
       description: "与团队的 AI 智能体对话 — 会话、工作流与连接器。"
   shared:
     # 由 elapsed_timer_controller 在客户端设置；%{time} 在 JS 中填充。
