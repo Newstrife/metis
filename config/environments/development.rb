@@ -75,6 +75,11 @@ Rails.application.configure do
   # Highlight code that enqueued background job in logs.
   config.active_job.verbose_enqueue_logs = true
 
+  # Solid Queue in dev too — jobs survive a server restart (async would
+  # drop in-flight turns), and the recurring scheduler (routines, stalled
+  # turn reaping) only runs under the bin/jobs supervisor.
+  config.active_job.queue_adapter = :solid_queue
+
   # Highlight code that triggered redirect in logs.
   config.action_dispatch.verbose_redirect_logs = true
 

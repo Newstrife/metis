@@ -50,4 +50,8 @@ if ($env:WECOM_BOT_ID -and (Test-Path "clients/wecom-bridge/node_modules")) {
 # 5. Web 服务（端口 3002，独立隐藏窗口 + 日志文件）
 Write-Host "Metis 启动中: http://localhost:3002  (登录: admin@metis.local / password)"
 Start-Process cmd -ArgumentList '/c','ruby bin\rails server 1> log\rails-server.log 2> log\rails-server.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+
+# 6. 后台任务 supervisor（Solid Queue：ChatJob、定时 Routine 等都靠它）
+# Windows 没有 fork()，必须用 --mode=async（线程模式）
+Start-Process cmd -ArgumentList '/c','ruby bin\jobs --mode=async 1> log\solid-queue.log 2> log\solid-queue.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
 Write-Host "已全部在后台启动，日志见 log\rails-server.log；停止用 .\stop-dev.ps1"

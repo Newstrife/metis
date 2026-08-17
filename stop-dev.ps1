@@ -16,5 +16,10 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
   Where-Object { $_.CommandLine -match 'wecom-bridge' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Host "企微桥接已停止 (pid $($_.ProcessId))" }
 
+# 2b. 停 Solid Queue supervisor（命令行含 bin\jobs 的 ruby 进程）
+Get-CimInstance Win32_Process -Filter "Name='ruby.exe'" |
+  Where-Object { $_.CommandLine -match 'bin[\\/]jobs' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Host "任务队列已停止 (pid $($_.ProcessId))" }
+
 # 3. 停 PostgreSQL
 & E:\pi\pgsql\bin\pg_ctl.exe -D E:\pi\pgsql-data stop
