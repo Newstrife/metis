@@ -92,7 +92,7 @@ async function pollReply(messageId) {
 
 function truncate(text) {
   if (text.length <= MAX_REPLY_CHARS) return text;
-  return `${text.slice(0, MAX_REPLY_CHARS)}\n\n…（回复过长已截断，完整内容请到 Metis 查看）`;
+  return `${text.slice(0, MAX_REPLY_CHARS)}\n\n…（回复过长已截断，完整内容请到小百同学查看）`;
 }
 
 // ---- 入站消息 ------------------------------------------------------------
@@ -112,17 +112,17 @@ client.on("message.text", async (frame) => {
   const streamId = generateReqId("stream");
   try {
     await client.replyStream(frame, streamId, "正在思考…", false);
-    const { message_id } = await metisPost("/api/wecom/messages", { from_userid: from, content });
+    const { message_id } = await metisPost("/api/wecom/messages", { from_userid: from, content, chatid });
     const reply = await pollReply(message_id);
     const text = reply.ok
       ? truncate(reply.content)
-      : `这次处理没有成功（${reply.status}），请打开 Metis 查看详情，或换个说法再试一次。`;
+      : `这次处理没有成功（${reply.status}），请打开小百同学查看详情，或换个说法再试一次。`;
     await client.replyStream(frame, streamId, text, true);
   } catch (err) {
     console.error("[msg] 处理失败:", err.message);
     const note = err.status === 409
       ? "上一条消息还在处理中，等它回复完再发下一条哦。"
-      : "Metis 暂时不可用，请稍后再试。";
+      : "小百同学暂时不可用，请稍后再试。";
     try {
       await client.replyStream(frame, streamId, note, true);
     } catch { /* 连接已断，等重连 */ }
@@ -132,7 +132,7 @@ client.on("message.text", async (frame) => {
 client.on("event.enter_chat", (frame) => {
   client.replyWelcome(frame, {
     msgtype: "text",
-    text: { content: "你好，我是 Metis。直接说事就行——查设备、问文档、跑分析都可以。" },
+    text: { content: "你好，我是小百同学。直接说事就行——查设备、问文档、跑分析都可以。" },
   }).catch((e) => console.error("[welcome]", e.message));
 });
 

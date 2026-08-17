@@ -44,8 +44,10 @@ class Conversation < ApplicationRecord
   scope :chats, -> { where(routine_id: nil).where.missing(:workflow_run) }
   scope :workflows, -> { where.associated(:workflow_run) }
   scope :routines, -> { where.not(routine_id: nil) }
-  # Inbound WeCom-bridge conversations key the sender in settings.
-  scope :for_wecom_user, ->(userid) { where("conversations.settings ->> 'wecom_userid' = ?", userid) }
+  # Inbound WeCom-bridge conversations key the context in settings: group
+  # chats by chatid (one conversation per group), DMs by sender.
+  scope :for_wecom_user, ->(userid) { where("conversations.settings ->> 'wecom_userid' = ?", userid).where("conversations.settings ->> 'wecom_chatid' IS NULL") }
+  scope :for_wecom_chat, ->(chatid) { where("conversations.settings ->> 'wecom_chatid' = ?", chatid) }
   scope :for_team, ->(team) { where(team: team) }
   # Coarse candidate scan for EvictDockerWorkspacesJob — Docker runtime,
   # quiet past the cutoff (messages touch the conversation, so updated_at

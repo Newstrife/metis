@@ -59,6 +59,42 @@ class Api::Wecom::MessagesControllerTest < ActionDispatch::IntegrationTest
     assert_response :conflict
   end
 
+  test "create gives each group chat its own conversation" do
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "群A第一条", chatid: "wrGroupA" }, headers: auth, as: :json
+    group_a = JSON.parse(response.body)["conversation_id"]
+    Message.find(JSON.parse(response.body)["message_id"]).update!(streaming_status: :done)
+
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "群B第一条", chatid: "wrGroupB" }, headers: auth, as: :json
+    group_b = JSON.parse(response.body)["conversation_id"]
+    assert_not_equal group_a, group_b
+    assert_equal "wrGroupB", Conversation.find(group_b).settings["wecom_chatid"]
+  end
+
+  test "create reuses the group conversation across senders" do
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "第一条", chatid: "wrGroupA" }, headers: auth, as: :json
+    first = JSON.parse(response.body)["conversation_id"]
+    Message.find(JSON.parse(response.body)["message_id"]).update!(streaming_status: :done)
+
+    assert_no_difference "Conversation.count" do
+      post "/api/wecom/messages", params: { from_userid: "lisi", content: "另一个人在同群", chatid: "wrGroupA" }, headers: auth, as: :json
+    end
+    assert_equal first, JSON.parse(response.body)["conversation_id"]
+  end
+
+  test "a busy group does not block another group or a DM" do
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "群A处理中", chatid: "wrGroupA" }, headers: auth, as: :json
+    assert_response :created
+
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "群B不受限", chatid: "wrGroupB" }, headers: auth, as: :json
+    assert_response :created
+
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "私聊不受限" }, headers: auth, as: :json
+    assert_response :created
+
+    post "/api/wecom/messages", params: { from_userid: "lisi", content: "群A催办", chatid: "wrGroupA" }, headers: auth, as: :json
+    assert_response :conflict
+  end
+
   test "create rejects blank content and missing sender" do
     post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "  " }, headers: auth, as: :json
     assert_response :unprocessable_entity

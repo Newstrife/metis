@@ -12,9 +12,10 @@ module Api
       def create
         content = params[:content].to_s.strip
         from = params[:from_userid].to_s.strip.first(64)
+        chatid = params[:chatid].to_s.strip.first(64).presence
         return render json: { error: "content and from_userid are required" }, status: :unprocessable_entity if content.blank? || from.blank?
 
-        conversation = conversation_for(from)
+        conversation = conversation_for(from, chatid)
         return render json: { error: "busy" }, status: :conflict if conversation.turn_in_progress?
 
         _user_message, assistant = ConversationTurn.start(conversation, content: content, sender: user)
@@ -49,14 +50,16 @@ module Api
         @user ||= User.find_by!(email: ENV.fetch("WECOM_BRIDGE_USER_EMAIL", "admin@metis.local"))
       end
 
-      # One long-lived conversation per WeCom sender — pi's session
-      # continuity carries context across messages.
-      def conversation_for(from)
-        user.conversations.for_wecom_user(from).first_or_create! do |conversation|
+      # One long-lived conversation per WeCom context — a group chat
+      # (chatid) gets its own, direct messages one per sender — so pi's
+      # session continuity stays scoped to the group/scene.
+      def conversation_for(from, chatid)
+        scope = chatid ? user.conversations.for_wecom_chat(chatid) : user.conversations.for_wecom_user(from)
+        scope.first_or_create! do |conversation|
           conversation.team = user.personal_team
-          conversation.title = "企业微信 · #{from}"
+          conversation.title = chatid ? "企业微信群 · #{chatid.last(6)}" : "企业微信 · #{from}"
           conversation.visibility = :personal
-          conversation.settings = { "wecom_userid" => from }
+          conversation.settings = chatid ? { "wecom_chatid" => chatid, "wecom_userid" => from } : { "wecom_userid" => from }
         end
       end
     end
