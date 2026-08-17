@@ -21,6 +21,7 @@ module Agent
       get_workflow get_project start_workflow create_workflow update_workflow
       list_skills create_skill update_skill
       list_routines create_routine update_routine
+      request_approval
     ].freeze
 
     # Build an `extension_ui:` handler bound to this conversation. It services
@@ -120,6 +121,10 @@ module Agent
 
     def update_routine
       JSON.generate(Agent::RoutineManager.update(@conversation, @params))
+    end
+
+    def request_approval
+      JSON.generate(Agent::WecomApproval.notify(@conversation, @params))
     end
   end
 end

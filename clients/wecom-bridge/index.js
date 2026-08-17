@@ -157,8 +157,9 @@ const server = http.createServer((req, res) => {
   req.on("data", (c) => { raw += c; });
   req.on("end", async () => {
     try {
-      const { to_userid, content } = JSON.parse(raw);
-      const chatid = lastChatByUser.get(to_userid);
+      const { to_userid, chatid: chatidParam, content } = JSON.parse(raw);
+      // chatid 直发（群通知/审批推送）；to_userid 走内存里的会话缓存
+      const chatid = chatidParam || lastChatByUser.get(to_userid);
       if (!chatid) throw new Error(`没有 ${to_userid} 的会话记录（对方需先给机器人发过消息）`);
       await client.sendMessage(chatid, { msgtype: "markdown", markdown: { content: truncate(String(content)) } });
       res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true }));

@@ -15,6 +15,7 @@
  *   metis_list_routines   — list the team's routines, with trigger + status (live)
  *   metis_create_routine  — create a scheduled/event routine (admin only)
  *   metis_update_routine  — edit a routine / enable-disable it (admin only)
+ *   metis_request_approval — push a high-risk action to the operator on WeCom
  *
  * These manage team skills as single SKILL.md rows. Multi-file skills (with
  * supporting assets) still go through the native file path: write
@@ -627,6 +628,46 @@ export default function metisWorkflowExtension(pi: ExtensionAPI) {
         "update_routine",
         params,
         (r) => `Updated the "${r.name}" routine${r.enabled === false ? " (disabled)" : ""}. Review it: ${r.url}`,
+      );
+    },
+  });
+
+  pi.registerTool({
+    name: "metis_request_approval",
+    label: "Request Operator Approval",
+    description:
+      "Push a high-risk action request to the operator's WeCom for approval. " +
+      "The agent never blocks: end the turn with 'pending approval', and only " +
+      "act once the operator approves in this conversation. Use when someone " +
+      "who is NOT the operator asks for a destructive or outward-facing " +
+      "action (delete/overwrite, install, send/publish, credentials).",
+    promptSnippet: "Push a high-risk action to the operator for WeCom approval",
+    promptGuidelines: [
+      "Use metis_request_approval when a requester who is not the operator asks for a high-risk action — never execute first and notify later.",
+      "Summarize the exact action and its consequence in `summary`; name the requester in `requester` when the message came from a WeCom group member.",
+      "After calling it, tell the requester the action is pending operator approval. Proceed only when the operator approves in this conversation.",
+      "If the tool answers ok:false, fall back to refusing the action and explaining why in your reply.",
+    ],
+    parameters: Type.Object({
+      summary: Type.String({
+        description:
+          "What would be done and why it's risky — concrete target and consequence, " +
+          'e.g. "delete E:\\backups\\2024 (12 GB) to free disk space".',
+      }),
+      requester: Type.Optional(
+        Type.String({
+          description: 'Who asked — the WeCom group member userid from the [群成员 …] tag, if any.',
+        }),
+      ),
+    }),
+
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      return hostWrite(
+        ctx,
+        "request_approval",
+        params,
+        (r) => `Approval request pushed to the operator on WeCom (${(r.delivered_to || []).join(", ")}). ` +
+               `Tell the requester it's pending; act only after the operator approves in this chat.`,
       );
     },
   });

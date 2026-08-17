@@ -70,6 +70,12 @@ class Agent::HostBridgeTest < ActiveSupport::TestCase
     assert_nil Agent::HostBridge.call(@conversation, "evil", {})
   end
 
+  test "request_approval dispatches to WecomApproval" do
+    # 测试环境未配 WECOM_BRIDGE_TOKEN，服务如实拒绝——证明 op 路由到了服务
+    json = Agent::HostBridge.call(@conversation, "request_approval", "summary" => "删库")
+    assert_equal false, JSON.parse(json)["ok"]
+  end
+
   test "the handler services metis:-prefixed requests and parses JSON params" do
     handler = Agent::HostBridge.handler(@conversation)
     json = handler.call(Req.new("metis:get_workflow", JSON.generate(name: "Ship")))
