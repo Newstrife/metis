@@ -27,6 +27,21 @@ class User < ApplicationRecord
 
   validate :avatar_acceptable
 
+  validates :wecom_userid, uniqueness: true, allow_nil: true
+
+  # Auto-provisioned account for a WeCom sender (clients/wecom-bridge):
+  # unknown senders get an account keyed by their 企业微信 userid, with a
+  # shared initial password they should change after first sign-in.
+  def self.provision_for_wecom!(userid)
+    find_or_create_by!(wecom_userid: userid) do |user|
+      user.email = "#{userid}@wecom.local"
+      user.password = user.password_confirmation =
+        ENV.fetch("WECOM_INITIAL_PASSWORD", "abc.123")
+    end
+  rescue ActiveRecord::RecordNotUnique
+    find_by!(wecom_userid: userid)
+  end
+
   after_create :create_personal_team
 
   # Locales the UI is translated into. New locales drop in by adding a

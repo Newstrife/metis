@@ -15,10 +15,12 @@ module Api
         chatid = params[:chatid].to_s.strip.first(64).presence
         return render json: { error: "content and from_userid are required" }, status: :unprocessable_entity if content.blank? || from.blank?
 
-        conversation = conversation_for(from, chatid)
+        conversation = conversation_for(sender, from, chatid)
         return render json: { error: "busy" }, status: :conflict if conversation.turn_in_progress?
 
-        _user_message, assistant = ConversationTurn.start(conversation, content: content, sender: user)
+        # 群消息带上发言人标识，agent 才能区分指令来自谁
+        turn_content = chatid ? "[群成员 #{from}] #{content}" : content
+        _user_message, assistant = ConversationTurn.start(conversation, content: turn_content, sender: sender)
         render json: { conversation_id: conversation.id, message_id: assistant.id }, status: :created
       rescue ActiveRecord::RecordNotUnique
         # turn_in_progress? 与落库之间存在竞态窗口，唯一索引是真正的闸门
@@ -44,22 +46,28 @@ module Api
         head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(token, expected)
       end
 
-      # v1: every WeCom sender maps to this one Metis account. Per-member
-      # mapping lands later with a wecom_userid on User.
-      def user
-        @user ||= User.find_by!(email: ENV.fetch("WECOM_BRIDGE_USER_EMAIL", "admin@metis.local"))
+      def sender
+        @sender ||= User.provision_for_wecom!(params[:from_userid].to_s.strip.first(64))
+      end
+
+      # The deployment-level account that owns group conversations, so the
+      # operator can see every group's turns in the web UI.
+      def bridge_owner
+        @bridge_owner ||= User.find_by!(email: ENV.fetch("WECOM_BRIDGE_USER_EMAIL", "admin@metis.local"))
       end
 
       # One long-lived conversation per WeCom context — a group chat
-      # (chatid) gets its own, direct messages one per sender — so pi's
-      # session continuity stays scoped to the group/scene.
-      def conversation_for(from, chatid)
-        scope = chatid ? user.conversations.for_wecom_chat(chatid) : user.conversations.for_wecom_user(from)
+      # (chatid) gets its own under the bridge owner, direct messages one
+      # per sender under their own account — so pi's session continuity
+      # stays scoped to the group/scene.
+      def conversation_for(sender, from, chatid)
+        owner = chatid ? bridge_owner : sender
+        scope = chatid ? owner.conversations.for_wecom_chat(chatid) : owner.conversations.for_wecom_user(from)
         scope.first_or_create! do |conversation|
-          conversation.team = user.personal_team
+          conversation.team = owner.personal_team
           conversation.title = chatid ? "企业微信群 · #{chatid.last(6)}" : "企业微信 · #{from}"
           conversation.visibility = :personal
-          conversation.settings = chatid ? { "wecom_chatid" => chatid, "wecom_userid" => from } : { "wecom_userid" => from }
+          conversation.settings = chatid ? { "wecom_chatid" => chatid } : { "wecom_userid" => from }
         end
       end
     end

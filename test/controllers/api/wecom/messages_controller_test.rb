@@ -17,19 +17,25 @@ class Api::Wecom::MessagesControllerTest < ActionDispatch::IntegrationTest
 
   def auth = { "Authorization" => "Bearer #{@token}" }
 
-  test "create starts a turn on a per-sender conversation" do
-    assert_difference "Conversation.count", 1 do
-      assert_difference "Message.count", 2 do
-        post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "查一下仪器台账" },
-             headers: auth, as: :json
+  test "create auto-provisions an account and starts a turn for an unknown sender" do
+    assert_difference "User.count", 1 do
+      assert_difference "Conversation.count", 1 do
+        assert_difference "Message.count", 2 do
+          post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "查一下仪器台账" },
+               headers: auth, as: :json
+        end
       end
     end
     assert_response :created
 
+    sender = User.find_by(wecom_userid: "zhangsan")
+    assert_equal "zhangsan@wecom.local", sender.email
+    assert sender.valid_password?("abc.123"), "初始密码应可登录"
+
     body = JSON.parse(response.body)
     conversation = Conversation.find(body["conversation_id"])
-    assert_equal @user, conversation.user
-    assert_equal @user.personal_team, conversation.team
+    assert_equal sender, conversation.user
+    assert_equal sender.personal_team, conversation.team
     assert conversation.visibility_personal?
     assert_equal "zhangsan", conversation.settings["wecom_userid"]
 
@@ -43,7 +49,7 @@ class Api::Wecom::MessagesControllerTest < ActionDispatch::IntegrationTest
     first = JSON.parse(response.body)["conversation_id"]
     Message.find(JSON.parse(response.body)["message_id"]).update!(streaming_status: :done)
 
-    assert_no_difference "Conversation.count" do
+    assert_no_difference [ "Conversation.count", "User.count" ] do
       post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "第二条" }, headers: auth, as: :json
     end
     assert_equal first, JSON.parse(response.body)["conversation_id"]
@@ -67,7 +73,12 @@ class Api::Wecom::MessagesControllerTest < ActionDispatch::IntegrationTest
     post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "群B第一条", chatid: "wrGroupB" }, headers: auth, as: :json
     group_b = JSON.parse(response.body)["conversation_id"]
     assert_not_equal group_a, group_b
-    assert_equal "wrGroupB", Conversation.find(group_b).settings["wecom_chatid"]
+
+    conversation_b = Conversation.find(group_b)
+    assert_equal "wrGroupB", conversation_b.settings["wecom_chatid"]
+    assert_equal @user, conversation_b.user, "群会话应挂在桥接主账户下便于监督"
+    user_message = conversation_b.messages.find_by(role: :user)
+    assert_equal "[群成员 zhangsan] 群B第一条", user_message.content
   end
 
   test "create reuses the group conversation across senders" do

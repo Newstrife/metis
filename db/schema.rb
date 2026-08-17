@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_13_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -344,9 +344,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_13_000000) do
     t.string "theme"
     t.string "timezone"
     t.datetime "updated_at", null: false
+    t.string "wecom_userid"
     t.index ["bridge_token_digest"], name: "index_users_on_bridge_token_digest", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+    t.index ["wecom_userid"], name: "index_users_on_wecom_userid", unique: true
   end
 
   create_table "webhook_events", force: :cascade do |t|
