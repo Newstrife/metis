@@ -15,6 +15,15 @@ module Api
         chatid = params[:chatid].to_s.strip.first(64).presence
         return render json: { error: "content and from_userid are required" }, status: :unprocessable_entity if content.blank? || from.blank?
 
+        # 群白名单：非空时只服务名单里的群（Setting → /settings/features）
+        whitelist = Setting.get("wecom.group_whitelist")
+        return render json: { rejected: "group_not_allowed" } if chatid && whitelist.any? && whitelist.exclude?(chatid)
+
+        sender = User.find_by(wecom_userid: from)
+        sender ||= User.provision_for_wecom!(from) if Setting.get("wecom.auto_provision")
+        return render json: { rejected: "account_required" } unless sender
+
+        chatid = nil unless Setting.get("wecom.group_conversations")
         conversation = conversation_for(sender, from, chatid)
         return render json: { error: "busy" }, status: :conflict if conversation.turn_in_progress?
 
@@ -44,10 +53,6 @@ module Api
 
         token = request.headers["Authorization"].to_s[/\ABearer (.+)\z/, 1].to_s
         head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(token, expected)
-      end
-
-      def sender
-        @sender ||= User.provision_for_wecom!(params[:from_userid].to_s.strip.first(64))
       end
 
       # The deployment-level account that owns group conversations, so the

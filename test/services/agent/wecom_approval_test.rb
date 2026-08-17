@@ -64,4 +64,14 @@ class Agent::WecomApprovalTest < ActiveSupport::TestCase
       poster: ->(_payload) { false })
     assert_not result[:ok]
   end
+
+  test "approval push can be disabled via the feature switch" do
+    Setting.set("security.approval_push", false)
+    result = Agent::WecomApproval.notify(@conversation, { "summary" => "删东西" },
+      poster: ->(*) { flunk "关闭时不应推送" })
+    assert_not result[:ok]
+    assert_equal "approval push is disabled", result[:error]
+  ensure
+    Setting.delete_all
+  end
 end

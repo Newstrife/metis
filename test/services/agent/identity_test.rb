@@ -21,6 +21,15 @@ class Agent::IdentityTest < ActiveSupport::TestCase
     assert_match(/#{conversation.user.email}/, out)
   end
 
+  test "the Trust section follows the security.trust_guard switch" do
+    assert_match(/## Trust/, render)
+
+    Setting.set("security.trust_guard", false)
+    assert_no_match(/## Trust/, render)
+  ensure
+    Setting.delete_all
+  end
+
   test "renders the Metis soul as behavioral guidance" do
     out = render
 

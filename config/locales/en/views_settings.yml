@@ -211,6 +211,7 @@ en:
       models: "Models"
       developer: "Developer"
       users: "Users"
+      features: "Features"
     accounts:
       show:
         title: "Account"
@@ -249,6 +250,35 @@ en:
         reset_password: "Reset password"
         delete: "Delete"
         delete_confirm: "Delete %{email}? Their personal workspace and conversations go with it. This cannot be undone."
+    features:
+      show:
+        title: "Features"
+        heading: "Features"
+        lead: "Deployment-level feature switches — changes take effect within seconds. List modules accept free-form entries."
+        state_on: "On"
+        state_off: "Off"
+        turn_on: "Turn on"
+        turn_off: "Turn off"
+        add_item: "Add"
+        remove_item: "Remove"
+        modules:
+          wecom_auto_provision:
+            name: "WeCom auto-provisioning"
+            desc: "Unknown WeCom senders get an account on first contact (<userid>@wecom.local, initial password abc.123). When off, unregistered senders are politely turned away."
+          wecom_group_conversations:
+            name: "Per-group conversations"
+            desc: "Each WeCom group gets its own conversation and memory. When off, messages fall back to one conversation per sender."
+          wecom_group_whitelist:
+            name: "Group whitelist"
+            desc: "Empty list = every group may use the bot. Add chatids to restrict service to listed groups only; others get a polite refusal."
+            empty: "The list is empty — every group is currently served."
+            placeholder: "Group chatid (starts with wr)"
+          security_approval_push:
+            name: "High-risk approval push"
+            desc: "When a non-operator requests a high-risk action (delete, install, publish…), the agent pushes an approval card to WeCom first and waits for the operator's go-ahead."
+          security_trust_guard:
+            name: "Agent trust guardrail"
+            desc: "Injects the Trust section into every turn's system prompt: only the operator can approve high-risk actions. Disable only for debugging."
     developer:
       show:
         title: "Developer"

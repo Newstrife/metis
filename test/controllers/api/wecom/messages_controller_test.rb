@@ -106,6 +106,54 @@ class Api::Wecom::MessagesControllerTest < ActionDispatch::IntegrationTest
     assert_response :conflict
   end
 
+  test "a group outside the whitelist is politely rejected" do
+    Setting.set("wecom.group_whitelist", [ "wrAllowed" ])
+    assert_no_difference [ "Conversation.count", "Message.count", "User.count" ] do
+      post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "hi", chatid: "wrStranger" }, headers: auth, as: :json
+    end
+    assert_response :success
+    assert_equal "group_not_allowed", JSON.parse(response.body)["rejected"]
+  ensure
+    Setting.delete_all
+  end
+
+  test "whitelisted groups pass" do
+    Setting.set("wecom.group_whitelist", [ "wrAllowed" ])
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "hi", chatid: "wrAllowed" }, headers: auth, as: :json
+    assert_response :created
+  ensure
+    Setting.delete_all
+  end
+
+  test "unknown senders are rejected when auto-provisioning is off" do
+    Setting.set("wecom.auto_provision", false)
+    assert_no_difference "User.count" do
+      post "/api/wecom/messages", params: { from_userid: "stranger", content: "hi" }, headers: auth, as: :json
+    end
+    assert_equal "account_required", JSON.parse(response.body)["rejected"]
+  ensure
+    Setting.delete_all
+  end
+
+  test "known senders still work when auto-provisioning is off" do
+    Setting.set("wecom.auto_provision", false)
+    User.provision_for_wecom!("zhangsan")
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "hi" }, headers: auth, as: :json
+    assert_response :created
+  ensure
+    Setting.delete_all
+  end
+
+  test "group_conversations off falls back to per-sender conversations" do
+    Setting.set("wecom.group_conversations", false)
+    post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "群消息", chatid: "wrGroupA" }, headers: auth, as: :json
+    conversation = Conversation.find(JSON.parse(response.body)["conversation_id"])
+    assert_nil conversation.settings["wecom_chatid"]
+    assert_equal "zhangsan", conversation.settings["wecom_userid"]
+  ensure
+    Setting.delete_all
+  end
+
   test "create rejects blank content and missing sender" do
     post "/api/wecom/messages", params: { from_userid: "zhangsan", content: "  " }, headers: auth, as: :json
     assert_response :unprocessable_entity

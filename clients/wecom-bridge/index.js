@@ -112,8 +112,16 @@ client.on("message.text", async (frame) => {
   const streamId = generateReqId("stream");
   try {
     await client.replyStream(frame, streamId, "正在思考…", false);
-    const { message_id } = await metisPost("/api/wecom/messages", { from_userid: from, content, chatid });
-    const reply = await pollReply(message_id);
+    const result = await metisPost("/api/wecom/messages", { from_userid: from, content, chatid });
+    // Metis 按功能开关拒答（群未开通 / 未注册成员），话术直接回给发信人
+    if (result.rejected) {
+      const note = result.rejected === "group_not_allowed"
+        ? "本群未开通小百同学服务，请联系管理员。"
+        : "你还没有小百同学账号，请联系管理员（徐斌）开通。";
+      await client.replyStream(frame, streamId, note, true);
+      return;
+    }
+    const reply = await pollReply(result.message_id);
     const text = reply.ok
       ? truncate(reply.content)
       : `这次处理没有成功（${reply.status}），请打开小百同学查看详情，或换个说法再试一次。`;

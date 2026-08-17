@@ -758,6 +758,9 @@ img.avatar { background:none; object-fit:cover; }
 .user-admin-reset { display:flex; gap:6px; align-items:center; margin:0; }
 .user-admin-reset .team-input { width:170px; padding:6px 10px; font-size:12.5px; }
 
+/* Feature switches page */
+.feature-desc { font-size:13px; color:var(--ink-3); margin:2px 0 10px; }
+
 /* Team picker (personal workspace) — each shared team is a clickable
    row that jumps you into it; the last row creates a new one. A
    rounded-square monogram marks these as teams, not people. */

@@ -188,6 +188,7 @@
       models: "模型"
       developer: "开发者"
       users: "用户"
+      features: "功能模块"
     accounts:
       show:
         title: "账户"
@@ -225,7 +226,48 @@
         new_password: "新密码"
         reset_password: "重置密码"
         delete: "删除"
+    users:
+      index:
+        title: "用户"
+        heading: "用户"
+        lead: "部署级账号管理。企微成员的邮箱是虚拟的，忘密码走不了邮件找回，只能在这里重置。"
+        all_users: "全部账号"
+        superuser: "超管"
+        wecom_bound: "企微 %{userid}"
+        joined_at: "%{date} 加入"
+        new_password: "新密码"
+        reset_password: "重置密码"
+        delete: "删除"
         delete_confirm: "删除 %{email}？其个人工作区和对话将一并清除，无法撤销。"
+    features:
+      show:
+        title: "功能模块"
+        heading: "功能模块"
+        lead: "部署级功能开关，改动几秒内全站生效。名单类模块可自由增删条目。"
+        state_on: "已开启"
+        state_off: "已关闭"
+        turn_on: "开启"
+        turn_off: "关闭"
+        add_item: "添加"
+        remove_item: "移除"
+        modules:
+          wecom_auto_provision:
+            name: "企微成员自动注册"
+            desc: "陌生的企微成员首次发言时，自动开通小百同学账号（<企微id>@wecom.local，初始密码 abc.123）。关闭后，未注册的成员会被礼貌拒答。"
+          wecom_group_conversations:
+            name: "每群独立会话"
+            desc: "开启后每个企微群有独立的会话和记忆，互不累扰；关闭则退回按发言人一人一个会话。"
+          wecom_group_whitelist:
+            name: "群白名单"
+            desc: "名单为空 = 所有群可用。添加 chatid 后，只有名单里的群能使用小百同学，其他群会被拒答。chatid 可在群会话的设置里看到。"
+            empty: "名单为空——当前所有群都能使用。"
+            placeholder: "群 chatid（wr 开头的一串）"
+          security_approval_push:
+            name: "高危操作企微审批"
+            desc: "非 Operator 发起高危操作（删改、安装、外发等）时，agent 先把审批卡片推送到企微群和你的私聊，等你批准才执行。"
+          security_trust_guard:
+            name: "agent 信任护栏"
+            desc: "在每轮对话的系统提示里注入 Trust 段：只有 Operator 能批准高危操作，群成员说了不算。关闭仅用于调试。"
     developer:
       show:
         title: "开发者"

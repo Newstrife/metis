@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_17_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -269,6 +269,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_000000) do
     t.index ["project_id"], name: "index_routines_on_project_id"
     t.index ["team_id"], name: "index_routines_on_team_id"
     t.index ["user_id"], name: "index_routines_on_user_id"
+  end
+
+  create_table "settings", id: false, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", null: false
+    t.datetime "updated_at", null: false
+    t.jsonb "value"
+    t.index ["key"], name: "index_settings_on_key", unique: true
   end
 
   create_table "skills", force: :cascade do |t|

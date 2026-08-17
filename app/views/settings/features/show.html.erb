@@ -1,0 +1,56 @@
+<% content_for :title, t('.title') %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title"><%= t('.heading') %></h1>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <p class="pane-lead"><%= t('.lead') %></p>
+
+      <% @modules.each do |key, mod| %>
+        <% current = Setting.get(key) %>
+        <section class="settings-card">
+          <div class="settings-card-head">
+            <span class="settings-card-title"><%= t(".modules.#{mod[:i18n]}.name") %></span>
+            <% if mod[:type] == :boolean %>
+              <span class="badge-pending"><%= current ? t('.state_on') : t('.state_off') %></span>
+            <% end %>
+          </div>
+          <p class="feature-desc"><%= t(".modules.#{mod[:i18n]}.desc") %></p>
+
+          <% if mod[:type] == :boolean %>
+            <%= button_to(current ? t('.turn_off') : t('.turn_on'), features_path,
+                  method: :patch, params: { key: key, value: !current },
+                  class: "btn #{current ? 'btn-ghost' : 'btn-primary'}") %>
+          <% else %>
+            <ul class="member-list">
+              <% current.each do |item| %>
+                <li class="member-row">
+                  <div class="member-id"><div class="member-name"><code><%= item %></code></div></div>
+                  <div class="member-actions">
+                    <%= button_to t('.remove_item'), features_path, method: :patch,
+                          params: { key: key, remove: item }, class: "btn btn-ghost",
+                          form: { class: "inline-form" } %>
+                  </div>
+                </li>
+              <% end %>
+            </ul>
+            <% if current.empty? %>
+              <p class="invite-empty"><%= t(".modules.#{mod[:i18n]}.empty") %></p>
+            <% end %>
+            <%= form_with url: features_path, method: :patch, class: "invite-form" do |f| %>
+              <div class="invite-row">
+                <%= f.text_field :item, placeholder: t(".modules.#{mod[:i18n]}.placeholder"),
+                      required: true, class: "team-input" %>
+                <%= hidden_field_tag :key, key %>
+                <%= f.submit t('.add_item'), class: "btn btn-primary" %>
+              </div>
+            <% end %>
+          <% end %>
+        </section>
+      <% end %>
+    </div>
+  </div>
+</main>
