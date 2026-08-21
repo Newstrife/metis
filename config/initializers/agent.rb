@@ -164,6 +164,7 @@ Rails.application.config.x.agent.provider_metadata = {
   "moonshotai"   => { label: "Moonshot AI",      env: "MOONSHOT_API_KEY" },
   "moonshotai-cn" => { label: "Moonshot AI (CN)", env: "MOONSHOT_API_KEY" },
   "kimi-coding"  => { label: "Kimi for Coding",  env: "KIMI_API_KEY" },
+  "xiaomi"       => { label: "Xiaomi",        env: "XIAOMI_API_KEY" },
   "groq"         => { env: "GROQ_API_KEY" },
   "cerebras"     => { env: "CEREBRAS_API_KEY" },
   "xai"          => { env: "XAI_API_KEY" },
