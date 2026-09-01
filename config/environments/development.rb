@@ -63,6 +63,13 @@ Rails.application.configure do
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
 
+  # Disable size-based log rotation. puma and bin/jobs share log/development.log;
+  # when rotation fires, the process that loses the Windows rename race ends up
+  # with a closed log stream and spams "log writing failed" forever (2026-08-28
+  # incident: solid-queue logger died, 450K stderr lines over 4 days). Dev logs
+  # are cheap to truncate manually; the cross-process rotation race is not.
+  config.log_file_size = nil
+
   # Raise an error on page load if there are pending migrations.
   config.active_record.migration_error = :page_load
 
