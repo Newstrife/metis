@@ -148,6 +148,30 @@ client.on("authenticated", () => console.log("🔐 企微 WebSocket 已认证"))
 client.on("disconnected", () => console.log("⚠️ 连接断开，等待自动重连…"));
 client.on("error", (e) => console.error("[ws]", e && e.message ? e.message : e));
 
+// ---- 看门狗 ---------------------------------------------------------------
+// 背景：2026-08-30 事故——重连后 auth 帧发出但认证响应未到，SDK 等待认证期间
+// 不启动心跳也无超时，进程永久假死（TCP 连着、消息收不到）。
+// SDK 认证完成后有 30s 心跳+pong 超时检测，空闲期不会误伤，看门狗只补两个盲区：
+//   1. connected 但 60s 未 authenticated → 断开，交给 SDK 自动重连
+//   2. 长期 disconnected（SDK 10 次重试用尽放弃）→ 每 10 分钟兜底拉起
+const wsState = { connected: false, authenticated: false, connectedAt: 0, downSince: Date.now() };
+client.on("connected", () => { wsState.connected = true; wsState.authenticated = false; wsState.connectedAt = Date.now(); });
+client.on("authenticated", () => { wsState.authenticated = true; });
+client.on("disconnected", () => { wsState.connected = false; wsState.authenticated = false; wsState.downSince = Date.now(); });
+
+setInterval(() => {
+  if (wsState.connected && !wsState.authenticated && Date.now() - wsState.connectedAt > 60_000) {
+    console.error("[watchdog] 认证超时（60s 无响应），强制断开等待 SDK 重连");
+    try { client.disconnect(); } catch { /* 已断则忽略 */ }
+    return;
+  }
+  if (!wsState.connected && Date.now() - wsState.downSince > 10 * 60_000) {
+    console.error("[watchdog] 连接长期未恢复，主动重连");
+    wsState.downSince = Date.now(); // 防止连续触发
+    try { client.connect(); } catch (e) { console.error("[watchdog] 重连失败:", e.message); }
+  }
+}, 30_000);
+
 // ---- 主动推送出口（Routine / agent 用） -----------------------------------
 // POST http://127.0.0.1:3201/notify  { "to_userid": "...", "content": "..." }
 // 寻址依赖该用户先给机器人发过消息（chatid 缓存在内存里）。
