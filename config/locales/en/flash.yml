@@ -114,11 +114,27 @@ en:
     settings:
       users:
         update:
-          notice: "Password reset for %{email}."
-          failure: "Reset failed: %{errors}"
+          notice: "%{email} updated."
+          failure: "Update failed: %{errors}"
         destroy:
           notice: "%{email} deleted."
           self: "You can't delete the account you're signed in with."
+      roles:
+        create:
+          notice: "Role %{name} created."
+        update:
+          notice: "Role %{name} saved."
+        save:
+          failure: "Save failed: %{errors}"
+        destroy:
+          notice: "Role %{name} deleted."
+      data_directories:
+        create:
+          notice: "Directory %{name} registered."
+        save:
+          failure: "Save failed: %{errors}"
+        destroy:
+          notice: "Directory %{name} unregistered."
       teams:
         update:
           notice: "Team renamed."

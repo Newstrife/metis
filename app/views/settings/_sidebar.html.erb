@@ -105,6 +105,24 @@
         </svg>
         <span><%= t('.users') %></span>
       <% end %>
+      <%= link_to roles_path,
+            class: "nav-item#{' on' if controller_name == 'roles'}" do %>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="5" r="2.5"/>
+          <path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4"/>
+          <path d="M11.5 2.5l2 2-3.5 3.5-2-2z"/>
+        </svg>
+        <span><%= t('.roles') %></span>
+      <% end %>
+      <%= link_to data_directories_path,
+            class: "nav-item#{' on' if controller_name == 'data_directories'}" do %>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2.5 4h5l1 1.5h5M2.5 4v8h11V5.5M2.5 8h11"/>
+        </svg>
+        <span><%= t('.data_directories') %></span>
+      <% end %>
       <%= link_to features_path,
             class: "nav-item#{' on' if controller_name == 'features'}" do %>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"

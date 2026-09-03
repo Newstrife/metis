@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_17_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_18_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pg_trgm"
@@ -117,6 +117,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_010000) do
     t.index ["team_id"], name: "index_conversations_on_team_id"
     t.index ["title"], name: "index_conversations_on_title_trigram", opclass: :gin_trgm_ops, using: :gin
     t.index ["user_id"], name: "index_conversations_on_user_id"
+  end
+
+  create_table "data_directories", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.string "name", null: false
+    t.string "path", null: false
+    t.boolean "public_access", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["path"], name: "index_data_directories_on_path", unique: true
+  end
+
+  create_table "directory_grants", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "data_directory_id", null: false
+    t.bigint "role_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["data_directory_id"], name: "index_directory_grants_on_data_directory_id"
+    t.index ["role_id", "data_directory_id"], name: "index_directory_grants_on_role_id_and_data_directory_id", unique: true
+    t.index ["role_id"], name: "index_directory_grants_on_role_id"
   end
 
   create_table "identities", force: :cascade do |t|
@@ -244,6 +264,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_010000) do
     t.index ["team_id", "name"], name: "index_projects_on_team_id_and_name", unique: true
     t.index ["team_id"], name: "index_projects_on_team_id"
     t.index ["updated_by_id"], name: "index_projects_on_updated_by_id"
+  end
+
+  create_table "role_assignments", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "role_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["role_id"], name: "index_role_assignments_on_role_id"
+    t.index ["user_id", "role_id"], name: "index_role_assignments_on_user_id_and_role_id", unique: true
+    t.index ["user_id"], name: "index_role_assignments_on_user_id"
+  end
+
+  create_table "roles", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.boolean "full_access", default: false, null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_roles_on_name", unique: true
   end
 
   create_table "routines", force: :cascade do |t|
@@ -417,6 +456,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_010000) do
   add_foreign_key "conversations", "routines"
   add_foreign_key "conversations", "teams"
   add_foreign_key "conversations", "users"
+  add_foreign_key "directory_grants", "data_directories"
+  add_foreign_key "directory_grants", "roles"
   add_foreign_key "identities", "users"
   add_foreign_key "invitations", "teams"
   add_foreign_key "invitations", "users", column: "invited_by_id"
@@ -429,6 +470,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_17_010000) do
   add_foreign_key "projects", "teams"
   add_foreign_key "projects", "users", column: "created_by_id"
   add_foreign_key "projects", "users", column: "updated_by_id"
+  add_foreign_key "role_assignments", "roles"
+  add_foreign_key "role_assignments", "users"
   add_foreign_key "routines", "projects"
   add_foreign_key "routines", "teams"
   add_foreign_key "routines", "users"

@@ -1,0 +1,68 @@
+<% content_for :title, t('.title') %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title"><%= t('.heading') %></h1>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <p class="pane-lead"><%= t('.lead') %></p>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-card-title"><%= t('.new_role') %></span>
+        </div>
+        <%= form_with model: @role, url: roles_path, class: "settings-form" do |f| %>
+          <div class="field-row">
+            <%= f.text_field :name, placeholder: t('.name_placeholder'), required: true, class: "team-input" %>
+            <%= f.text_field :description, placeholder: t('.description_placeholder'), class: "team-input" %>
+            <label class="role-check">
+              <%= f.check_box :full_access %> <span><%= t('.full_access') %></span>
+            </label>
+            <%= f.submit t('.create'), class: "btn btn-primary" %>
+          </div>
+        <% end %>
+      </section>
+
+      <% @roles.each do |role| %>
+        <section class="settings-card">
+          <div class="settings-card-head">
+            <span class="settings-card-title">
+              <%= role.name %>
+              <% if role.full_access? %><span class="badge-pending"><%= t('.full_access') %></span><% end %>
+            </span>
+            <span class="settings-card-count"><%= t('.member_count', count: role.users.size) %></span>
+          </div>
+          <% if role.description.present? %><p class="pane-lead"><%= role.description %></p><% end %>
+
+          <%= form_with model: role, url: role_path(role), method: :patch, class: "settings-form" do |f| %>
+            <div class="field-row">
+              <%= f.text_field :name, class: "team-input" %>
+              <%= f.text_field :description, placeholder: t('.description_placeholder'), class: "team-input" %>
+              <label class="role-check">
+                <%= f.check_box :full_access %> <span><%= t('.full_access') %></span>
+              </label>
+            </div>
+            <div class="field-row role-dir-list">
+              <span class="grp-label"><%= t('.directory_grants') %></span>
+              <% @directories.each do |dir| %>
+                <label class="role-check" title="<%= dir.path %>">
+                  <%= check_box_tag "role[data_directory_ids][]", dir.id, role.data_directory_ids.include?(dir.id), id: "role_#{role.id}_dir_#{dir.id}" %>
+                  <span><%= dir.name %></span>
+                </label>
+              <% end %>
+              <%= hidden_field_tag "role[data_directory_ids][]", "" %>
+            </div>
+            <div class="field-row">
+              <%= f.submit t('.save'), class: "btn btn-ghost" %>
+              <%= button_to t('.delete'), role_path(role), method: :delete, class: "btn btn-danger",
+                    form: { class: "inline-form" },
+                    data: { turbo_confirm: t('.delete_confirm', name: role.name) } %>
+            </div>
+          <% end %>
+        </section>
+      <% end %>
+    </div>
+  </div>
+</main>

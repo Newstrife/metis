@@ -90,6 +90,8 @@ Rails.application.routes.draw do
 
     resource :account, only: %i[show update destroy], controller: "settings/accounts"
     resources :users, only: %i[index update destroy], controller: "settings/users"
+    resources :roles, only: %i[index create update destroy], controller: "settings/roles"
+    resources :data_directories, only: %i[index create destroy], controller: "settings/data_directories"
     resource :features, only: %i[show update], controller: "settings/features"
     resource :developer, only: %i[show], controller: "settings/developer"
     post  "developer/bridge_token", to: "settings/developer#bridge_token", as: :developer_bridge_token

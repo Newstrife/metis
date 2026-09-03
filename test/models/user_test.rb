@@ -10,6 +10,47 @@ class UserTest < ActiveSupport::TestCase
                            info: { email: email, nickname: "x" })
   end
 
+  test "a new user sees only public directories (least privilege)" do
+    user = create_user
+    public_dir = DataDirectory.create!(name: "公开", path: "公开", public_access: true)
+    private_dir = DataDirectory.create!(name: "名册", path: "名册")
+
+    assert_not user.full_data_access?
+    assert_includes user.accessible_data_directories, public_dir
+    assert_not_includes user.accessible_data_directories, private_dir
+    assert user.data_directory_permits?("公开")
+    assert_not user.data_directory_permits?("名册")
+  end
+
+  test "role grants open directories and union across roles" do
+    user = create_user
+    hr = Role.create!(name: "人事")
+    ops = Role.create!(name: "生产")
+    roster = DataDirectory.create!(name: "名册", path: "名册")
+    devices = DataDirectory.create!(name: "设备", path: "设备")
+    hr.data_directories << roster
+    ops.data_directories << devices
+    user.roles << hr << ops
+
+    assert user.data_directory_permits?("名册")
+    assert user.data_directory_permits?("设备")
+    assert_not user.data_directory_permits?("财务")
+  end
+
+  test "full_access role bypasses directory checks" do
+    user = create_user
+    user.roles << Role.create!(name: "运维", full_access: true)
+    DataDirectory.create!(name: "名册", path: "名册")
+
+    assert user.full_data_access?
+    assert user.data_directory_permits?("名册")
+  end
+
+  test "superuser has full data access without any role" do
+    user = User.create!(email: "root-#{SecureRandom.hex(4)}@example.com", password: "password123", superuser: true)
+    assert user.full_data_access?
+  end
+
   test "from_omniauth refuses to create a brand-new account when signup is disallowed" do
     assert_no_difference("User.count") do
       assert_raises(User::SignupNotAllowed) do

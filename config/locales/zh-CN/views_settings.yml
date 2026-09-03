@@ -188,6 +188,8 @@
       models: "模型"
       developer: "开发者"
       users: "用户"
+      roles: "角色"
+      data_directories: "数据目录"
       features: "功能模块"
     accounts:
       show:
@@ -225,20 +227,40 @@
         joined_at: "%{date} 加入"
         new_password: "新密码"
         reset_password: "重置密码"
-        delete: "删除"
-    users:
-      index:
-        title: "用户"
-        heading: "用户"
-        lead: "部署级账号管理。企微成员的邮箱是虚拟的，忘密码走不了邮件找回，只能在这里重置。"
-        all_users: "全部账号"
-        superuser: "超管"
-        wecom_bound: "企微 %{userid}"
-        joined_at: "%{date} 加入"
-        new_password: "新密码"
-        reset_password: "重置密码"
+        save_roles: "保存角色"
         delete: "删除"
         delete_confirm: "删除 %{email}？其个人工作区和对话将一并清除，无法撤销。"
+    roles:
+      index:
+        title: "角色"
+        heading: "角色"
+        lead: "数据访问角色。角色下勾选可访问的数据目录作为权限清单；一个人可挂多个角色，权限取并集。"
+        new_role: "新增角色"
+        name_placeholder: "角色名，如：人事专员"
+        description_placeholder: "描述（可选）"
+        full_access: "全部数据"
+        create: "创建"
+        save: "保存"
+        delete: "删除"
+        delete_confirm: "删除角色 %{name}？其成员将失去该角色带来的数据权限。"
+        directory_grants: "可访问目录"
+        member_count: "%{count} 人"
+    data_directories:
+      index:
+        title: "数据目录"
+        heading: "数据目录"
+        lead: "知识库根目录下的一个子目录 = 一个权限单元。在磁盘上建好子目录后在这里登记，才能授权给角色。"
+        new_directory: "登记目录"
+        name_placeholder: "名称，如：考勤制度"
+        path_placeholder: "相对路径，如：考勤制度"
+        description_placeholder: "描述（可选）"
+        public_access: "全员可见"
+        create: "登记"
+        all_directories: "已登记目录"
+        granted_roles: "授权角色：%{roles}"
+        no_roles: "无"
+        delete: "删除"
+        delete_confirm: "删除目录 %{name} 的登记？相关角色的授权将一并移除（磁盘文件不受影响）。"
     features:
       show:
         title: "功能模块"

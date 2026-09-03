@@ -53,6 +53,31 @@ class User < ApplicationRecord
   # no-flash script in the head). Explicit `light`/`dark` overrides it.
   THEMES = %w[system light dark].freeze
 
+  # 数据权限（RBAC）：用户可挂多个角色，有效权限为各角色目录授权的并集；
+  # 与团队角色（Membership#role）相互独立——个人工作区的 owner 也不天然
+  # 拥有数据权限。企微自动注册的成员默认没有任何角色，只能看到
+  # public_access 目录，由超管在用户管理页按需授予角色。
+  has_many :role_assignments, dependent: :destroy
+  has_many :roles, through: :role_assignments
+
+  # 超管或持有 full_access 角色的用户不受目录限制。
+  def full_data_access?
+    superuser? || roles.any?(&:full_access?)
+  end
+
+  # 该用户可访问的数据目录集合（full 时为全部目录）。
+  def accessible_data_directories
+    return DataDirectory.all if full_data_access?
+
+    DataDirectory.where(public_access: true)
+                 .or(DataDirectory.where(id: DirectoryGrant.where(role_id: role_ids).select(:data_directory_id)))
+                 .distinct
+  end
+
+  def data_directory_permits?(path)
+    accessible_data_directories.any? { |d| d.path == path.to_s.tr("\\", "/") }
+  end
+
   # Trim whitespace and treat empty strings as nil for every profile
   # field — keeps a stray space in the form from sneaking past the
   # inclusion/length validators below and causing surprises downstream

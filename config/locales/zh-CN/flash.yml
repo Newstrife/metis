@@ -107,11 +107,27 @@
     settings:
       users:
         update:
-          notice: "%{email} 的密码已重置。"
-          failure: "重置失败：%{errors}"
+          notice: "%{email} 已更新。"
+          failure: "更新失败：%{errors}"
         destroy:
           notice: "%{email} 已删除。"
           self: "不能删除当前登录的账号。"
+      roles:
+        create:
+          notice: "角色 %{name} 已创建。"
+        update:
+          notice: "角色 %{name} 已保存。"
+        save:
+          failure: "保存失败：%{errors}"
+        destroy:
+          notice: "角色 %{name} 已删除。"
+      data_directories:
+        create:
+          notice: "目录 %{name} 已登记。"
+        save:
+          failure: "保存失败：%{errors}"
+        destroy:
+          notice: "目录 %{name} 的登记已删除。"
       teams:
         update:
           notice: "团队已重命名。"

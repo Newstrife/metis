@@ -211,6 +211,8 @@ en:
       models: "Models"
       developer: "Developer"
       users: "Users"
+      roles: "Roles"
+      data_directories: "Data directories"
       features: "Features"
     accounts:
       show:
@@ -248,8 +250,40 @@ en:
         joined_at: "Joined %{date}"
         new_password: "New password"
         reset_password: "Reset password"
+        save_roles: "Save roles"
         delete: "Delete"
         delete_confirm: "Delete %{email}? Their personal workspace and conversations go with it. This cannot be undone."
+    roles:
+      index:
+        title: "Roles"
+        heading: "Roles"
+        lead: "Data-access roles. Grant directories to a role as its permission list; a user may hold many roles and gets the union."
+        new_role: "New role"
+        name_placeholder: "Role name, e.g. HR specialist"
+        description_placeholder: "Description (optional)"
+        full_access: "Full access"
+        create: "Create"
+        save: "Save"
+        delete: "Delete"
+        delete_confirm: "Delete role %{name}? Its members lose the data access it granted."
+        directory_grants: "Directory grants"
+        member_count: "%{count} members"
+    data_directories:
+      index:
+        title: "Data directories"
+        heading: "Data directories"
+        lead: "One subdirectory under the knowledge root = one permission unit. Create the folder on disk, then register it here to grant it to roles."
+        new_directory: "Register directory"
+        name_placeholder: "Name, e.g. Attendance policies"
+        path_placeholder: "Relative path, e.g. attendance"
+        description_placeholder: "Description (optional)"
+        public_access: "Visible to all"
+        create: "Register"
+        all_directories: "Registered directories"
+        granted_roles: "Granted to: %{roles}"
+        no_roles: "none"
+        delete: "Delete"
+        delete_confirm: "Unregister %{name}? Grants referencing it are removed too (files on disk are untouched)."
     features:
       show:
         title: "Features"

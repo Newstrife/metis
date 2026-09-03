@@ -1,0 +1,59 @@
+<% content_for :title, t('.title') %>
+
+<main class="pane">
+  <header class="pane-head">
+    <h1 class="pane-title"><%= t('.heading') %></h1>
+  </header>
+
+  <div class="pane-body">
+    <div class="pane-inner">
+      <p class="pane-lead"><%= t('.lead') %></p>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-card-title"><%= t('.new_directory') %></span>
+        </div>
+        <%= form_with model: @directory, url: data_directories_path, class: "settings-form" do |f| %>
+          <div class="field-row">
+            <%= f.text_field :name, placeholder: t('.name_placeholder'), required: true, class: "team-input" %>
+            <%= f.text_field :path, placeholder: t('.path_placeholder'), required: true, class: "team-input" %>
+            <%= f.text_field :description, placeholder: t('.description_placeholder'), class: "team-input" %>
+            <label class="role-check">
+              <%= f.check_box :public_access %> <span><%= t('.public_access') %></span>
+            </label>
+            <%= f.submit t('.create'), class: "btn btn-primary" %>
+          </div>
+        <% end %>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-card-title"><%= t('.all_directories') %></span>
+          <span class="settings-card-count"><%= @directories.size %></span>
+        </div>
+
+        <ul class="member-list">
+          <% @directories.each do |dir| %>
+            <li class="member-row">
+              <div class="member-id">
+                <div class="member-name">
+                  <%= dir.name %>
+                  <% if dir.public_access? %><span class="badge-pending"><%= t('.public_access') %></span><% end %>
+                </div>
+                <div class="member-email">
+                  <%= dir.path %><% if dir.description.present? %> · <%= dir.description %><% end %>
+                  · <%= t('.granted_roles', roles: dir.roles.map(&:name).to_sentence.presence || t('.no_roles')) %>
+                </div>
+              </div>
+              <div class="member-actions">
+                <%= button_to t('.delete'), data_directory_path(dir), method: :delete, class: "btn btn-danger",
+                      form: { class: "inline-form" },
+                      data: { turbo_confirm: t('.delete_confirm', name: dir.name) } %>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      </section>
+    </div>
+  </div>
+</main>
