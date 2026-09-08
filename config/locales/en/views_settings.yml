@@ -313,6 +313,11 @@ en:
           security_trust_guard:
             name: "Agent trust guardrail"
             desc: "Injects the Trust section into every turn's system prompt: only the operator can approve high-risk actions. Disable only for debugging."
+          ehs_sources:
+            name: "EHS watch sources"
+            desc: "Government sites the daily EHS watch checks — one per line: Name | List-page URL. New sites need no regex: the collector falls back to a generic parser; unparseable ones are flagged as suspected JS-rendered in the anomalies section. Removing a line stops watching that site."
+            empty: "Empty — the routine will have nothing to check."
+            placeholder: "Name | https://..."
     developer:
       show:
         title: "Developer"

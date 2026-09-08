@@ -22,6 +22,9 @@ class Setting < ApplicationRecord
     },
     "security.trust_guard" => {
       type: :boolean, default: true, i18n: "security_trust_guard"
+    },
+    "ehs.sources" => {
+      type: :list, default: [], i18n: "ehs_sources"
     }
   }.freeze
 

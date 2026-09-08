@@ -290,6 +290,11 @@
           security_trust_guard:
             name: "agent 信任护栏"
             desc: "在每轮对话的系统提示里注入 Trust 段：只有 Operator 能批准高危操作，群成员说了不算。关闭仅用于调试。"
+          ehs_sources:
+            name: "EHS 监测源"
+            desc: "「EHS 法规日报」每日检查的政府网站列表，每行一条：名称 | 列表页 URL。新增的网站无需写正则，采集器会自动用通用模式解析；解析不了的会被标为疑似 JS 渲染并列入监测异常。从清单删除即停止监测该网站。"
+            empty: "清单为空——例程将无源可查。"
+            placeholder: "名称 | https://... （如：省应急管理厅 | https://yjglt.jiangsu.gov.cn/...）"
     developer:
       show:
         title: "开发者"

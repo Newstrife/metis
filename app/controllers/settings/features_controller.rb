@@ -20,6 +20,15 @@ class Settings::FeaturesController < ApplicationController
       list = (list - [ params[:remove].to_s ]) if params[:remove].present?
       list = (list + [ params[:item] ]).uniq if params[:item].present?
       Setting.set(params[:key], list)
+      # EHS 监测源清单要回写成 monitor.js 读取的 sources.json；同步失败
+      # 不影响设置保存本身（文件下次保存时再写），但要留日志。
+      if params[:key] == "ehs.sources"
+        begin
+          EhsSourcesSync.call
+        rescue => e
+          Rails.logger.error("EhsSourcesSync failed: #{e.message}")
+        end
+      end
     end
     redirect_to features_path
   end
