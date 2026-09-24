@@ -4,8 +4,9 @@ module Agent
   # over pi's Extension UI channel (Agent::HostBridge), so this returns a
   # structured result the agent relays in its own reply — it does not post into
   # the chat itself. Metis resolves the named workflow + project for the team
-  # and seeds a fresh QUEUED run with this chat's transcript; the operator
-  # reviews the seeded context and starts it. Never raises into the turn: a
+  # and seeds a fresh run with this chat's transcript. From an interactive
+  # chat the run is QUEUED for the operator to review and start; from a
+  # routine-fired chat it AUTOSTARTS, since no human is in the loop. Never raises into the turn: a
   # failure becomes an `{ ok: false, error: }` the agent can report or retry.
   class WorkflowHandoff
     def self.from_tool_call(conversation, args)
@@ -33,16 +34,20 @@ module Agent
       return failure(error) if error
 
       # A queued run never runs a turn, so auto-titling can't name it — title
-      # it now from the agent's note, else the workflow name.
+      # it now from the agent's note, else the workflow name. A handoff from
+      # a routine-fired chat autostarts: nobody is watching a routine chat,
+      # so parking it queued would strand it until a human stumbles on it.
+      autostart = @conversation.routine_id.present?
       run = WorkflowRun.start(
         team: @conversation.team, user: @conversation.user,
         workflow: workflow, project: project, input: build_input,
         settings: settings, visibility: @conversation.visibility,
-        trigger_summary: "Spun off from a chat", autostart: false,
+        trigger_summary: autostart ? "Fired by routine \"#{@conversation.routine.name}\"" : "Spun off from a chat",
+        autostart: autostart,
         title: handoff_title(workflow)
       )
       {
-        ok: true, queued: true, workflow: workflow.name, project: project.name,
+        ok: true, queued: !autostart, started: autostart, workflow: workflow.name, project: project.name,
         model: settings["model"].presence, provider: settings["provider"].presence,
         url: Rails.application.routes.url_helpers.conversation_path(run.conversation)
       }

@@ -40,6 +40,17 @@ if (Test-Path $pidFile) {
   Write-Host "已清理残留的 server.pid"
 }
 
+# 3.5 防火墙放行 3002（局域网访问需要；需管理员权限，非管理员则提示一次后跳过）
+if (-not (Get-NetFirewallRule -DisplayName "Metis Web 3002" -ErrorAction SilentlyContinue)) {
+  $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  if ($isAdmin) {
+    New-NetFirewallRule -DisplayName "Metis Web 3002" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3002 | Out-Null
+    Write-Host "已添加防火墙入站规则: Metis Web 3002"
+  } else {
+    Write-Host "提示: 局域网访问需管理员运行一次: netsh advfirewall firewall add rule name=`"Metis Web 3002`" dir=in action=allow protocol=TCP localport=3002"
+  }
+}
+
 # 4. 企业微信桥接（已填 WECOM_BOT_ID 且依赖已装时随 dev 一起拉起）
 # 用 cmd /c 做重定向：Start-Process -Redirect* 会踩文件锁/句柄继承的坑
 if ($env:WECOM_BOT_ID -and (Test-Path "clients/wecom-bridge/node_modules")) {
@@ -47,9 +58,9 @@ if ($env:WECOM_BOT_ID -and (Test-Path "clients/wecom-bridge/node_modules")) {
   Start-Process cmd -ArgumentList '/c','node clients\wecom-bridge\index.js 1> log\wecom-bridge.log 2> log\wecom-bridge.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
 }
 
-# 5. Web 服务（端口 3002，独立隐藏窗口 + 日志文件）
-Write-Host "Metis 启动中: http://localhost:3002  (登录: admin@metis.local / password)"
-Start-Process cmd -ArgumentList '/c','ruby bin\rails server 1> log\rails-server.log 2> log\rails-server.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+# 5. Web 服务（端口 3002，绑定 0.0.0.0 允许局域网访问，独立隐藏窗口 + 日志文件）
+Write-Host "Metis 启动中: http://localhost:3002  局域网: http://10.1.20.3:3002  (登录: admin@metis.local / password)"
+Start-Process cmd -ArgumentList '/c','ruby bin\rails server -b 0.0.0.0 -p 3002 1> log\rails-server.log 2> log\rails-server.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
 
 # 6. 后台任务 supervisor（Solid Queue：ChatJob、定时 Routine 等都靠它）
 # Windows 没有 fork()，必须用 --mode=async（线程模式）

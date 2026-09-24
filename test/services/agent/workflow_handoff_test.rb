@@ -68,6 +68,26 @@ class Agent::WorkflowHandoffTest < ActiveSupport::TestCase
     end
   end
 
+  test "a handoff from a routine-fired chat autostarts the run" do
+    routine = @team.routines.create!(
+      user: @user, name: "Daily report", prompt: "do the daily thing",
+      trigger_source: :schedule, cron: "30 9 * * *"
+    )
+    @conversation.update!(routine: routine)
+
+    result = nil
+    assert_enqueued_jobs(1, only: WorkflowAdvanceJob) do
+      result = handoff("workflow" => "ship")
+    end
+
+    run = WorkflowRun.last
+    assert result[:ok]
+    assert result[:started]
+    refute result[:queued]
+    assert run.pending?, "routine handoffs skip the queue and start immediately"
+    assert_includes run.trigger_summary, routine.name
+  end
+
   test "name matching is case-insensitive" do
     assert_difference -> { WorkflowRun.count }, 1 do
       handoff("workflow" => "SHIP")
