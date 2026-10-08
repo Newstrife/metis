@@ -53,6 +53,7 @@ class ChatJob < ApplicationJob
     segments = []
     tools = {}
     errored = false
+    error_message = nil
     canceled = false
     events = 0
 
@@ -65,6 +66,7 @@ class ChatJob < ApplicationJob
       when :tool_call_started, :tool_call_progress, :tool_call_finished
         record_tool_call(tools, event)
       when :error            then errored = true
+                                   error_message ||= event[:message].to_s.presence
       end
       broadcaster.handle(event)
 
@@ -75,8 +77,14 @@ class ChatJob < ApplicationJob
       end
     end
 
+    content = scrub_null_bytes(final_text(segments, text))
+    # A turn that failed before producing any text (e.g. a provider 402
+    # surfaced as a model error) would otherwise persist an empty body —
+    # invisible in the UI after reload and indistinguishable from a slow
+    # turn for API pollers. Keep the reason on the message instead.
+    content = "\u26A0\uFE0F #{error_message}" if content.blank? && error_message.present?
     assistant_message.update!(
-      content: scrub_null_bytes(final_text(segments, text)),
+      content: content,
       reasoning: scrub_null_bytes(reasoning.presence),
       tool_calls: scrub_null_bytes(tools.values),
       streaming_status: final_status(canceled: canceled, errored: errored),

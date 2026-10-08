@@ -163,6 +163,18 @@ class Agent::Adapters::PiTest < ActiveSupport::TestCase
     assert_equal "final answer", ui[:content]
   end
 
+  test "translates an assistant message_end with stopReason error as an error event" do
+    # A failed model call (provider 402/429/5xx) ends the assistant message
+    # with stopReason "error" and empty content — it must not become a
+    # "done" turn with an empty body.
+    ui = adapter.translate(pi_event("type" => "message_end",
+                                    "message" => { "id" => "m1", "role" => "assistant", "content" => [],
+                                                   "stopReason" => "error",
+                                                   "errorMessage" => "402: Insufficient account balance" }))
+    assert_equal :error, ui.type
+    assert_equal "402: Insufficient account balance", ui[:message]
+  end
+
   test "drops message_end for a non-assistant message so it can't leak into the body" do
     # pi emits message_end for the user prompt and tool-result messages too;
     # their text must never reach the assistant body.

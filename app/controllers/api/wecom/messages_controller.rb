@@ -9,11 +9,17 @@ module Api
     class MessagesController < ActionController::API
       before_action :authenticate_bridge!
 
+      # 附件上限（base64 解码前）；企微侧文件本身限制 20MB
+      MAX_UPLOAD_BYTES = 15.megabytes
+
       def create
         content = params[:content].to_s.strip
         from = params[:from_userid].to_s.strip.first(64)
         chatid = params[:chatid].to_s.strip.first(64).presence
-        return render json: { error: "content and from_userid are required" }, status: :unprocessable_entity if content.blank? || from.blank?
+        upload = decode_upload
+        return if performed? # decode_upload 已 render 错误
+        return render json: { error: "from_userid is required" }, status: :unprocessable_entity if from.blank?
+        return render json: { error: "content or file is required" }, status: :unprocessable_entity if content.blank? && upload.nil?
 
         # 群白名单：非空时只服务名单里的群（Setting → /settings/features）
         whitelist = Setting.get("wecom.group_whitelist")
@@ -28,8 +34,11 @@ module Api
         return render json: { error: "busy" }, status: :conflict if conversation.turn_in_progress?
 
         # 群消息带上发言人标识，agent 才能区分指令来自谁
-        turn_content = chatid ? "[群成员 #{from}] #{content}" : content
-        _user_message, assistant = ConversationTurn.start(conversation, content: turn_content, sender: sender)
+        display_content = content.presence || "[发送了文件：#{upload[:filename]}]"
+        turn_content = chatid ? "[群成员 #{from}] #{display_content}" : display_content
+        _user_message, assistant = ConversationTurn.start(conversation, content: turn_content, sender: sender) do |message|
+          attach_upload(message, upload) if upload
+        end
         render json: { conversation_id: conversation.id, message_id: assistant.id }, status: :created
       rescue ActiveRecord::RecordNotUnique
         # turn_in_progress? 与落库之间存在竞态窗口，唯一索引是真正的闸门
@@ -37,12 +46,15 @@ module Api
       end
 
       # Poll target for the daemon: content is present only once the turn
-      # settled successfully; errored/canceled surface as terminal status.
+      # settled successfully; errored/canceled surface as terminal status,
+      # errored additionally carries the failure reason persisted on the
+      # message (see ChatJob) so the daemon can relay it.
       def show
         message = Message.find_by(id: params[:id], role: :assistant)
         return head :not_found unless message
 
-        render json: { status: message.streaming_status, content: message.done? ? message.content : nil }
+        render json: { status: message.streaming_status, content: message.done? ? message.content : nil,
+                       error: message.errored? ? message.content.presence : nil }
       end
 
       private
@@ -53,6 +65,42 @@ module Api
 
         token = request.headers["Authorization"].to_s[/\ABearer (.+)\z/, 1].to_s
         head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(token, expected)
+      end
+
+      # 附件：桥接把企微文件 base64 传上来。图片进 images（pi 视觉内联），
+      # 其他进 files（运行时投影到 workspace/uploads/）。
+      def decode_upload
+        param = params[:file]
+        return nil if param.blank?
+
+        encoded = param[:data_base64].to_s
+        if encoded.bytesize > MAX_UPLOAD_BYTES * 4 / 3 + 8
+          render json: { error: "file too large" }, status: :content_too_large
+          return nil
+        end
+        data = begin
+          Base64.strict_decode64(encoded)
+        rescue ArgumentError
+          render json: { error: "file data_base64 is not valid base64" }, status: :unprocessable_entity
+          return nil
+        end
+        if data.empty? || data.bytesize > MAX_UPLOAD_BYTES
+          render json: { error: "file too large" }, status: :content_too_large
+          return nil
+        end
+
+        filename = param[:filename].to_s.presence || "wecom-upload.bin"
+        content_type = param[:content_type].to_s.presence || Marcel::MimeType.for(name: filename)
+        { data: data, filename: filename, content_type: content_type }
+      end
+
+      def attach_upload(message, upload)
+        attachment = { io: StringIO.new(upload[:data]), filename: upload[:filename], content_type: upload[:content_type] }
+        if upload[:content_type].start_with?("image/")
+          message.images.attach(attachment)
+        else
+          message.files.attach(attachment)
+        end
       end
 
       # The deployment-level account that owns group conversations, so the

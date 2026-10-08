@@ -197,6 +197,19 @@ class ChatJobTest < ActiveSupport::TestCase
     assert @assistant_message.reload.errored?
   end
 
+  test "persists the failure reason as content when an errored turn produced no text" do
+    # An empty done-looking body is invisible after reload and
+    # indistinguishable from a slow turn for API pollers (WeCom bridge).
+    run_with([
+               Agent::UiEvent.new(:error, data: { message: "402: Insufficient account balance" }),
+               Agent::UiEvent.new(:turn_finished)
+             ])
+
+    @assistant_message.reload
+    assert @assistant_message.errored?
+    assert_equal "⚠️ 402: Insufficient account balance", @assistant_message.content
+  end
+
   test "persists pi's session id to the conversation" do
     run_with([ Agent::UiEvent.new(:text_delta, data: { delta: "hi" }),
               Agent::UiEvent.new(:turn_finished) ],

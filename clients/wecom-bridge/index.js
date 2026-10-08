@@ -82,9 +82,9 @@ async function metisGet(pathname) {
 async function pollReply(messageId) {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const { status, content } = await metisGet(`/api/wecom/messages/${messageId}`);
+    const { status, content, error } = await metisGet(`/api/wecom/messages/${messageId}`);
     if (status === "done" && content) return { ok: true, content };
-    if (status === "errored" || status === "canceled") return { ok: false, status };
+    if (status === "errored" || status === "canceled") return { ok: false, status, error };
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
   return { ok: false, status: "timeout" };
@@ -96,6 +96,36 @@ function truncate(text) {
 }
 
 // ---- 入站消息 ------------------------------------------------------------
+
+// 转发 Metis 并把结果回给发信人（文本与附件共用）
+async function forwardAndReply(frame, streamId, { from, chatid, content, file }) {
+  const result = await metisPost("/api/wecom/messages", { from_userid: from, content, chatid, file });
+  // Metis 按功能开关拒答（群未开通 / 未注册成员），话术直接回给发信人
+  if (result.rejected) {
+    const note = result.rejected === "group_not_allowed"
+      ? "本群未开通小百同学服务，请联系管理员。"
+      : "你还没有小百同学账号，请联系管理员（徐斌）开通。";
+    await client.replyStream(frame, streamId, note, true);
+    return;
+  }
+  const reply = await pollReply(result.message_id);
+  const text = reply.ok
+    ? truncate(reply.content)
+    : reply.error
+      ? truncate(reply.error)
+      : `这次处理没有成功（${reply.status}），请打开小百同学查看详情，或换个说法再试一次。`;
+  await client.replyStream(frame, streamId, text, true);
+}
+
+async function reportFailure(frame, streamId, err) {
+  console.error("[msg] 处理失败:", err.message);
+  const note = err.status === 409
+    ? "上一条消息还在处理中，等它回复完再发下一条哦。"
+    : "小百同学暂时不可用，请稍后再试。";
+  try {
+    await client.replyStream(frame, streamId, note, true);
+  } catch { /* 连接已断，等重连 */ }
+}
 
 client.on("message.text", async (frame) => {
   const id = msgidOf(frame);
@@ -112,30 +142,63 @@ client.on("message.text", async (frame) => {
   const streamId = generateReqId("stream");
   try {
     await client.replyStream(frame, streamId, "正在思考…", false);
-    const result = await metisPost("/api/wecom/messages", { from_userid: from, content, chatid });
-    // Metis 按功能开关拒答（群未开通 / 未注册成员），话术直接回给发信人
-    if (result.rejected) {
-      const note = result.rejected === "group_not_allowed"
-        ? "本群未开通小百同学服务，请联系管理员。"
-        : "你还没有小百同学账号，请联系管理员（徐斌）开通。";
-      await client.replyStream(frame, streamId, note, true);
-      return;
-    }
-    const reply = await pollReply(result.message_id);
-    const text = reply.ok
-      ? truncate(reply.content)
-      : `这次处理没有成功（${reply.status}），请打开小百同学查看详情，或换个说法再试一次。`;
-    await client.replyStream(frame, streamId, text, true);
+    await forwardAndReply(frame, streamId, { from, chatid, content });
   } catch (err) {
-    console.error("[msg] 处理失败:", err.message);
-    const note = err.status === 409
-      ? "上一条消息还在处理中，等它回复完再发下一条哦。"
-      : "小百同学暂时不可用，请稍后再试。";
-    try {
-      await client.replyStream(frame, streamId, note, true);
-    } catch { /* 连接已断，等重连 */ }
+    await reportFailure(frame, streamId, err);
   }
 });
+
+// 附件（文件 / 图片）：下载解密后 base64 转给 Metis 作为消息附件。
+// 企微 file/image 消息体同构：{ url, aeskey }。
+const MAX_FILE_BYTES = 15 * 1024 * 1024;
+const MIME_BY_EXT = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".webp": "image/webp", ".bmp": "image/bmp",
+  ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/markdown",
+  ".js": "text/javascript", ".ts": "text/typescript", ".json": "application/json",
+  ".csv": "text/csv", ".log": "text/plain", ".xml": "text/xml",
+  ".html": "text/html", ".css": "text/css", ".zip": "application/zip",
+  ".doc": "application/msword", ".xls": "application/vnd.ms-excel",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+};
+const mimeOf = (name) => MIME_BY_EXT[(name.match(/\.[^.]+$/)?.[0] || "").toLowerCase()] || "application/octet-stream";
+
+async function handleAttachment(frame, kind) {
+  const id = msgidOf(frame);
+  if (dedupe(id)) return;
+
+  const from = senderOf(frame);
+  const chatid = chatidOf(frame);
+  if (chatid) lastChatByUser.set(from, chatid);
+
+  const media = body(frame)[kind] || {};
+  if (!media.url) return;
+  console.log(`[msg] ${from}: <${kind}> ${media.url.slice(0, 80)}`);
+
+  const streamId = generateReqId("stream");
+  try {
+    await client.replyStream(frame, streamId, "正在接收文件…", false);
+    const { buffer, filename } = await client.downloadFile(media.url, media.aeskey);
+    if (buffer.length > MAX_FILE_BYTES) {
+      await client.replyStream(frame, streamId,
+        `文件太大（${(buffer.length / 1048576).toFixed(1)}MB），超过 15MB 上限，请压缩或拆分后再发。`, true);
+      return;
+    }
+    const name = filename || `wecom-${kind}`;
+    const caption = (body(frame).text && body(frame).text.content || "").trim();
+    await forwardAndReply(frame, streamId, {
+      from, chatid, content: caption,
+      file: { filename: name, content_type: mimeOf(name), data_base64: buffer.toString("base64") }
+    });
+  } catch (err) {
+    await reportFailure(frame, streamId, err);
+  }
+}
+
+client.on("message.file", (frame) => handleAttachment(frame, "file"));
+client.on("message.image", (frame) => handleAttachment(frame, "image"));
 
 client.on("event.enter_chat", (frame) => {
   client.replyWelcome(frame, {

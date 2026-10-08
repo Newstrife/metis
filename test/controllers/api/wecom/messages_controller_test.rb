@@ -191,4 +191,65 @@ class Api::Wecom::MessagesControllerTest < ActionDispatch::IntegrationTest
     get "/api/wecom/messages/0", headers: auth
     assert_response :not_found
   end
+
+  test "show exposes the persisted failure reason for an errored turn" do
+    post "/api/wecom/messages", params: { from_userid: "lisi", content: "在吗" }, headers: auth, as: :json
+    message_id = JSON.parse(response.body)["message_id"]
+    Message.find(message_id).update!(content: "⚠️ 402: Insufficient account balance", streaming_status: :errored)
+
+    get "/api/wecom/messages/#{message_id}", headers: auth
+    body = JSON.parse(response.body)
+    assert_equal "errored", body["status"]
+    assert_nil body["content"]
+    assert_equal "⚠️ 402: Insufficient account balance", body["error"]
+  end
+
+  test "create attaches a base64 file to the user message" do
+    post "/api/wecom/messages", params: {
+      from_userid: "zhangsan", content: "能看的懂这段js吗",
+      file: { filename: "demo.js", content_type: "text/javascript",
+              data_base64: Base64.strict_encode64("console.log('hi')\n") }
+    }, headers: auth, as: :json
+    assert_response :created
+
+    conversation = Conversation.find(JSON.parse(response.body)["conversation_id"])
+    user_message = conversation.messages.find_by(role: :user)
+    assert_equal 1, user_message.files.count
+    assert_equal "demo.js", user_message.files.first.filename.to_s
+    assert_equal "console.log('hi')\n", user_message.files.first.download
+  end
+
+  test "create accepts a file without text and names it in the turn content" do
+    post "/api/wecom/messages", params: {
+      from_userid: "zhangsan",
+      file: { filename: "notes.txt", data_base64: Base64.strict_encode64("hello") }
+    }, headers: auth, as: :json
+    assert_response :created
+
+    conversation = Conversation.find(JSON.parse(response.body)["conversation_id"])
+    user_message = conversation.messages.find_by(role: :user)
+    assert_includes user_message.content, "notes.txt"
+    assert_equal "text/plain", user_message.files.first.content_type
+  end
+
+  test "create routes image uploads to images so pi gets them inline" do
+    png = Base64.strict_encode64("\x89PNG\r\n\x1A\n".b)
+    post "/api/wecom/messages", params: {
+      from_userid: "zhangsan",
+      file: { filename: "shot.png", content_type: "image/png", data_base64: png }
+    }, headers: auth, as: :json
+    assert_response :created
+
+    user_message = Conversation.order(:id).last.messages.find_by(role: :user)
+    assert_equal 1, user_message.images.count
+    assert_equal 0, user_message.files.count
+  end
+
+  test "create rejects an oversized upload" do
+    post "/api/wecom/messages", params: {
+      from_userid: "zhangsan",
+      file: { filename: "big.bin", data_base64: Base64.strict_encode64("x" * (16.megabytes)) }
+    }, headers: auth, as: :json
+    assert_response :content_too_large
+  end
 end

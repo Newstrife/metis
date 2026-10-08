@@ -94,7 +94,18 @@ module Agent
           # pi emits message_end for every message in the agent loop — the user
           # prompt and tool-result messages too. Only the assistant's carries
           # reply text; the others must not leak into the message body.
-          message_role(event) == "assistant" ? ui(:message_finished, event, id: message_id(event), content: message_content(event)) : nil
+          if message_role(event) != "assistant"
+            nil
+          elsif event.raw.dig("message", "stopReason") == "error"
+            # A failed model call (provider 402/429/5xx) ends the assistant
+            # message with stopReason "error" and empty content. Surface it
+            # as an error so the turn settles as errored — not "done" with
+            # an empty body that pollers (WeCom bridge) can't tell apart
+            # from a slow turn.
+            ui(:error, event, message: event.raw.dig("message", "errorMessage").presence || "The model run failed.")
+          else
+            ui(:message_finished, event, id: message_id(event), content: message_content(event))
+          end
         when :tool_execution_start
           note_skill_touched(event)
           ui(:tool_call_started, event,
