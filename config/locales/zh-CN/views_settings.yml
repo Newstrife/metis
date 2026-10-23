@@ -284,6 +284,9 @@
             desc: "名单为空 = 所有群可用。添加 chatid 后，只有名单里的群能使用小百同学，其他群会被拒答。chatid 可在群会话的设置里看到。"
             empty: "名单为空——当前所有群都能使用。"
             placeholder: "群 chatid（wr 开头的一串）"
+          wecom_doc_mcp:
+            name: "企微文档读写"
+            desc: "给小百同学挂载企业微信「文档」MCP：会话里发文档/表格链接就能读取、总结、续写，也能按要求新建文档、表格、智能表格。以 .env 里 WECOM_DOC_MCP_URL 凭据授权人的身份操作文档；关闭后所有会话都不再提供这些工具。如在企微后台重置了 MCP 配置，需同步更新 .env 里的 WECOM_DOC_MCP_URL。"
           security_approval_push:
             name: "高危操作企微审批"
             desc: "非 Operator 发起高危操作（删改、安装、外发等）时，agent 先把审批卡片推送到企微群和你的私聊，等你批准才执行。"

@@ -266,9 +266,11 @@ have).
 
 ```ruby
 def to_h
-  # Per-connector member entries, plus an optional team-wide github_bot.
+  # Per-connector member entries, plus the optional team-wide github_bot
+  # and the deployment-wide wecom_doc server.
   entries = connectors.filter_map { |c| [c.name, server_entry(c)] if server_entry(c) }
   entries << bot_entry if bot_entry
+  entries << wecom_doc_entry if wecom_doc_entry
   { "mcpServers" => entries.to_h }
 end
 
@@ -286,6 +288,15 @@ installation token (`GithubApp::InstallationToken.for`) so the agent can
 act as `<slug>[bot]` (the reviewing-code skill posts PR reviews this way;
 GitHub forbids approving your own PR, so the member `github` server
 can't). A mint failure just omits it — never crashes the turn.
+
+`wecom_doc_entry` stages the deployment's 企业微信文档 server (WeCom Docs
+MCP — read/create/edit WeCom docs, sheets, smart sheets, smart pages) as
+a bare `{ "url" => … }` entry whenever `McpConfig.wecom_doc?` — i.e.
+`WECOM_DOC_MCP_URL` set AND the `wecom.doc_mcp` Setting on. Deployment
+config, not a Connector: the apikey-bearing URL binds the bot + the
+authorizing user's identity, so it lives in `.env` and stages for every
+turn. `Identity#connectors_block` advertises it on the same gate. See
+docs/connectors.md.
 
 ## `Agent::Identity`
 

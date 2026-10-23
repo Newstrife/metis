@@ -307,6 +307,9 @@ en:
             desc: "Empty list = every group may use the bot. Add chatids to restrict service to listed groups only; others get a polite refusal."
             empty: "The list is empty — every group is currently served."
             placeholder: "Group chatid (starts with wr)"
+          wecom_doc_mcp:
+            name: "WeCom docs (MCP)"
+            desc: "Mounts the WeCom Docs MCP server for the agent: read, summarize and continue doc/sheet links posted in chat, and create new docs, sheets and smart sheets on request. Acts as the identity behind WECOM_DOC_MCP_URL in .env; when off, no conversation gets these tools. Resetting the MCP config in the WeCom admin console requires updating WECOM_DOC_MCP_URL in .env."
           security_approval_push:
             name: "High-risk approval push"
             desc: "When a non-operator requests a high-risk action (delete, install, publish…), the agent pushes an approval card to WeCom first and waits for the operator's go-ahead."

@@ -11,6 +11,15 @@ module Agent
     # pi-mcp-adapter reads this from pi's working directory.
     FILENAME = ".mcp.json".freeze
 
+    class << self
+      # True when this turn stages the deployment's WeCom Docs server
+      # (see #wecom_doc_entry). Agent::Identity mirrors this so its
+      # Connectors block never advertises a server McpConfig omits.
+      def wecom_doc?
+        Setting.get("wecom.doc_mcp") && ENV["WECOM_DOC_MCP_URL"].present?
+      end
+    end
+
     def initialize(conversation)
       @conversation = conversation
     end
@@ -23,6 +32,8 @@ module Agent
       end
       bot = bot_entry
       entries << bot if bot
+      doc = wecom_doc_entry
+      entries << doc if doc
       { "mcpServers" => entries.to_h }
     end
 
@@ -147,6 +158,21 @@ module Agent
     rescue GithubApp::InstallationToken::Error => error
       Rails.logger.error("McpConfig: github_bot server skipped — #{error.message}")
       nil
+    end
+
+    # The deployment's 企业微信文档 server (WeCom Docs MCP) — read, create
+    # and edit WeCom docs/sheets/smart sheets/smart docs from the agent.
+    # `WECOM_DOC_MCP_URL` is the Streamable-HTTP URL WeCom issues for the
+    # bot's 文档 permission, carrying an `apikey` query param that binds
+    # the bot AND the authorizing user's identity — so it is deployment
+    # config like WECOM_BOT_SECRET (kept in .env), not a per-team
+    # Connector/ConnectorCredential. Every turn gets it under the same
+    # identity; `wecom.doc_mcp` (Setting → /settings/features) is the
+    # runtime kill switch. See docs/connectors.md.
+    def wecom_doc_entry
+      return unless self.class.wecom_doc?
+
+      [ "wecom_doc", { "url" => ENV["WECOM_DOC_MCP_URL"] } ]
     end
   end
 end

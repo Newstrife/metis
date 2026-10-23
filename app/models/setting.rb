@@ -17,6 +17,9 @@ class Setting < ApplicationRecord
     "wecom.group_whitelist" => {
       type: :list, default: [], i18n: "wecom_group_whitelist"
     },
+    "wecom.doc_mcp" => {
+      type: :boolean, default: true, i18n: "wecom_doc_mcp"
+    },
     "security.approval_push" => {
       type: :boolean, default: true, i18n: "security_approval_push"
     },

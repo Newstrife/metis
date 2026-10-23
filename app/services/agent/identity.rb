@@ -411,9 +411,20 @@ module Agent
 
     def connectors_block
       lines = enabled_connectors.map { |connector| connector_line(connector) }
+      lines << wecom_doc_line if Agent::McpConfig.wecom_doc?
       return "_None enabled for this team._" if lines.empty?
 
       lines.join("\n")
+    end
+
+    # The deployment-staged WeCom Docs server (McpConfig#wecom_doc_entry) —
+    # not a team Connector, but advertised here on the same gate so the
+    # agent knows chat-incoming doc links can be read and summarized
+    # through MCP instead of falling back to scraping.
+    def wecom_doc_line
+      "- **企业微信文档** (`wecom_doc`) — deployment apikey; read, summarize, " \
+        "create and edit WeCom docs / sheets / smart sheets / smart docs " \
+        "(e.g. `doc_search`, `doc_contents_get`, `doc_create`)"
     end
 
     def connector_line(connector)

@@ -394,6 +394,44 @@ omniauth.
   call fails and the broker refreshes it before the next turn. Nothing
   is installed in the runtimes for this connector.
 
+## The deployment's WeCom Docs server (`wecom_doc`)
+
+The 企业微信智能机器人「文档」permission exposes a Streamable-HTTP MCP
+server (`https://qyapi.weixin.qq.com/mcp/v2/bot/doc?apikey=…`) — read,
+search, create and edit WeCom docs / sheets / smart sheets / smart docs
+and smart pages (`doc_search`, `doc_contents_get`, `doc_create`,
+`sheet_*`, `smartsheet_*`, `smartpage_*`, …).
+
+It is deliberately **not** a `Connector`. The `apikey` in the URL binds
+the bot *and* the authorizing user's identity (WeCom's own wording:
+关联机器人和用户个人信息) — one deployment-wide principal, not a
+per-member credential, and nothing a team-level governance model can
+split. So it lives where the other WeCom secrets live
+(`WECOM_DOC_MCP_URL` in `.env`), and `Agent::McpConfig#wecom_doc_entry`
+stages it for **every** turn as a bare `{ "url" => … }` entry — the
+apikey rides the query string, so there is no header credential to
+render and no `Connector`/`ConnectorCredential` row involved.
+`Agent::Identity`'s Connectors block advertises it on the same
+`Agent::McpConfig.wecom_doc?` gate, so the agent never sees a server it
+wasn't told about (or vice versa).
+
+Governance and rotation:
+
+- `wecom.doc_mcp` (Setting → /settings/features) is the runtime kill
+  switch; `WECOM_DOC_MCP_URL` presence is the config gate. Both must be
+  on for the server to be staged.
+- The authority is broad by nature — anyone who can talk to the agent
+  (WeCom senders reaching the bot, web members of the team) drives the
+  doc tools **as the authorizing identity**. The real access boundary is
+  the WeCom-side gates (`wecom.group_whitelist`, `wecom.auto_provision`)
+  plus the built-in confirm-before-destructive semantics WeCom's doc
+  tools carry (`…_update`/`…_delete` tools require an explicit
+  confirmation argument server-side).
+- Resetting the MCP config in the WeCom admin console (重置配置) rotates
+  the apikey: update `WECOM_DOC_MCP_URL` and restart. No Metis record
+  ever carries the old key — it only flows into the per-turn projected
+  `.mcp.json`, never into the DB.
+
 ## Identities, not a single provider per user
 
 A user has many `Identity` rows — one per provider they've signed in

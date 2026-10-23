@@ -472,4 +472,16 @@ class Agent::IdentityTest < ActiveSupport::TestCase
   test "no eviction warning by default" do
     refute_match(/## Workspace notice/, render)
   end
+
+  test "the Connectors block advertises the deployment WeCom Docs server on the same gate" do
+    previous = ENV["WECOM_DOC_MCP_URL"]
+    ENV["WECOM_DOC_MCP_URL"] = "https://qyapi.weixin.qq.com/mcp/v2/bot/doc?apikey=k"
+    assert_match(/`wecom_doc`/, render)
+
+    ENV.delete("WECOM_DOC_MCP_URL")
+    refute_match(/`wecom_doc`/, render)
+  ensure
+    previous.nil? ? ENV.delete("WECOM_DOC_MCP_URL") : ENV["WECOM_DOC_MCP_URL"] = previous
+    Setting.delete_all
+  end
 end

@@ -305,4 +305,50 @@ class Agent::McpConfigTest < ActiveSupport::TestCase
 
     assert_nil rendered["mcpServers"]["notion"]
   end
+
+  # The deployment's WeCom Docs server (McpConfig#wecom_doc_entry) —
+  # staged from WECOM_DOC_MCP_URL + the `wecom.doc_mcp` toggle, with no
+  # Connector row involved.
+  def with_wecom_doc_url(value)
+    previous = ENV["WECOM_DOC_MCP_URL"]
+    value.nil? ? ENV.delete("WECOM_DOC_MCP_URL") : ENV["WECOM_DOC_MCP_URL"] = value
+    yield
+  ensure
+    previous.nil? ? ENV.delete("WECOM_DOC_MCP_URL") : ENV["WECOM_DOC_MCP_URL"] = previous
+  end
+
+  test "stages the deployment WeCom Docs server when the URL is configured" do
+    with_wecom_doc_url("https://qyapi.weixin.qq.com/mcp/v2/bot/doc?apikey=k") do
+      assert_equal({ "url" => "https://qyapi.weixin.qq.com/mcp/v2/bot/doc?apikey=k" },
+                   rendered["mcpServers"]["wecom_doc"])
+    end
+  end
+
+  test "no WeCom Docs server when the URL is unset" do
+    with_wecom_doc_url(nil) do
+      assert_not_includes rendered["mcpServers"].keys, "wecom_doc"
+    end
+  end
+
+  test "no WeCom Docs server when the doc_mcp toggle is off" do
+    Setting.set("wecom.doc_mcp", false)
+    with_wecom_doc_url("https://qyapi.weixin.qq.com/mcp/v2/bot/doc?apikey=k") do
+      assert_not_includes rendered["mcpServers"].keys, "wecom_doc"
+    end
+  end
+
+  test "wecom_doc? mirrors the staging gate" do
+    Setting.set("wecom.doc_mcp", true)
+    with_wecom_doc_url("https://qyapi.weixin.qq.com/mcp/v2/bot/doc?apikey=k") do
+      assert Agent::McpConfig.wecom_doc?
+    end
+    with_wecom_doc_url(nil) do
+      assert_not Agent::McpConfig.wecom_doc?
+    end
+
+    Setting.set("wecom.doc_mcp", false)
+    with_wecom_doc_url("https://qyapi.weixin.qq.com/mcp/v2/bot/doc?apikey=k") do
+      assert_not Agent::McpConfig.wecom_doc?
+    end
+  end
 end
