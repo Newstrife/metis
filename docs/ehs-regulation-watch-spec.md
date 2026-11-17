@@ -7,7 +7,7 @@
 1. **上下文**：`node E:\pi\ehs-monitor\ehs-api.js context --output E:\pi\ehs\workspace_tmp\ehs-context.json`，使用具有 `regulations:read`、`documents:read` 的 EHS API Key 分页读取两个正式库。
 2. **提交**：submission JSON 包含 `externalId/title/period/summary/overview/regulationAnalyses/documentSuggestions`；修改建议必须携带 EHS `regulationId` 与 `documentId`。先 `--dry-run` 校验再正式提交；metis 使用 `monitoring:write`，无核准或发布权限。
 3. **幂等**：组织 + 来源 + `externalId` 唯一；同内容重试返回原记录，不同内容返回 409。
-4. **核准**：EHS 页面查看完整解析、法规条款引用、体系文件原文/建议文本/理由/优先级；驳回需填写意见，全程审计。
+4. **摘要与核准**：EHS「监测摘要」只读展示 submission 的 `summary`（原检测文件摘要）；「监测核准」查看完整解析、法规条款引用、体系文件原文/建议文本/理由/优先级，驳回需填写意见，全程审计。
 5. **配置**：`EHS_API_BASE_URL`（默认 `http://127.0.0.1:3000/api/v1`）与 `EHS_API_KEY` 仅放本地环境或 `.env`，不得入库。
 
 实际例程快照：`E:\pi\ehs-monitor\EHS-例程prompt.md`；实际工作流快照：`E:\pi\ehs-monitor\EHS-工作流steps.json`；完整执行约束：`E:\pi\ehs-monitor\EHS-执行版SOP.md`。
