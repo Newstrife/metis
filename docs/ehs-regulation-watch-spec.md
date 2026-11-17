@@ -1,3 +1,21 @@
+# Spec: EHS 法规监测——每日采集 → 版本差异 → 公司文件影响分析 → EHS 待核准
+
+> **2026-11-17 集成修订（优先于下文旧方案）**：监测结果不再只写入 `E:\pi\ehs` 或直接推送企微，而是经 `node E:\pi\ehs-monitor\ehs-api.js submit --input <submission.json>` 写入 `E:\EHS` 的“监测核准”暂存区，服务端固定 `PENDING`。授权人员在 EHS 核准/驳回；核准不自动发布法规或修改体系文件。法规差异及修改建议只引用 EHS Linker 法规与标准库，体系文件只引用 EHS Linker 体系文件；下文提到的 `laws-knowledge`、`knowledge`、`E:\enterprise_data\EHS制度` 检索链路均由 `ehs-api.js context` 取代。企微只发送待核准提醒，不再自动推送未核准附件。
+
+## 当前集成接口
+
+1. **上下文**：`node E:\pi\ehs-monitor\ehs-api.js context --output E:\pi\ehs\workspace_tmp\ehs-context.json`，使用具有 `regulations:read`、`documents:read` 的 EHS API Key 分页读取两个正式库。
+2. **提交**：submission JSON 包含 `externalId/title/period/summary/overview/regulationAnalyses/documentSuggestions`；修改建议必须携带 EHS `regulationId` 与 `documentId`。先 `--dry-run` 校验再正式提交；metis 使用 `monitoring:write`，无核准或发布权限。
+3. **幂等**：组织 + 来源 + `externalId` 唯一；同内容重试返回原记录，不同内容返回 409。
+4. **核准**：EHS 页面查看完整解析、法规条款引用、体系文件原文/建议文本/理由/优先级；驳回需填写意见，全程审计。
+5. **配置**：`EHS_API_BASE_URL`（默认 `http://127.0.0.1:3000/api/v1`）与 `EHS_API_KEY` 仅放本地环境或 `.env`，不得入库。
+
+实际例程快照：`E:\pi\ehs-monitor\EHS-例程prompt.md`；实际工作流快照：`E:\pi\ehs-monitor\EHS-工作流steps.json`；完整执行约束：`E:\pi\ehs-monitor\EHS-执行版SOP.md`。
+
+---
+
+# 原方案存档（路径与审批规则以上方修订为准）
+
 # Spec: EHS 法规监测——每日采集 → 版本差异 → 公司文件影响分析 → 审批后推送企微
 
 **Repo**: `Newstrife/metis`（Rails 8.1 + pi agent harness，约定见 CLAUDE.md / understanding-metis 技能）；配套本地脚本目录 `E:\pi\ehs-monitor`（新建，仿 `E:\pi\knowledge` 的 Node 脚本形态）。
