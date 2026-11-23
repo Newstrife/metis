@@ -9,6 +9,15 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+# 0. 日志超限就地截断（保留尾部 50MB，阈值内自动跳过；见 truncate-dev-logs.ps1）
+& powershell -ExecutionPolicy Bypass -NoProfile -File "$PSScriptRoot\truncate-dev-logs.ps1"
+
+# 0.5 日志按日归档目录。Rails 日志由应用内 DatedLogDevice 按写入日写入
+# log/<日期>/development.log（见 lib/dated_log_device.rb）；这里的 stdout
+# 重定向按【启动日】归档——进程跨天后仍留在启动日目录，重启后进新目录。
+$logDir = Join-Path $PSScriptRoot "log\$(Get-Date -Format yyyy-MM-dd)"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
 # 1. 启动 PostgreSQL（已在运行则跳过；独立隐藏窗口，脱离本控制台）
 & E:\pi\pgsql\bin\pg_isready.exe -h 127.0.0.1 -p 5432 -q | Out-Null
 if ($LASTEXITCODE -ne 0) {
@@ -55,14 +64,14 @@ if (-not (Get-NetFirewallRule -DisplayName "Metis Web 3002" -ErrorAction Silentl
 # 用 cmd /c 做重定向：Start-Process -Redirect* 会踩文件锁/句柄继承的坑
 if ($env:WECOM_BOT_ID -and (Test-Path "clients/wecom-bridge/node_modules")) {
   Write-Host "启动企业微信桥接 ..."
-  Start-Process cmd -ArgumentList '/c','node clients\wecom-bridge\index.js 1> log\wecom-bridge.log 2> log\wecom-bridge.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+  Start-Process cmd -ArgumentList '/c',"node clients\wecom-bridge\index.js 1> $logDir\wecom-bridge.log 2> $logDir\wecom-bridge.err.log" -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
 }
 
 # 5. Web 服务（端口 3002，绑定 0.0.0.0 允许局域网访问，独立隐藏窗口 + 日志文件）
 Write-Host "Metis 启动中: http://localhost:3002  局域网: http://10.1.20.3:3002  (登录: admin@metis.local / password)"
-Start-Process cmd -ArgumentList '/c','ruby bin\rails server -b 0.0.0.0 -p 3002 1> log\rails-server.log 2> log\rails-server.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+Start-Process cmd -ArgumentList '/c',"ruby bin\rails server -b 0.0.0.0 -p 3002 1> $logDir\rails-server.log 2> $logDir\rails-server.err.log" -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
 
 # 6. 后台任务 supervisor（Solid Queue：ChatJob、定时 Routine 等都靠它）
 # Windows 没有 fork()，必须用 --mode=async（线程模式）
-Start-Process cmd -ArgumentList '/c','ruby bin\jobs --mode=async 1> log\solid-queue.log 2> log\solid-queue.err.log' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+Start-Process cmd -ArgumentList '/c',"ruby bin\jobs --mode=async 1> $logDir\solid-queue.log 2> $logDir\solid-queue.err.log" -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
 Write-Host "已全部在后台启动，日志见 log\rails-server.log；停止用 .\stop-dev.ps1"

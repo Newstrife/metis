@@ -1,4 +1,5 @@
 require "active_support/core_ext/integer/time"
+require_relative "../../lib/dated_log_device"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
@@ -69,6 +70,22 @@ Rails.application.configure do
   # incident: solid-queue logger died, 450K stderr lines over 4 days). Dev logs
   # are cheap to truncate manually; the cross-process rotation race is not.
   config.log_file_size = nil
+
+  # 按日分目录记录：log/<YYYY-MM-DD>/development.log。Web、bin/jobs、console
+  # 各持一个 DatedLogDevice 实例，在跨天首写时自行切换，全程不重命名文件——
+  # 没有 Windows 重命名竞态（原因见上）。stdout 镜像照旧（由 start-dev.ps1
+  # 重定向到当日目录，按启动日归档）。保留期默认 7 天，超期日期目录在跨天
+  # 首写时整目录删除（此刻已无进程持有其中的文件）。
+  dated_file_logger = ActiveSupport::Logger.new(DatedLogDevice.new(
+    Rails.root.join("log"),
+    name: "#{Rails.env}.log",
+    retention_days: ENV.fetch("METIS_LOG_RETENTION_DAYS", 7).to_i
+  ))
+  dated_file_logger.level = config.log_level
+  config.logger = ActiveSupport::BroadcastLogger.new(
+    ActiveSupport::TaggedLogging.new(ActiveSupport::Logger.new($stdout)),
+    ActiveSupport::TaggedLogging.new(dated_file_logger)
+  )
 
   # Raise an error on page load if there are pending migrations.
   config.active_record.migration_error = :page_load

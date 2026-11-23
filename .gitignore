@@ -18,6 +18,9 @@
 !/log/.keep
 !/tmp/.keep
 
+# WeCom bridge runtime logs (written next to the bridge's own code).
+/clients/wecom-bridge/*.log
+
 # Ignore pidfiles, but keep the directory.
 /tmp/pids/*
 !/tmp/pids/
