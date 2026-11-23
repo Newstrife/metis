@@ -3,16 +3,41 @@
 // 入站：企微消息 --WSS--> 本进程 --HTTP POST--> Metis /api/wecom/messages
 // 出站：轮询 Metis 直到 assistant 消息落定 --WSS replyStream--> 企微
 // 推送：POST 本机 /notify（Routine/agent 用）--> sendMessage 主动发企微
+//   { chatid | to_userid, content?, file?: { filename, data_base64 } }
+//   content 为 markdown 文本（可选）；file 为附件（可选）；二者至少给一个，
+//   都给时先发文本再发文件。附件走 uploadMedia + sendMediaMessage，
+//   复用本进程已认证的 WS 连接（不会踢线），大小上限 15MB。
 //
-// 环境变量（见 .env）：
+// 环境变量（见 .env，本进程启动时自读，已设的进程变量优先）：
 //   WECOM_BOT_ID / WECOM_BOT_SECRET  智能机器人凭证（企微管理后台）
 //   WECOM_BRIDGE_TOKEN               与 Metis 共享的 bearer token
 //   METIS_URL                        默认 http://127.0.0.1:3002
 //   WECOM_BRIDGE_PORT                /notify 监听端口，默认 3201（仅回环）
 
+const fs = require("node:fs");
 const http = require("node:http");
 const AiBot = require("@wecom/aibot-node-sdk");
 const { generateReqId } = AiBot;
+
+// 启动时自读 E:\pi\metis\.env（零依赖 dotenv；已设的进程变量优先，便于部署注入）
+(function loadEnvFile() {
+  const file = process.env.WECOM_ENV_FILE || "E:/pi/metis/.env";
+  let text;
+  try { text = fs.readFileSync(file, "utf8"); } catch { return; }
+  for (const raw of text.split(/\r?\n/)) {
+    let line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (line.startsWith("export ")) line = line.slice("export ".length).trim();
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let val = line.slice(eq + 1).trim();
+    if (val.length >= 2 && ((val[0] === '"' && val[val.length - 1] === '"') || (val[0] === "'" && val[val.length - 1] === "'"))) {
+      val = val.slice(1, -1);
+    }
+    if (key && process.env[key] === undefined) process.env[key] = val;
+  }
+})();
 
 const METIS_URL = process.env.METIS_URL || "http://127.0.0.1:3002";
 const TOKEN = process.env.WECOM_BRIDGE_TOKEN;
@@ -236,8 +261,12 @@ setInterval(() => {
 }, 30_000);
 
 // ---- 主动推送出口（Routine / agent 用） -----------------------------------
-// POST http://127.0.0.1:3201/notify  { "to_userid": "...", "content": "..." }
-// 寻址依赖该用户先给机器人发过消息（chatid 缓存在内存里）。
+// POST http://127.0.0.1:3201/notify
+//   { "chatid" | "to_userid", "content"?, "file"?: { "filename", "data_base64" } }
+// 寻址依赖该用户先给机器人发过消息（chatid 缓存在内存里）；chatid 直发不受限。
+// file 走素材上传 + 文件消息，复用本进程 WS 连接（并发开新连接会被踢线，勿用）。
+
+const MAX_NOTIFY_FILE_BYTES = 15 * 1024 * 1024;
 
 const server = http.createServer((req, res) => {
   if (req.method !== "POST" || req.url !== "/notify") {
@@ -252,12 +281,28 @@ const server = http.createServer((req, res) => {
   req.on("data", (c) => { raw += c; });
   req.on("end", async () => {
     try {
-      const { to_userid, chatid: chatidParam, content } = JSON.parse(raw);
+      const { to_userid, chatid: chatidParam, content, file } = JSON.parse(raw);
       // chatid 直发（群通知/审批推送）；to_userid 走内存里的会话缓存
       const chatid = chatidParam || lastChatByUser.get(to_userid);
       if (!chatid) throw new Error(`没有 ${to_userid} 的会话记录（对方需先给机器人发过消息）`);
-      await client.sendMessage(chatid, { msgtype: "markdown", markdown: { content: truncate(String(content)) } });
-      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true }));
+      if (!content && !(file && file.data_base64)) throw new Error("content 或 file 至少提供一个");
+      const delivered = [];
+      if (content) {
+        await client.sendMessage(chatid, { msgtype: "markdown", markdown: { content: truncate(String(content)) } });
+        delivered.push("markdown");
+      }
+      if (file && file.data_base64) {
+        const buf = Buffer.from(file.data_base64, "base64");
+        if (!buf.length) throw new Error("file.data_base64 解码后为空");
+        if (buf.length > MAX_NOTIFY_FILE_BYTES) {
+          throw new Error(`文件 ${buf.length} 字节超过 ${MAX_NOTIFY_FILE_BYTES} 上限`);
+        }
+        const filename = file.filename || "attachment";
+        const up = await client.uploadMedia(buf, { type: "file", filename });
+        await client.sendMediaMessage(chatid, "file", up.media_id);
+        delivered.push(`file:${filename}`);
+      }
+      res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: true, delivered }));
     } catch (err) {
       res.writeHead(422, { "Content-Type": "application/json" }).end(JSON.stringify({ ok: false, error: err.message }));
     }
