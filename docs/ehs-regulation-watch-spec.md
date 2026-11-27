@@ -1,13 +1,13 @@
-# Spec: EHS 法规监测——每日采集 → 版本差异 → 公司文件影响分析 → EHS 待核准
+# Spec: EHS 法规监测——每日采集 → 版本差异 → 公司文件影响分析 → EHS 评价→核准
 
-> **2026-11-17 集成修订（优先于下文旧方案）**：监测结果不再只写入 `E:\pi\ehs` 或直接推送企微，而是经 `node E:\pi\ehs-monitor\ehs-api.js submit --input <submission.json>` 写入 `E:\EHS` 的监测提交暂存区，服务端固定 `PENDING`。核准 / 驳回仅能通过 API（原「法规解析」「监测核准」Web 页面已于 2026-11-25 移除）；EHS 相关项进入「符合性评价」待复核、标准进入「标准核实」处理；核准不自动发布法规或修改体系文件。法规差异及修改建议只引用 EHS Linker 法规与标准库，体系文件只引用 EHS Linker 体系文件；下文提到的 `laws-knowledge`、`knowledge`、`E:\enterprise_data\EHS制度` 检索链路均由 `ehs-api.js context` 取代。企微只发送待核准提醒，不再自动推送未核准附件。
+> **2026-11-17 集成修订（2026-11-27 流程重构更新，优先于下文旧方案）**：监测结果不再只写入 `E:\pi\ehs` 或直接推送企微，而是经 `node E:\pi\ehs-monitor\ehs-api.js submit --input <submission.json>` 写入 `E:\EHS` 的监测提交暂存区，服务端固定 `PENDING`。流程为「评价→核准」：法规进入「法规符合性评价」、标准进入「标准符合性评价」，由企业授权人员录入评价结论（5 选 1：符合/部分符合/不符合/仅参考/不适用；已废止本轮不做），再进「法规和标准核准库」核准——通过进法规与标准库（标准「不适用」→ 不适用标准库），退回（必填意见、结论清空）重新评价后再次进核准库，可多轮循环、全程审计；原「法规解析」「监测核准」Web 页面已于 2026-11-25 移除（仅 API）。提交契约：`regulationAnalyses[0].regulationId` 可选，缺省时必给 `regulationName` + `category`（+ `documentNumber?`），服务端自动创建「待核准占位」法规（核准入库前不在法规与标准库展示）；既有法规仍填 `regulationId`，校验/幂等/409 不变。核准不自动发布法规或修改体系文件。法规差异及修改建议只引用 EHS Linker 法规与标准库，体系文件只引用 EHS Linker 体系文件；下文提到的 `laws-knowledge`、`knowledge`、`E:\enterprise_data\EHS制度` 检索链路均由 `ehs-api.js context` 取代。企微只发送提醒，不再自动推送未核准附件。
 
 ## 当前集成接口
 
 1. **上下文**：`node E:\pi\ehs-monitor\ehs-api.js context --output E:\pi\ehs\workspace_tmp\ehs-context.json`，使用具有 `regulations:read`、`documents:read` 的 EHS API Key 分页读取两个正式库。
-2. **逐部提交**：对 `E:\pi\ehs\法规解析\YYYYMM\` 的每份 md 单独提交，必须关联 EHS `regulationId`，不得按每日合并；`ehsRelevant=true` 时同事务生成 `NOT_EVALUATED + PENDING` 符合性评价并返回 evaluationId。先 `--dry-run` 再正式提交；metis 使用 `monitoring:write`，无核准、评价复核或发布权限。
+2. **逐部提交**：对 `E:\pi\ehs\法规解析\YYYYMM\` 的每份 md 单独提交，不得按每日合并；既有法规关联 EHS `regulationId`，新法规省略 `regulationId` 时必给 `regulationName` + `category`（+ `documentNumber?`），服务端自动创建「待核准占位」法规；`ehsRelevant=true` 时同事务生成 `NOT_EVALUATED + PENDING`（待评价）符合性评价并返回 evaluationId。先 `--dry-run` 再正式提交；metis 使用 `monitoring:write`，无评价、核准、退回或发布权限。
 3. **幂等**：组织 + 来源 + `externalId` 唯一；同内容重试返回原记录，不同内容返回 409。
-4. **解析、核准与评价**：md 原文保存在提交记录（API 可读，原 Web 页面已移除）；核准 / 驳回仅 API；EHS 相关候选直接进入「符合性评价」待复核。所有操作保留审计，核准不自动发布法规或修改体系文件。
+4. **解析、评价与核准**：md 原文保存在提交记录（API 可读，原 Web 页面已移除）；EHS 相关候选进入「法规符合性评价」待评价，标准进入「标准符合性评价」；评价（结论 5 选 1：符合/部分符合/不符合/仅参考/不适用）后进「法规和标准核准库」，通过进法规与标准库（标准「不适用」→ 不适用标准库）/ 退回（必填意见、结论清空）重新评价，可多轮循环。所有操作保留审计，核准不自动发布法规或修改体系文件。
 5. **配置**：`EHS_API_BASE_URL`（默认 `http://127.0.0.1:3000/api/v1`）与 `EHS_API_KEY` 仅放本地环境或 `.env`，不得入库。
 
 实际例程快照：`E:\pi\ehs-monitor\EHS-例程prompt.md`；实际工作流快照：`E:\pi\ehs-monitor\EHS-工作流steps.json`；完整执行约束：`E:\pi\ehs-monitor\EHS-执行版SOP.md`。
